@@ -51,11 +51,18 @@ function Invoke-Direct([string]$Url, [string]$Method = 'GET', [string]$Body = $n
 
 function Test-Gpu {
     $smi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
-    if (-not $smi) { Stop-Script 'nvidia-smi not found: install the NVIDIA driver first' }
-    $line = & $smi.Source --query-gpu=name,driver_version,memory.total,memory.used --format=csv,noheader,nounits 2>$null | Select-Object -First 1
-    if ($LASTEXITCODE -ne 0 -or -not $line) { Stop-Script 'nvidia-smi gave no GPU line' }
+    if (-not $smi) { Write-Host 'WARNING: nvidia-smi not found - the model will run on the CPU'; return '' }
+    # Collect all output first: '| Select-Object -First 1' stops the native
+    # process early in PS 5.1 and leaves a non-zero $LASTEXITCODE.
+    $out = @(& $smi.Source --query-gpu=name,driver_version,memory.total,memory.used --format=csv,noheader,nounits 2>&1)
+    $line = $out | Where-Object { "$_" -match ',' } | Select-Object -First 1
+    if (-not $line) {
+        Write-Host 'WARNING: nvidia-smi gave no GPU line - the model may run on the CPU. nvidia-smi said:'
+        $out | ForEach-Object { Write-Host ('  ' + $_) }
+        return ''
+    }
     Write-Host ('gpu: ' + $line)
-    return $line
+    return "$line"
 }
 
 function Get-OllamaExe {
@@ -155,7 +162,7 @@ function Test-ModelOnGpu([string]$Exe) {
     if ($ps -match '100% GPU') { Write-Host 'ollama runs the model fully on the GPU' }
     elseif ($ps -match 'GPU') { Write-Host 'WARNING: the model is only partly on the GPU; a smaller model or context may be needed' }
     else { Write-Host 'WARNING: ollama ps shows no GPU use; check the NVIDIA driver and ollama logs' }
-    $after = & nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits 2>$null | Select-Object -First 1
+    $after = @(& nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits 2>$null) | Select-Object -First 1
     Write-Host ('gpu memory used now: ' + $after + ' MB')
 }
 

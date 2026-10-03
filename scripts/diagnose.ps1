@@ -65,9 +65,13 @@ function Get-GpuFacts {
     if ($smi) {
         $line = $null
         try {
-            $line = & $smi.Source --query-gpu=name,driver_version,memory.total,memory.used --format=csv,noheader,nounits 2>$null | Select-Object -First 1
+            # Collect all output first: '| Select-Object -First 1' stops the native
+            # process early in PS 5.1 and leaves a non-zero $LASTEXITCODE.
+            $out = @(& $smi.Source --query-gpu=name,driver_version,memory.total,memory.used --format=csv,noheader,nounits 2>$null)
+            $line = $out | Where-Object { "$_" -match ',' } | Select-Object -First 1
         } catch { $line = $null }
-        if ($LASTEXITCODE -eq 0 -and $line) {
+        if ($line) {
+            $line = "$line"
             $parts = $line.Split(',') | ForEach-Object { $_.Trim() }
             return @{ name = $parts[0]; driver = $parts[1]; memory_total_mb = [int]$parts[2];
                       memory_used_mb = [int]$parts[3]; source = 'nvidia-smi'; state = 'nvidia' }
