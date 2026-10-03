@@ -1,0 +1,20 @@
+# kill switch is created by hand, never committed
+/STOP
+# local config and secrets
+config.yaml
+.env
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+# node (gate scripts)
+node_modules/
+# playwright
+test-results/
+playwright-report/
