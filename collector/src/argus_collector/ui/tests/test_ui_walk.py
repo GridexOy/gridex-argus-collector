@@ -13,6 +13,7 @@ import pytest
 from argus_collector.runtime import contract as runtime
 from argus_collector.ui import contract
 from argus_collector.ui.app import PanelApp
+from argus_collector.ui.tests.conftest import make_tk_root
 from argus_collector.ui.tests.test_ui import display  # noqa: F401 - fixture reuse
 from argus_collector.walk.tests.fake_policy import GoldPolicy
 from collector.tests.fake_model_server import FakeModelServer
@@ -66,7 +67,7 @@ def test_panel_drives_a_real_walk_with_the_fake_model(
     site_url, fake = stands
     monkeypatch.setenv("ARGUS_COLLECTOR_HOME", str(tmp_path))
     write_config(tmp_path, fake.endpoint)
-    root = tk.Tk()
+    root = make_tk_root()
     try:
         app = contract.create_app(root)
         assert app.view.collect.status_label.cget("text") == "Ei keruuta käynnissä"

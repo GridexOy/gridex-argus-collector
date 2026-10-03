@@ -7,7 +7,6 @@ import os
 import shutil
 import subprocess
 import time
-import tkinter as tk
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -19,6 +18,7 @@ from argus_collector.extraction.contract import Contact, VerifiedField
 from argus_collector.runtime import contract as runtime
 from argus_collector.runtime import service as runtime_service
 from argus_collector.ui import contract, repository, service
+from argus_collector.ui.tests.conftest import make_tk_root
 from argus_collector.walk.contract import WalkEvent
 
 
@@ -137,7 +137,7 @@ def test_window_renders_keruu_block_and_live_rows(
     display: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("ARGUS_COLLECTOR_HOME", str(tmp_path))
-    root = tk.Tk()
+    root = make_tk_root()
     try:
         app = contract.create_app(root)
         root.update()
