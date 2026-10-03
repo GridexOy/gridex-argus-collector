@@ -12,6 +12,8 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
+from playwright.sync_api import Error as ActionError
+
 from argus_collector.browser import repository, service
 from argus_collector.browser.repository import BrowserLaunchError
 from argus_collector.browser.service import LaunchPlan, LaunchResult
@@ -19,6 +21,7 @@ from argus_collector.browser.session import PageState, WalkBrowser
 from argus_collector.runtime import contract as runtime
 
 __all__ = [
+    "ActionError",
     "BrowserLaunchError",
     "LaunchPlan",
     "LaunchResult",

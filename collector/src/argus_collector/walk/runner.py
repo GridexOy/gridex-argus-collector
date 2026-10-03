@@ -83,7 +83,13 @@ def _walk(state: WalkState) -> None:
             if action.kind == service.ACTION_FINISH:
                 return
             state.check_stop()
-            page = _perform(state, wb, page, action)
+            try:
+                page = _perform(state, wb, page, action)
+            except browser.ActionError:
+                # The chosen click/navigate failed (timeout, covered element, stale
+                # reference, ...). Whatever was already found stays; end the walk
+                # as a normal finish instead of failing the whole run over one step.
+                return
 
 
 def _handle_page(state: WalkState, page: browser.PageState) -> Action:

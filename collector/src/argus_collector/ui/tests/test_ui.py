@@ -146,7 +146,8 @@ def test_window_renders_keruu_block_and_live_rows(
             assert not app.view.is_enabled(name), name
         assert app.view.is_enabled("open_browser")
         assert app.view.connection_label.cget("text") == "Yhteys: Ei yhteyttä"
-        assert app.view.version_label.cget("text").startswith("cv0.4.1.0 (")
+        expected_prefix = f"cv{runtime.current_version_status().file_version} ("
+        assert app.view.version_label.cget("text").startswith(expected_prefix)
         app.view.collect.url_var.set("not a url")
         app.walk.start("not a url")
         assert app.view.collect.status_label.cget("text") == "Virheellinen osoite: not a url"

@@ -2,22 +2,15 @@
 
 from __future__ import annotations
 
-import json
-from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 from argus_collector.discovery.contract import Candidate
-from argus_collector.models.contract import ModelConfig
 from argus_collector.storage import contract as storage
 from argus_collector.walk import contract, service
+from argus_collector.walk.tests.conftest import settings_for
 from argus_collector.walk.tests.fake_policy import GoldPolicy
 from collector.tests.fake_model_server import FakeModelServer
-from test_site import server
-
-GOLD = Path(__file__).resolve().parents[5] / "test_site" / "gold" / "fixture_oy.json"
 
 
 def link(i: int, text: str, href: str) -> Candidate:
@@ -50,37 +43,6 @@ def test_prompts_clip_text_and_number_elements() -> None:
     assert len(user) < service.MAX_TEXT_CHARS + 500
 
 
-@pytest.fixture(scope="module")
-def site() -> Iterator[str]:
-    srv = server.start(port=0)
-    try:
-        yield server.base_url(srv)
-    finally:
-        srv.shutdown()
-        srv.server_close()
-
-
-@pytest.fixture
-def gold() -> dict[str, Any]:
-    data: dict[str, Any] = json.loads(GOLD.read_text(encoding="utf-8"))
-    return data
-
-
-def _settings(
-    site: str, fake: FakeModelServer, tmp_path: Path, budget: int = 10
-) -> contract.WalkSettings:
-    return contract.WalkSettings(
-        start_url=site,
-        model=ModelConfig(fake.endpoint, "fake-instruct"),
-        page_budget=budget,
-        headless=True,
-        profile_dir=tmp_path / "profile",
-        evidence_dir=tmp_path / "evidence",
-        db_path=tmp_path / "collector.db",
-        stop_files=(tmp_path / "STOP",),
-    )
-
-
 def _rows(
     contacts: list[contract.WalkEvent],
 ) -> dict[tuple[str, str | None, str | None], contract.WalkEvent]:
@@ -100,8 +62,9 @@ def test_walk_finds_every_gold_person_with_evidence(
     policy = GoldPolicy(gold["persons"])
     fake = FakeModelServer(policy).start()
     events: list[contract.WalkEvent] = []
+    settings = settings_for(site, fake, tmp_path)
     try:
-        summary = contract.run_walk(_settings(site, fake, tmp_path), events.append, lambda: False)
+        summary = contract.run_walk(settings, events.append, lambda: False)
     finally:
         fake.stop()
     assert summary.error == "" and not summary.stopped
@@ -161,7 +124,7 @@ def test_walk_stops_on_request_and_on_stop_file(
     fake = FakeModelServer(GoldPolicy(gold["persons"])).start()
     events: list[contract.WalkEvent] = []
     try:
-        settings = _settings(site, fake, tmp_path)
+        settings = settings_for(site, fake, tmp_path)
         summary = contract.run_walk(settings, events.append, lambda: True)
         assert summary.stopped and events[-1].kind == service.EVENT_STOPPED
         (tmp_path / "STOP").write_text("", encoding="utf-8")
@@ -176,7 +139,7 @@ def test_walk_reports_model_down_as_error(site: str, tmp_path: Path) -> None:
     fake = FakeModelServer(lambda s, u: "{}").start()
     fake.stop()
     events: list[contract.WalkEvent] = []
-    summary = contract.run_walk(_settings(site, fake, tmp_path), events.append, lambda: False)
+    summary = contract.run_walk(settings_for(site, fake, tmp_path), events.append, lambda: False)
     assert summary.error == "" and events[-1].kind == service.EVENT_DONE
     failed = [e for e in events if e.kind == service.EVENT_STEP and "failed" in e.detail]
     assert failed, "a dead model endpoint is reported in the step line, the walk falls back"
