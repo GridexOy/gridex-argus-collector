@@ -111,6 +111,10 @@ def test_walk_finds_every_gold_person_with_evidence(
     for person in gold["persons"]:
         assert (person["name"], person["email"], person["phone"]) in rows, person["name"]
     assert not any(e.contact and e.contact.name.value == "Ghost Person" for e in contacts)
+    assert len(contacts) == len(gold["persons"]), "no duplicate or channel-less contact rows"
+    assert all(e.contact and (e.contact.phone or e.contact.email) for e in contacts), (
+        "every emitted contact must carry at least one verified channel"
+    )
     assert all("linkedin" not in u for u in summary.visited) and summary.pages <= 10
     assert {u.rsplit("/", 1)[-1] for u in summary.visited} >= {
         "team.html",

@@ -41,7 +41,12 @@ def run_powershell_diagnose(script: Path, model_endpoint: str, model_name: str) 
     ]
     try:
         done = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=POWERSHELL_TIMEOUT_S, check=False
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=POWERSHELL_TIMEOUT_S,
+            check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise DiagnosticsError(f"cannot run {script.name}: {exc}") from exc

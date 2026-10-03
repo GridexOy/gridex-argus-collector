@@ -134,6 +134,8 @@ def _parse_cards(
         contact = extraction.verify_card(card, text, channels) if card else None
         if contact is None:
             continue
+        if contact.phone is None and contact.email is None:
+            continue  # no channel yet (e.g. hidden until a reveal click); wait for a re-parse
         key = (
             contact.name.value.casefold(),
             contact.phone.value if contact.phone else None,
