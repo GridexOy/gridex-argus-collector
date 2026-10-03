@@ -112,7 +112,8 @@ def windows_memory() -> tuple[int, int]:
 
     status = MemoryStatus()
     status.dwLength = ctypes.sizeof(MemoryStatus)
-    kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+    windll = getattr(ctypes, "windll")  # noqa: B009 - windll exists only on Windows
+    kernel32 = windll.kernel32
     if not kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
         return 0, 0
     mib = 1024 * 1024
