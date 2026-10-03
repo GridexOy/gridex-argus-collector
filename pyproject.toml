@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "argus-collector"
+version = "0.0.1.0"
+description = "ARGUS 2.0 local contact collector (Selain) for Windows"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "playwright==1.56.0",
+  "PyYAML==6.0.3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==9.1.1",
+  "ruff==0.16.10",
+  "mypy==2.4.0",
+  "types-PyYAML==6.0.12.20250915",
+  "pip-audit==2.10.0",
+  "import-linter==2.15",
+]
+
+[tool.setuptools.packages.find]
+where = ["collector/src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["collector/src", "."]
+testpaths = ["collector", "test_site"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+mypy_path = "collector/src"
+packages = ["argus_collector"]
+
+[[tool.mypy.overrides]]
+module = ["scripts.*", "test_site.*"]
+ignore_missing_imports = true
+
+[tool.importlinter]
+root_package = "argus_collector"
+
+[[tool.importlinter.contracts]]
+name = "ui sits above the other modules, runtime is the base"
+type = "layers"
+layers = [
+  "argus_collector.ui",
+  "argus_collector.browser | argus_collector.diagnostics",
+  "argus_collector.runtime",
+]
+
+[[tool.importlinter.contracts]]
+name = "modules talk to each other only through contract.py"
+type = "forbidden"
+source_modules = ["argus_collector.ui", "argus_collector.browser", "argus_collector.diagnostics"]
+forbidden_modules = [
+  "argus_collector.runtime.service",
+  "argus_collector.runtime.repository",
+  "argus_collector.diagnostics.service",
+  "argus_collector.diagnostics.repository",
+  "argus_collector.browser.service",
+  "argus_collector.browser.repository",
+]
+ignore_imports = [
+  "argus_collector.diagnostics.* -> argus_collector.diagnostics.*",
+  "argus_collector.browser.* -> argus_collector.browser.*",
+]

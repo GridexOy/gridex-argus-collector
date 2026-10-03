@@ -1,0 +1,35 @@
+{
+  "fixture": "fixture_oy",
+  "stage": "S0",
+  "company": {
+    "name": "Fixture Oy",
+    "business_id": "1234567-8",
+    "phone": "+358201234560",
+    "email": "info@fixture.example",
+    "address": "Pajakatu 12, 33100 Tampere",
+    "source_pages": ["index.html", "contact.html"]
+  },
+  "persons": [
+    {
+      "name": "Anna Virtanen",
+      "title": "Sales Director",
+      "email": "anna.virtanen@fixture.example",
+      "phone": "+358401234567",
+      "source_page": "contact.html"
+    },
+    {
+      "name": "Mikko Korhonen",
+      "title": "Key Account Manager",
+      "email": "mikko.korhonen@fixture.example",
+      "phone": "+358407654321",
+      "source_page": "contact.html"
+    },
+    {
+      "name": "Sari Nieminen",
+      "title": "Customer Service",
+      "email": "sari.nieminen@fixture.example",
+      "phone": "+358201234561",
+      "source_page": "contact.html"
+    }
+  ]
+}

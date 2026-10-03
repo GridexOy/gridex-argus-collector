@@ -1,0 +1,7 @@
+# Development and gate dependencies, pinned.
+pytest==9.1.1
+ruff==0.16.10
+mypy==2.4.0
+types-PyYAML==6.0.12.20250915
+pip-audit==2.10.0
+import-linter==2.15

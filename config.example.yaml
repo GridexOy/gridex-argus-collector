@@ -1,0 +1,17 @@
+# ARGUS collector configuration (no secrets here; the collector token is
+# entered in the panel and stored with DPAPI from stage S1 on).
+# Copy to %LOCALAPPDATA%\Gridex\ArgusCollector\config.yaml (install.ps1 does
+# it on first install) or to the repo root as config.yaml (git-ignored).
+
+argus:
+  # Base URL of ARGUS, used from S1 (contract server during development).
+  base_url: ""
+
+test_site:
+  # Port of the local fixture site served by "Avaa tyoselain" and the tests.
+  port: 8765
+
+model:
+  # Local model endpoint (M2, stage S4). diagnose.ps1 probes <endpoint>/health;
+  # "Malli: ei ladattu" is shown while nothing answers here.
+  endpoint: "http://127.0.0.1:8080"
