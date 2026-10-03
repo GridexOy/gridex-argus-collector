@@ -1,8 +1,8 @@
 """Single entry point of the `browser` module.
 
-S0 scope: open the visible work browser (persistent profile, installed
-Chrome on Windows) on a URL, and give the panel a command line that does
-the same in a separate process so the panel never blocks.
+Open the visible work browser (persistent profile, installed Chrome on
+Windows) on a URL, give the panel a command line that does the same in a
+separate process, and drive a walk page by page (`WalkBrowser`, `session.py`).
 """
 
 from __future__ import annotations
@@ -15,12 +15,15 @@ from pathlib import Path
 from argus_collector.browser import repository, service
 from argus_collector.browser.repository import BrowserLaunchError
 from argus_collector.browser.service import LaunchPlan, LaunchResult
+from argus_collector.browser.session import PageState, WalkBrowser
 from argus_collector.runtime import contract as runtime
 
 __all__ = [
     "BrowserLaunchError",
     "LaunchPlan",
     "LaunchResult",
+    "PageState",
+    "WalkBrowser",
     "launcher_command",
     "launcher_env",
     "open_work_browser",

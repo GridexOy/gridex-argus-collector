@@ -93,3 +93,23 @@ def test_cli_no_wait_prints_opened_line(site: ThreadingHTTPServer, tmp_path: Pat
     assert done.returncode == 0, done.stderr
     assert '"opened": true' in done.stdout
     assert "Fixture Oy" in done.stdout
+
+
+def test_walk_browser_observes_candidates_and_clicks(
+    site: ThreadingHTTPServer, tmp_path: Path
+) -> None:
+    url = server.base_url(site) + "team.html"
+    with contract.WalkBrowser(headless=True, profile_dir=tmp_path / "profile") as wb:
+        page = wb.goto(url)
+        assert page.url == url and "Pekka Salo" in page.text and "<html" in page.html
+        kinds = {(c.kind, c.text) for c in page.candidates}
+        assert ("button", "Näytä yhteystiedot") in kinds and ("link", "Seuraava sivu") in kinds
+        assert not any(
+            c.href.startswith("mailto:") or c.href.startswith("tel:") for c in page.candidates
+        )
+        button = next(c for c in page.candidates if c.kind == "button")
+        after = wb.click(button)
+        assert "pekka.salo@fixture.example" in after.text and "mailto:pekka.salo" in after.html
+        assert not any(c.text == "Näytä yhteystiedot" for c in after.candidates)
+        scrolled = wb.scroll()
+        assert scrolled.url == after.url

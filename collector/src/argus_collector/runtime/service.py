@@ -20,9 +20,11 @@ class BuildInfo:
 
 @dataclass(frozen=True)
 class Config:
-    """Settings the panel needs in S0; `config.example.yaml` documents them."""
+    """Settings of `config.example.yaml`; empty model strings mean the `models` defaults."""
 
-    model_endpoint: str = "http://127.0.0.1:8080"
+    model_endpoint: str = ""
+    model_name: str = ""
+    walk_page_budget: int = 15
     test_site_port: int = 8765
     argus_base_url: str = ""
     source: str = "defaults"
@@ -97,20 +99,27 @@ def _section(data: dict[str, object], name: str) -> dict[str, object]:
     return {str(k): v for k, v in raw.items()}
 
 
+def _positive_int(section: dict[str, object], key: str, default: int, limit: int) -> int:
+    value = section.get(key, default)
+    if not isinstance(value, int) or isinstance(value, bool) or not 0 < value < limit:
+        raise ValueError(f"{key} must be a whole number below {limit}, got {value!r}")
+    return value
+
+
 def config_from_mapping(data: dict[str, object], source: str) -> Config:
     """Build Config from a parsed YAML mapping; unknown keys are ignored."""
-    model, site, argus = (
+    model, site, argus, walk = (
         _section(data, "model"),
         _section(data, "test_site"),
         _section(data, "argus"),
+        _section(data, "walk"),
     )
     defaults = Config()
-    port = site.get("port", defaults.test_site_port)
-    if not isinstance(port, int) or isinstance(port, bool) or not 0 < port < 65536:
-        raise ValueError(f"test_site.port must be a port number, got {port!r}")
     return Config(
-        model_endpoint=str(model.get("endpoint", defaults.model_endpoint)),
-        test_site_port=port,
+        model_endpoint=str(model.get("endpoint", defaults.model_endpoint) or ""),
+        model_name=str(model.get("name", defaults.model_name) or ""),
+        walk_page_budget=_positive_int(walk, "page_budget", defaults.walk_page_budget, 1000),
+        test_site_port=_positive_int(site, "port", defaults.test_site_port, 65536),
         argus_base_url=str(argus.get("base_url", defaults.argus_base_url) or ""),
         source=source,
     )

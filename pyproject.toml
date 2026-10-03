@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "argus-collector"
-version = "0.0.1.0"
+version = "0.4.1.0"
 description = "ARGUS 2.0 local contact collector (Selain) for Windows"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -53,18 +53,32 @@ ignore_missing_imports = true
 root_package = "argus_collector"
 
 [[tool.importlinter.contracts]]
-name = "ui sits above the other modules, runtime is the base"
+name = "layers: ui > walk > browser|extraction|diagnostics > discovery|models|evidence > normalization|storage > runtime"
 type = "layers"
 layers = [
   "argus_collector.ui",
-  "argus_collector.browser | argus_collector.diagnostics",
+  "argus_collector.walk",
+  "argus_collector.browser | argus_collector.extraction | argus_collector.diagnostics",
+  "argus_collector.discovery | argus_collector.models | argus_collector.evidence",
+  "argus_collector.normalization | argus_collector.storage",
   "argus_collector.runtime",
 ]
 
 [[tool.importlinter.contracts]]
 name = "modules talk to each other only through contract.py"
 type = "forbidden"
-source_modules = ["argus_collector.ui", "argus_collector.browser", "argus_collector.diagnostics"]
+source_modules = [
+  "argus_collector.ui",
+  "argus_collector.walk",
+  "argus_collector.browser",
+  "argus_collector.extraction",
+  "argus_collector.diagnostics",
+  "argus_collector.discovery",
+  "argus_collector.models",
+  "argus_collector.evidence",
+  "argus_collector.normalization",
+  "argus_collector.storage",
+]
 forbidden_modules = [
   "argus_collector.runtime.service",
   "argus_collector.runtime.repository",
@@ -72,8 +86,31 @@ forbidden_modules = [
   "argus_collector.diagnostics.repository",
   "argus_collector.browser.service",
   "argus_collector.browser.repository",
+  "argus_collector.browser.session",
+  "argus_collector.discovery.service",
+  "argus_collector.discovery.repository",
+  "argus_collector.models.service",
+  "argus_collector.models.repository",
+  "argus_collector.evidence.service",
+  "argus_collector.evidence.repository",
+  "argus_collector.extraction.service",
+  "argus_collector.extraction.repository",
+  "argus_collector.normalization.service",
+  "argus_collector.normalization.repository",
+  "argus_collector.storage.service",
+  "argus_collector.storage.repository",
+  "argus_collector.walk.service",
+  "argus_collector.walk.repository",
+  "argus_collector.walk.runner",
 ]
 ignore_imports = [
   "argus_collector.diagnostics.* -> argus_collector.diagnostics.*",
   "argus_collector.browser.* -> argus_collector.browser.*",
+  "argus_collector.discovery.* -> argus_collector.discovery.*",
+  "argus_collector.models.* -> argus_collector.models.*",
+  "argus_collector.evidence.* -> argus_collector.evidence.*",
+  "argus_collector.extraction.* -> argus_collector.extraction.*",
+  "argus_collector.normalization.* -> argus_collector.normalization.*",
+  "argus_collector.storage.* -> argus_collector.storage.*",
+  "argus_collector.walk.* -> argus_collector.walk.*",
 ]

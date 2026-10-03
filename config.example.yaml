@@ -12,6 +12,14 @@ test_site:
   port: 8765
 
 model:
-  # Local model endpoint (M2, stage S4). diagnose.ps1 probes <endpoint>/health;
-  # "Malli: ei ladattu" is shown while nothing answers here.
-  endpoint: "http://127.0.0.1:8080"
+  # OpenAI-compatible local endpoint on this PC, never through the system
+  # proxy. Ollama by default; a llama.cpp server works with its own /v1 URL.
+  # diagnose.ps1 and the panel probe <endpoint>/models and expect `name` listed.
+  endpoint: "http://127.0.0.1:11434/v1"
+  # Model installed by scripts\install_model.ps1 (fits the 24 GB RTX 4090 with
+  # a 16k context; strong JSON and Finnish). Alternative: "llama3.1:8b".
+  name: "qwen2.5:14b-instruct"
+
+walk:
+  # Distinct pages one site walk may open before it finishes.
+  page_budget: 15

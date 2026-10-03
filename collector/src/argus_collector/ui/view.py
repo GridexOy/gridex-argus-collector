@@ -14,6 +14,7 @@ from argus_collector.ui.service import (
     Line,
     PanelProps,
 )
+from argus_collector.ui.view_collect import CollectBlock
 
 BG = "#ffffff"
 FG = "#1f2328"
@@ -25,8 +26,8 @@ COLOURS = {
 }
 PAD_X = 12
 PAD_Y = 4
-MIN_WIDTH = 640
-MIN_HEIGHT = 480
+MIN_WIDTH = 960
+MIN_HEIGHT = 720
 
 
 def _style(root: tk.Tk) -> None:
@@ -36,6 +37,7 @@ def _style(root: tk.Tk) -> None:
     style.configure(".", background=BG, foreground=FG, font=("Segoe UI", 10))
     style.configure("Heading.TLabel", font=("Segoe UI", 11, "bold"))
     style.configure("Version.TLabel", font=("Consolas", 9))
+    style.configure("Treeview", background=BG, fieldbackground=BG, foreground=FG)
 
 
 def _colour(level: str) -> str:
@@ -45,11 +47,17 @@ def _colour(level: str) -> str:
 class PanelView:
     """One window, light theme, blocks in the order of TZ_SELAIN section 5.1."""
 
-    def __init__(self, root: tk.Tk, props: PanelProps, on_open_browser: Callable[[], None]) -> None:
+    def __init__(
+        self,
+        root: tk.Tk,
+        props: PanelProps,
+        on_open_browser: Callable[[], None],
+        on_start_walk: Callable[[str], None],
+        on_stop_walk: Callable[[], None],
+        on_open_source: Callable[[str], None],
+    ) -> None:
         self.root = root
         self.buttons: dict[str, ttk.Button] = {}
-        self.checks: dict[str, ttk.Checkbutton] = {}
-        self.check_vars: dict[str, tk.BooleanVar] = {}
         self.resource_labels: list[ttk.Label] = []
         _style(root)
         root.title(props.title)
@@ -57,7 +65,10 @@ class PanelView:
         self.body = ttk.Frame(root)
         self.body.pack(fill="both", expand=True)
         self._build_connection(props)
-        self._build_collecting(props)
+        self._heading(props.collecting_title)
+        self.collect = CollectBlock(
+            self.body, props.collect, on_start_walk, on_stop_walk, on_open_source
+        )
         self._build_resources(props, on_open_browser)
         self.stop_label = ttk.Label(self.body, text="", wraplength=MIN_WIDTH - 40)
         self.stop_label.pack(anchor="w", padx=PAD_X, pady=PAD_Y)
@@ -74,28 +85,6 @@ class PanelView:
         self._heading(props.connection_title)
         self.connection_label = ttk.Label(self.body)
         self.connection_label.pack(anchor="w", padx=PAD_X, pady=PAD_Y)
-
-    def _build_collecting(self, props: PanelProps) -> None:
-        self._heading(props.collecting_title)
-        row = ttk.Frame(self.body)
-        row.pack(anchor="w", padx=PAD_X, pady=PAD_Y)
-        for name, label in (
-            ("start", props.start_label),
-            ("pause", props.pause_label),
-            ("stop", props.stop_label),
-        ):
-            button = ttk.Button(row, text=label)
-            button.pack(side="left", padx=(0, 8))
-            self.buttons[name] = button
-        for name, label in (
-            ("autostart", props.autostart_label),
-            ("auto_collect", props.auto_collect_label),
-        ):
-            var = tk.BooleanVar(self.root, value=False)
-            check = ttk.Checkbutton(self.body, text=label, variable=var)
-            self.check_vars[name] = var
-            check.pack(anchor="w", padx=12, pady=1)
-            self.checks[name] = check
 
     def _build_resources(self, props: PanelProps, on_open_browser: Callable[[], None]) -> None:
         self._heading(props.resources_title)
@@ -119,11 +108,7 @@ class PanelView:
         self.connection_label.configure(
             text=f"{props.connection_title}: {props.connection_state.text}"
         )
-        state = "normal" if props.collecting_enabled else "disabled"
-        for name in ("start", "pause", "stop"):
-            self.buttons[name].state(["!disabled"] if state == "normal" else ["disabled"])
-        for check in self.checks.values():
-            check.state(["!disabled"] if state == "normal" else ["disabled"])
+        self.collect.render(props.collect)
         self.buttons["open_browser"].state(
             ["!disabled"] if props.open_browser_enabled else ["disabled"]
         )
@@ -144,4 +129,6 @@ class PanelView:
         self._set_line(self.browser_status, line)
 
     def is_enabled(self, name: str) -> bool:
-        return "disabled" not in self.buttons[name].state()
+        if name in self.buttons:
+            return "disabled" not in self.buttons[name].state()
+        return self.collect.is_enabled(name)

@@ -1,13 +1,19 @@
 {
   "fixture": "fixture_oy",
-  "stage": "S0",
+  "stage": "S4",
   "company": {
     "name": "Fixture Oy",
     "business_id": "1234567-8",
     "phone": "+358201234560",
     "email": "info@fixture.example",
     "address": "Pajakatu 12, 33100 Tampere",
-    "source_pages": ["index.html", "contact.html"]
+    "source_pages": [
+      "index.html",
+      "contact.html",
+      "team.html",
+      "team-2.html"
+    ],
+    "jsonld_page": "index.html"
   },
   "persons": [
     {
@@ -15,21 +21,66 @@
       "title": "Sales Director",
       "email": "anna.virtanen@fixture.example",
       "phone": "+358401234567",
-      "source_page": "contact.html"
+      "source_page": "contact.html",
+      "how": "link"
     },
     {
       "name": "Mikko Korhonen",
       "title": "Key Account Manager",
       "email": "mikko.korhonen@fixture.example",
       "phone": "+358407654321",
-      "source_page": "contact.html"
+      "source_page": "contact.html",
+      "how": "link"
     },
     {
       "name": "Sari Nieminen",
       "title": "Customer Service",
       "email": "sari.nieminen@fixture.example",
       "phone": "+358201234561",
-      "source_page": "contact.html"
+      "source_page": "contact.html",
+      "how": "link"
+    },
+    {
+      "name": "Pekka Salo",
+      "title": "Purchasing Manager",
+      "email": "pekka.salo@fixture.example",
+      "phone": "+358507654321",
+      "source_page": "team.html",
+      "how": "button",
+      "button": "Näytä yhteystiedot"
+    },
+    {
+      "name": "Liisa Mäkelä",
+      "title": "Marketing Lead",
+      "email": "liisa.makela@fixture.example",
+      "phone": "+358405550101",
+      "source_page": "team.html",
+      "how": "button",
+      "button": "Näytä yhteystiedot"
+    },
+    {
+      "name": "Jukka Laine",
+      "title": "Production Manager",
+      "email": "jukka.laine@fixture.example",
+      "phone": "+358402223333",
+      "source_page": "team-2.html",
+      "how": "text",
+      "email_text": "jukka.laine (at) fixture.example",
+      "phone_text": "+358 40 222 3333"
+    },
+    {
+      "name": "Elina Koski",
+      "title": "HR Manager",
+      "email": "elina.koski@fixture.example",
+      "phone": "+358401112222",
+      "source_page": "team-2.html",
+      "how": "link"
     }
-  ]
+  ],
+  "pages": {
+    "index.html": "home, footer, JSON-LD Organization",
+    "contact.html": "three people with tel:/mailto: links",
+    "team.html": "two people whose email/phone appear only after the button; link Seuraava sivu",
+    "team-2.html": "two people: one with obfuscated email in text, one with links; LinkedIn link (never walked)"
+  }
 }

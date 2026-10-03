@@ -81,8 +81,14 @@ if ($LASTEXITCODE -ne 0) { Stop-Install 'editable install of the app failed' }
 # --- 7. build info for the panel ---------------------------------------------
 $build = @{ version = $version; commit = $commit; built_at = (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz') }
 $build | ConvertTo-Json | Set-Content -Path (Join-Path $dataDir 'build.json') -Encoding UTF8 -ErrorAction Stop
-if (-not (Test-Path (Join-Path $dataDir 'config.yaml'))) {
-    Copy-Item (Join-Path $repo 'config.example.yaml') (Join-Path $dataDir 'config.yaml') -ErrorAction Stop
+$configPath = Join-Path $dataDir 'config.yaml'
+if (-not (Test-Path $configPath)) {
+    Copy-Item (Join-Path $repo 'config.example.yaml') $configPath -ErrorAction Stop
+} elseif (-not (Select-String -Path $configPath -Pattern '^\s*name:' -Quiet)) {
+    # config.yaml from 0.0.1.0 has no model name and the old endpoint: replace it, keep a copy.
+    Copy-Item $configPath ($configPath + '.bak') -Force -ErrorAction Stop
+    Copy-Item (Join-Path $repo 'config.example.yaml') $configPath -Force -ErrorAction Stop
+    Write-Host "config.yaml refreshed from config.example.yaml (old copy: config.yaml.bak)"
 }
 
 # --- 8. desktop shortcut -----------------------------------------------------
@@ -98,4 +104,5 @@ $shortcut.Save()
 
 Write-Host "installed cv$version ($commit) into $appDir"
 Write-Host "start: $startScript  (desktop shortcut 'ARGUS Selain')"
+Write-Host "model: scripts\install_model.ps1 installs Ollama and the model when 'Malli: ei ladattu' is shown"
 & (Join-Path $appDir 'scripts\diagnose.ps1')

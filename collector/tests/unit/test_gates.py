@@ -40,6 +40,14 @@ def test_cyrillic_is_caught_in_code_but_not_in_docs(tmp_path: Path) -> None:
     assert not result.ok and result.errors == ["scripts/x.py:1: Cyrillic text"]
 
 
+def test_powershell_must_be_ascii(tmp_path: Path) -> None:
+    write(tmp_path / "scripts" / "a.ps1", "Write-Host 'Nayta'\n")
+    write(tmp_path / "scripts" / "b.ps1", "Write-Host 'N\u00e4yt\u00e4'\n")
+    write(tmp_path / "collector" / "c.py", "x = 'N\u00e4yt\u00e4'\n")
+    errors = check_no_cyrillic.run(tmp_path).errors
+    assert errors == ["scripts/b.ps1:1: non-ASCII character in PowerShell"]
+
+
 def test_size_limits_for_python_and_powershell(tmp_path: Path) -> None:
     long_function = "def f():\n" + "    x = 1\n" * 41
     write(tmp_path / "collector" / "a.py", long_function)

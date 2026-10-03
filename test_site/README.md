@@ -15,18 +15,21 @@ Port 0 picks a free port; the default is `test_site.port` in `config.yaml`.
 
 | Fixture | Pages | Gold |
 |---|---|---|
-| `fixture_oy` | `index.html` (home, footer with company phone/email), `contact.html` (three people with title, email, phone; office address) | `gold/fixture_oy.json` |
+| `fixture_oy` | `index.html` (home, footer with company phone/email, JSON-LD Organization), `contact.html` (three people with `tel:`/`mailto:` links), `team.html` (two people whose email/phone appear only after the button "Näytä yhteystiedot"; link "Seuraava sivu"), `team-2.html` (one person with `jukka.laine (at) fixture.example` and a plain-text phone, one with links; a LinkedIn link the walk must not open) | `gold/fixture_oy.json` |
 
 The gold file lists every record the collector must find: company fields and
-persons with `name`, `title`, `email`, `phone` (E.164 as in the `tel:` href)
-and the page they come from. `tests/test_server.py` checks that every gold
-value is present in the served HTML, so page and gold cannot drift apart.
+persons with `name`, `title`, `email`, `phone` (E.164), the page they come
+from and `how` the page shows them: `link` (`tel:`/`mailto:` in the html),
+`button` (built by JS from `data-user`/`data-domain`/`data-phone` after the
+button) or `text` (obfuscated `email_text`, plain `phone_text`).
+`tests/test_server.py` checks each form in the served HTML, so page and gold
+cannot drift apart; `argus_collector.walk` tests walk the whole site.
 
 ## Scope by stage
 
-S0 ships only the minimal set above (one company, plain HTML, footer).
-The remaining fixtures of section 12.2 (JSON-LD, JS catalogue with
-pagination and "show more", accordion/email reveal, department filters,
+0.4.1.0 ships one company with plain HTML, footer, JSON-LD, a reveal
+button, pagination and an obfuscated address. The remaining fixtures of
+section 12.2 (JS catalogue with "show more", department filters,
 duplicate names and shared phone, redirect between approved hosts,
 iframe/shadow DOM, PDF/vCard/OCR for M2, captcha/timeout/infinite
 pagination, injected instructions, phone on a host outside

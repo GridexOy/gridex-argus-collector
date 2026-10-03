@@ -1,4 +1,8 @@
-"""check_no_cyrillic: no Cyrillic letters in code directories (CLAUDE.md rule 12)."""
+"""check_no_cyrillic: no Cyrillic letters in code directories (CLAUDE.md rule 12).
+
+PowerShell files must be pure ASCII on top of that: PowerShell 5.1 reads a
+BOM-less file as ANSI, so any non-ASCII byte becomes garbage on MAIN-PC.
+"""
 
 from __future__ import annotations
 
@@ -39,4 +43,6 @@ def run(root: Path) -> GateResult:
         for number, line in enumerate(text.splitlines(), start=1):
             if CYRILLIC.search(line):
                 result.fail(f"{rel(path, root)}:{number}: Cyrillic text")
+            elif path.suffix == ".ps1" and not line.isascii():
+                result.fail(f"{rel(path, root)}:{number}: non-ASCII character in PowerShell")
     return result

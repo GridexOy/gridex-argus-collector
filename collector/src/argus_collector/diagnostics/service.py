@@ -56,6 +56,7 @@ class Facts:
     disk_total_gb: float
     disk_free_gb: float
     model_endpoint: str
+    model_name: str
     model_reachable: bool
     model_detail: str
 
@@ -128,6 +129,7 @@ def facts_from_json(data: dict[str, Any]) -> Facts:
         disk_total_gb=float(disk["total_gb"]),
         disk_free_gb=float(disk["free_gb"]),
         model_endpoint=str(model["endpoint"]),
+        model_name=str(model.get("name", "")),
         model_reachable=bool(model["reachable"]),
         model_detail=str(model["detail"]),
     )
@@ -182,6 +184,7 @@ def report_to_json(report: Report) -> str:
         },
         "model": {
             "endpoint": f.model_endpoint,
+            "name": f.model_name,
             "reachable": f.model_reachable,
             "detail": f.model_detail,
             "state": s.model.value,

@@ -96,9 +96,21 @@ def test_stop_files_detected_in_both_places(tmp_path: Path) -> None:
 def test_config_defaults_and_mapping() -> None:
     assert service.config_from_mapping({}, "defaults").test_site_port == 8765
     cfg = service.config_from_mapping(
-        {"model": {"endpoint": "http://127.0.0.1:9000"}, "test_site": {"port": 9001}}, "x"
+        {
+            "model": {"endpoint": "http://127.0.0.1:9000", "name": "llama3.1:8b"},
+            "test_site": {"port": 9001},
+            "walk": {"page_budget": 3},
+        },
+        "x",
     )
     assert cfg.model_endpoint == "http://127.0.0.1:9000" and cfg.test_site_port == 9001
+    assert cfg.model_name == "llama3.1:8b" and cfg.walk_page_budget == 3
+    assert service.config_from_mapping({}, "d").model_name == ""
+
+
+def test_config_rejects_bad_page_budget() -> None:
+    with pytest.raises(ValueError):
+        service.config_from_mapping({"walk": {"page_budget": 0}}, "x")
 
 
 @pytest.mark.parametrize("port", [0, 70000, "8765", True])

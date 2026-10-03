@@ -17,6 +17,7 @@ from argus_collector.diagnostics.contract import (
 )
 from argus_collector.runtime.contract import VersionStatus, finnish_stamp, version_line
 from argus_collector.ui.repository import Messages
+from argus_collector.ui.walk_lines import CollectProps, contact_row, walk_event_line
 
 LEVEL_OK = "ok"
 LEVEL_WARN = "warn"
@@ -33,6 +34,19 @@ MODEL_KEYS = {
     ModelState.NONE: "resources.model.none",
 }
 
+__all__ = [
+    "LEVEL_ERROR",
+    "LEVEL_INFO",
+    "LEVEL_OK",
+    "LEVEL_WARN",
+    "CollectProps",
+    "Line",
+    "PanelProps",
+    "build_props",
+    "contact_row",
+    "walk_event_line",
+]
+
 
 @dataclass(frozen=True)
 class Line:
@@ -47,12 +61,7 @@ class PanelProps:
     connection_title: str
     connection_state: Line
     collecting_title: str
-    start_label: str
-    pause_label: str
-    stop_label: str
-    autostart_label: str
-    auto_collect_label: str
-    collecting_enabled: bool
+    collect: CollectProps
     resources_title: str
     resources: list[Line] = field(default_factory=list)
     open_browser_label: str = ""
@@ -85,16 +94,27 @@ def gpu_lines(msgs: Messages, report: Report) -> list[Line]:
     return lines
 
 
+def model_lines(msgs: Messages, report: Report) -> list[Line]:
+    f, s = report.facts, report.states
+    level = LEVEL_OK if s.model is not ModelState.NONE else LEVEL_WARN
+    detail = msgs.t(
+        "resources.model.detail",
+        name=f.model_name,
+        endpoint=f.model_endpoint,
+        detail=f.model_detail,
+    )
+    return [Line(msgs.t(MODEL_KEYS[s.model]), level), Line(detail, LEVEL_INFO)]
+
+
 def resource_lines(msgs: Messages, report: Report) -> list[Line]:
     """Chrome, model, disk, memory, GPU lines of the Resurssit block (section 5.1)."""
     f, s = report.facts, report.states
     chrome_level = LEVEL_OK if s.chrome is ChromeState.AVAILABLE else LEVEL_ERROR
-    model_level = LEVEL_OK if s.model is not ModelState.NONE else LEVEL_WARN
     disk_level = LEVEL_OK if s.disk is DiskState.OK else LEVEL_WARN
     lines = [
         Line(msgs.t("resources.os", name=f.os_name, version=f.os_version), LEVEL_INFO),
         Line(msgs.t(CHROME_KEYS[s.chrome]), chrome_level),
-        Line(msgs.t(MODEL_KEYS[s.model]), model_level),
+        *model_lines(msgs, report),
         Line(
             msgs.t("resources.disk", path=f.disk_path, free=f.disk_free_gb, pct=s.disk_used_pct),
             disk_level,
@@ -115,14 +135,50 @@ def resources_props(msgs: Messages, report: Report | None, error: str | None) ->
     return resource_lines(msgs, report)
 
 
+def collect_props(
+    msgs: Messages, report: Report | None, stop_reason: str | None, walking: bool
+) -> CollectProps:
+    """Kaynnista is live only with a listed model, an available Chrome and no STOP."""
+    ready = (
+        report is not None
+        and report.states.chrome is ChromeState.AVAILABLE
+        and report.states.model is not ModelState.NONE
+    )
+    hint = ""
+    if stop_reason:
+        hint = msgs.t("collecting.stopFile")
+    elif not ready:
+        hint = msgs.t("collecting.notReady")
+    return CollectProps(
+        site_url_label=msgs.t("collecting.siteUrl"),
+        start_label=msgs.t("collecting.start"),
+        pause_label=msgs.t("collecting.pause"),
+        stop_label=msgs.t("collecting.stop"),
+        autostart_label=msgs.t("collecting.autostartWindows"),
+        auto_collect_label=msgs.t("collecting.autoCollect"),
+        start_enabled=ready and not walking and not stop_reason,
+        stop_enabled=walking,
+        hint=hint,
+        open_source_hint=msgs.t("collecting.openSource"),
+        idle_status=msgs.t("collecting.status.idle"),
+        columns=[
+            msgs.t("collecting.col.name"),
+            msgs.t("collecting.col.title"),
+            msgs.t("collecting.col.phone"),
+            msgs.t("collecting.col.email"),
+            msgs.t("collecting.col.source"),
+        ],
+    )
+
+
 def build_props(
     msgs: Messages,
     version: VersionStatus,
     report: Report | None,
     report_error: str | None,
     stop_reason: str | None,
+    walking: bool = False,
 ) -> PanelProps:
-    """S0 panel: no server connection exists, so collection stays disabled."""
     banner = Line(msgs.t("stop.active", files=stop_reason), LEVEL_ERROR) if stop_reason else None
     return PanelProps(
         title=msgs.t("app.name"),
@@ -130,15 +186,10 @@ def build_props(
         connection_title=msgs.t("connection.title"),
         connection_state=Line(msgs.t("connection.state.disconnected"), LEVEL_WARN),
         collecting_title=msgs.t("collecting.title"),
-        start_label=msgs.t("collecting.start"),
-        pause_label=msgs.t("collecting.pause"),
-        stop_label=msgs.t("collecting.stop"),
-        autostart_label=msgs.t("collecting.autostartWindows"),
-        auto_collect_label=msgs.t("collecting.autoCollect"),
-        collecting_enabled=False,
+        collect=collect_props(msgs, report, stop_reason, walking),
         resources_title=msgs.t("resources.title"),
         resources=resources_props(msgs, report, report_error),
         open_browser_label=msgs.t("attention.openBrowser"),
-        open_browser_enabled=True,
+        open_browser_enabled=not walking,
         stop_banner=banner,
     )

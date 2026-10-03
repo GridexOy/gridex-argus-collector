@@ -1,0 +1,85 @@
+"""Single entry point of the `models` module: the local model adapter (M2).
+
+Talks to an OpenAI-compatible chat endpoint on this PC (Ollama
+`http://127.0.0.1:11434/v1` by default, llama.cpp server works the same).
+The system proxy is never used for it (urllib `ProxyHandler({})`): the
+Windows proxy on MAIN-PC answers 127.0.0.1 with 502. Every call is logged
+to the `model_calls` table with tokens, milliseconds and `cost_eur = 0`
+(TZ_SELAIN section 3.2 p.5). The model never searches and never invents:
+callers verify every value it returns against the page text.
+"""
+
+from __future__ import annotations
+
+import sqlite3
+from typing import Any
+
+from argus_collector.models import repository, service
+from argus_collector.models.repository import ModelError
+from argus_collector.models.service import Health, ModelConfig, ModelReply
+
+__all__ = [
+    "DEFAULT_ENDPOINT",
+    "DEFAULT_MODEL",
+    "Health",
+    "ModelClient",
+    "ModelConfig",
+    "ModelError",
+    "ModelReply",
+    "health",
+    "resolve_config",
+]
+
+DEFAULT_ENDPOINT = service.DEFAULT_ENDPOINT
+DEFAULT_MODEL = service.DEFAULT_MODEL
+PROVIDER = "local"
+
+
+def resolve_config(endpoint: str = "", name: str = "") -> ModelConfig:
+    """ModelConfig from `config.yaml` values; empty strings take the defaults."""
+    return ModelConfig(endpoint=endpoint or DEFAULT_ENDPOINT, name=name or DEFAULT_MODEL)
+
+
+def health(endpoint: str, name: str, timeout_s: float = service.HEALTH_TIMEOUT_S) -> Health:
+    """GET <endpoint>/models without proxy; `model_listed` when `name` is served."""
+    try:
+        listed = repository.list_models(endpoint, timeout_s)
+    except ModelError as exc:
+        return Health(reachable=False, model_listed=False, detail=f"no answer: {exc}")
+    return service.health_from_models(listed, name)
+
+
+class ModelClient:
+    """Chat completions in JSON mode against the configured local endpoint."""
+
+    def __init__(self, config: ModelConfig, conn: sqlite3.Connection | None = None) -> None:
+        self.config = config
+        self.conn = conn
+
+    def chat(self, system: str, user: str, purpose: str) -> ModelReply:
+        """One chat completion (plain text). Raises ModelError; the call is logged either way."""
+        body = service.request_body(self.config, system, user, json_mode=False)
+        return self._send(body, purpose)
+
+    def chat_json(self, system: str, user: str, purpose: str) -> dict[str, Any]:
+        """One chat completion in JSON mode, parsed to a dict (one retry on bad JSON)."""
+        body = service.request_body(self.config, system, user, json_mode=True)
+        reply = self._send(body, purpose)
+        parsed = service.parse_json_reply(reply.content)
+        if parsed is None:
+            reply = self._send(body, purpose + ":retry")
+            parsed = service.parse_json_reply(reply.content)
+        if parsed is None:
+            raise ModelError(f"model {self.config.name} did not return a JSON object")
+        return parsed
+
+    def _send(self, body: dict[str, Any], purpose: str) -> ModelReply:
+        try:
+            reply = repository.post_chat(self.config, body)
+        except ModelError as exc:
+            if self.conn is not None:
+                repository.log_call(self.conn, self.config, purpose, None, str(exc))
+            raise
+        if self.conn is not None:
+            repository.log_call(self.conn, self.config, purpose, reply, "")
+        return reply

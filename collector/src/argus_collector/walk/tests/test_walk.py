@@ -1,0 +1,178 @@
+"""Walk: pure rules, and the integration walk of the fixture site with the fake model."""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from argus_collector.discovery.contract import Candidate
+from argus_collector.models.contract import ModelConfig
+from argus_collector.storage import contract as storage
+from argus_collector.walk import contract, service
+from argus_collector.walk.tests.fake_policy import GoldPolicy
+from collector.tests.fake_model_server import FakeModelServer
+from test_site import server
+
+GOLD = Path(__file__).resolve().parents[5] / "test_site" / "gold" / "fixture_oy.json"
+
+
+def link(i: int, text: str, href: str) -> Candidate:
+    return Candidate(i, "link", text, href, f'[data-argus-idx="{i}"]')
+
+
+def test_validate_start_url() -> None:
+    assert contract.validate_start_url(" example.com ") == "https://example.com"
+    assert contract.validate_start_url("http://127.0.0.1:8765/") == "http://127.0.0.1:8765/"
+    assert contract.validate_start_url("") is None
+    assert contract.validate_start_url("not a url") is None
+    assert contract.validate_start_url("ftp://x.example") is None
+
+
+def test_parse_action_validates_index_and_falls_back() -> None:
+    cands = [link(3, "Contact", "http://h/contact"), Candidate(5, "button", "Show", "", "[x]")]
+    assert service.parse_action({"action": "navigate", "index": 3}, cands).candidate == cands[0]
+    assert service.parse_action({"action": "click", "index": "5"}, cands).kind == "click"
+    assert service.parse_action({"action": "finish"}, cands).kind == "finish"
+    assert service.parse_action({"action": "scroll"}, cands).kind == "scroll"
+    bad = service.parse_action({"action": "click", "index": 99}, cands)
+    assert bad.kind == "navigate" and bad.candidate == cands[0]
+    assert service.parse_action("garbage", []).kind == "finish"
+    assert service.parse_action({"action": "navigate", "index": 5}, cands).kind == "click"
+
+
+def test_prompts_clip_text_and_number_elements() -> None:
+    system, user = service.action_prompt("u", "t", "x" * 20000, [link(0, "A", "http://h/a")], 3)
+    assert "[...]" in user and "[0] link: 'A' -> http://h/a" in user and "numbered list" in system
+    assert len(user) < service.MAX_TEXT_CHARS + 500
+
+
+@pytest.fixture(scope="module")
+def site() -> Iterator[str]:
+    srv = server.start(port=0)
+    try:
+        yield server.base_url(srv)
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+@pytest.fixture
+def gold() -> dict[str, Any]:
+    data: dict[str, Any] = json.loads(GOLD.read_text(encoding="utf-8"))
+    return data
+
+
+def _settings(
+    site: str, fake: FakeModelServer, tmp_path: Path, budget: int = 10
+) -> contract.WalkSettings:
+    return contract.WalkSettings(
+        start_url=site,
+        model=ModelConfig(fake.endpoint, "fake-instruct"),
+        page_budget=budget,
+        headless=True,
+        profile_dir=tmp_path / "profile",
+        evidence_dir=tmp_path / "evidence",
+        db_path=tmp_path / "collector.db",
+        stop_files=(tmp_path / "STOP",),
+    )
+
+
+def _rows(
+    contacts: list[contract.WalkEvent],
+) -> dict[tuple[str, str | None, str | None], contract.WalkEvent]:
+    rows = {}
+    for event in contacts:
+        c = event.contact
+        assert c is not None
+        rows[
+            (c.name.value, c.email.value if c.email else None, c.phone.value if c.phone else None)
+        ] = event
+    return rows
+
+
+def test_walk_finds_every_gold_person_with_evidence(
+    site: str, tmp_path: Path, gold: dict[str, Any]
+) -> None:
+    policy = GoldPolicy(gold["persons"])
+    fake = FakeModelServer(policy).start()
+    events: list[contract.WalkEvent] = []
+    try:
+        summary = contract.run_walk(_settings(site, fake, tmp_path), events.append, lambda: False)
+    finally:
+        fake.stop()
+    assert summary.error == "" and not summary.stopped
+    assert events[-1].kind == service.EVENT_DONE
+    contacts = [e for e in events if e.kind == service.EVENT_CONTACT]
+    rows = _rows(contacts)
+    for person in gold["persons"]:
+        assert (person["name"], person["email"], person["phone"]) in rows, person["name"]
+    assert not any(e.contact and e.contact.name.value == "Ghost Person" for e in contacts)
+    assert all("linkedin" not in u for u in summary.visited) and summary.pages <= 10
+    assert {u.rsplit("/", 1)[-1] for u in summary.visited} >= {
+        "team.html",
+        "team-2.html",
+        "contact.html",
+    }
+    steps = [
+        e.detail for e in events if e.kind == service.EVENT_STEP and e.step == service.STEP_CLICK
+    ]
+    assert steps == ["Näytä yhteystiedot"]
+    _check_evidence(tmp_path, contacts, policy)
+
+
+def _check_evidence(tmp_path: Path, contacts: list[contract.WalkEvent], policy: GoldPolicy) -> None:
+    conn = storage.connect(tmp_path / "collector.db")
+    for event in contacts:
+        row = conn.execute(
+            "SELECT text_path FROM evidence_manifest WHERE evidence_id = ?", (event.evidence_id,)
+        ).fetchone()
+        assert row is not None and Path(row["text_path"]).is_file()
+        text = Path(row["text_path"]).read_text(encoding="utf-8")
+        assert event.contact is not None
+        for field in (
+            event.contact.name,
+            event.contact.title,
+            event.contact.email,
+            event.contact.phone,
+        ):
+            if field is not None and field.start >= 0:
+                assert text[field.start : field.end] == field.quote
+    observed = conn.execute("SELECT COUNT(*) FROM observations").fetchone()[0]
+    assert observed == len(contacts)
+    calls = conn.execute(
+        "SELECT COUNT(*), SUM(cost_eur), MIN(prompt_tokens) FROM model_calls"
+    ).fetchone()
+    assert calls[0] == policy.card_calls + policy.action_calls and calls[1] == 0 and calls[2] > 0
+    run = conn.execute("SELECT result, pages FROM runs").fetchone()
+    assert run["result"] == "completed" and run["pages"] >= 4
+
+
+def test_walk_stops_on_request_and_on_stop_file(
+    site: str, tmp_path: Path, gold: dict[str, Any]
+) -> None:
+    fake = FakeModelServer(GoldPolicy(gold["persons"])).start()
+    events: list[contract.WalkEvent] = []
+    try:
+        settings = _settings(site, fake, tmp_path)
+        summary = contract.run_walk(settings, events.append, lambda: True)
+        assert summary.stopped and events[-1].kind == service.EVENT_STOPPED
+        (tmp_path / "STOP").write_text("", encoding="utf-8")
+        events.clear()
+        summary = contract.run_walk(settings, events.append, lambda: False)
+        assert summary.stopped and summary.pages <= 1
+    finally:
+        fake.stop()
+
+
+def test_walk_reports_model_down_as_error(site: str, tmp_path: Path) -> None:
+    fake = FakeModelServer(lambda s, u: "{}").start()
+    fake.stop()
+    events: list[contract.WalkEvent] = []
+    summary = contract.run_walk(_settings(site, fake, tmp_path), events.append, lambda: False)
+    assert summary.error == "" and events[-1].kind == service.EVENT_DONE
+    failed = [e for e in events if e.kind == service.EVENT_STEP and "failed" in e.detail]
+    assert failed, "a dead model endpoint is reported in the step line, the walk falls back"

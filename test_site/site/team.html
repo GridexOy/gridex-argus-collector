@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Team - Fixture Oy</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="logo" href="index.html">Fixture Oy</a>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="contact.html">Contact</a>
+      <a href="team.html">Team</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Team</h1>
+    <p>Our purchasing and marketing people. Page 1 of 2.</p>
+    <p>
+      <button type="button" id="reveal" data-reveal="contacts">Näytä yhteystiedot</button>
+    </p>
+
+    <section id="people">
+      <ul class="people">
+        <li class="person" data-user="pekka.salo" data-domain="fixture.example" data-phone="050 765 4321">
+          <span class="name">Pekka Salo</span>
+          <span class="title">Purchasing Manager</span>
+          <span class="channels"></span>
+        </li>
+        <li class="person" data-user="liisa.makela" data-domain="fixture.example" data-phone="040 555 0101">
+          <span class="name">Liisa Mäkelä</span>
+          <span class="title">Marketing Lead</span>
+          <span class="channels"></span>
+        </li>
+      </ul>
+    </section>
+
+    <p class="pager">
+      <a href="team-2.html" rel="next">Seuraava sivu</a>
+    </p>
+  </main>
+
+  <footer class="site-footer">
+    <p>Fixture Oy &middot; Pajakatu 12, 33100 Tampere &middot; Business ID 1234567-8</p>
+    <p>Tel. <a href="tel:+358201234560">020 123 4560</a> &middot;
+       <a href="mailto:info@fixture.example">info@fixture.example</a></p>
+  </footer>
+
+  <script>
+    // Contacts are built only after the button is pressed: a static fetch
+    // of this page shows no email or phone for these two people.
+    document.getElementById('reveal').addEventListener('click', function () {
+      var cards = document.querySelectorAll('li.person');
+      for (var i = 0; i < cards.length; i++) {
+        var card = cards[i];
+        var email = card.getAttribute('data-user') + '@' + card.getAttribute('data-domain');
+        var phone = card.getAttribute('data-phone');
+        var box = card.querySelector('.channels');
+        box.innerHTML = '';
+        var mail = document.createElement('a');
+        mail.className = 'email';
+        mail.href = 'mailto:' + email;
+        mail.textContent = email;
+        var tel = document.createElement('span');
+        tel.className = 'phone';
+        tel.textContent = 'puh. ' + phone;
+        box.appendChild(mail);
+        box.appendChild(document.createTextNode(' '));
+        box.appendChild(tel);
+      }
+      this.disabled = true;
+      this.textContent = 'Yhteystiedot näkyvissä';
+    });
+  </script>
+</body>
+</html>

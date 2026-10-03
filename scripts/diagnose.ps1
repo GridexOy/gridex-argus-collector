@@ -1,10 +1,11 @@
 # diagnose.ps1 - ARGUS collector machine check (Windows PowerShell 5.1).
-# Prints Windows, Chrome, NVIDIA, RAM, disk and local model lines with explicit
+# Prints Windows, Chrome, NVIDIA, RAM, disk and local model (Ollama /models) lines with explicit
 # states (never "unknown"). -Json prints the argus-collector-diagnose/1 document
 # that the panel parses; the state rules match argus_collector.diagnostics.
 param(
     [switch]$Json,
-    [string]$ModelEndpoint = 'http://127.0.0.1:8080'
+    [string]$ModelEndpoint = 'http://127.0.0.1:11434/v1',
+    [string]$ModelName = 'qwen2.5:14b-instruct'
 )
 
 # 'Continue': PS 5.1 turns native stderr into terminating errors under 'Stop';
@@ -100,28 +101,45 @@ function Get-DiskFacts {
     return @{ path = $env:SystemDrive; total_gb = $totalGb; free_gb = $freeGb; used_pct = $usedPct; state = $state }
 }
 
+function Invoke-Direct([string]$Url) {
+    # Loopback call without the system proxy (WinHTTP proxy answers 127.0.0.1 with 502).
+    $req = [System.Net.HttpWebRequest]::Create($Url)
+    $req.Method = 'GET'
+    $req.Proxy = $null
+    $req.Timeout = 2000
+    $resp = $req.GetResponse()
+    $reader = New-Object System.IO.StreamReader($resp.GetResponseStream())
+    $text = $reader.ReadToEnd()
+    $reader.Close()
+    $resp.Close()
+    return $text
+}
+
 function Get-ModelFacts([hashtable]$Gpu) {
+    # Same rule as argus_collector.models.health: <endpoint>/models must answer
+    # and list the configured model (or model:latest).
     $reachable = $false
     $detail = ''
     try {
-        $resp = Invoke-WebRequest -UseBasicParsing -Uri ($ModelEndpoint.TrimEnd('/') + '/health') -TimeoutSec 2
-        $reachable = [int]$resp.StatusCode -lt 500
-        $detail = 'HTTP ' + $resp.StatusCode
-    } catch {
-        $errResp = $_.Exception.Response
-        if ($errResp -and [int]$errResp.StatusCode -lt 500) {
+        $text = Invoke-Direct ($ModelEndpoint.TrimEnd('/') + '/models')
+        $ids = @()
+        $doc = $text | ConvertFrom-Json
+        if ($doc.data) { $ids = @($doc.data | ForEach-Object { [string]$_.id }) }
+        if (($ids -contains $ModelName) -or ($ids -contains ($ModelName + ':latest'))) {
             $reachable = $true
-            $detail = 'HTTP ' + [int]$errResp.StatusCode
+            $detail = 'model ' + $ModelName + ' listed'
         } else {
-            $detail = 'no answer: ' + $_.Exception.Message
+            $detail = 'model ' + $ModelName + ' not listed (' + (($ids | Select-Object -First 5) -join ', ') + ')'
         }
+    } catch {
+        $detail = 'no answer: ' + $_.Exception.Message
     }
     $state = 'none'
     if ($reachable) {
         $state = 'cpu'
         if ($Gpu.state -eq 'nvidia' -and $Gpu.memory_used_mb -ge $GpuModelMinUsedMb) { $state = 'gpu' }
     }
-    return @{ endpoint = $ModelEndpoint; reachable = $reachable; detail = $detail; state = $state }
+    return @{ endpoint = $ModelEndpoint; name = $ModelName; reachable = $reachable; detail = $detail; state = $state }
 }
 
 function Write-Lines([hashtable]$Doc) {

@@ -10,15 +10,13 @@ import os
 import platform
 import shutil
 import subprocess
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 from argus_collector.diagnostics.service import Facts
+from argus_collector.models import contract as models
 
 CHROME_CANDIDATES = ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser")
 PROBE_TIMEOUT_S = 5
-MODEL_TIMEOUT_S = 1.5
 POWERSHELL_TIMEOUT_S = 60
 
 
@@ -26,7 +24,7 @@ class DiagnosticsError(RuntimeError):
     """diagnose.ps1 could not be run or returned garbage."""
 
 
-def run_powershell_diagnose(script: Path, model_endpoint: str) -> str:
+def run_powershell_diagnose(script: Path, model_endpoint: str, model_name: str) -> str:
     """Run diagnose.ps1 -Json and return its stdout (Windows only)."""
     cmd = [
         "powershell.exe",
@@ -38,6 +36,8 @@ def run_powershell_diagnose(script: Path, model_endpoint: str) -> str:
         "-Json",
         "-ModelEndpoint",
         model_endpoint,
+        "-ModelName",
+        model_name,
     ]
     try:
         done = subprocess.run(
@@ -126,28 +126,22 @@ def probe_disk(path: Path) -> tuple[str, float, float]:
     return str(path), round(usage.total / gib, 1), round(usage.free / gib, 1)
 
 
-# The local model lives on this PC: never route it through the system proxy
-# (on Windows urllib takes the proxy from the registry, even for 127.0.0.1).
-DIRECT_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+def probe_model(model: models.ModelConfig) -> tuple[bool, str]:
+    """The model is "reachable" only when the endpoint answers AND lists the model.
+
+    `models.health` never uses the system proxy (Windows answers 127.0.0.1
+    with 502 through it).
+    """
+    health = models.health(model.endpoint, model.name)
+    return health.reachable and health.model_listed, health.detail
 
 
-def probe_model(endpoint: str) -> tuple[bool, str]:
-    url = endpoint.rstrip("/") + "/health"
-    try:
-        with DIRECT_OPENER.open(url, timeout=MODEL_TIMEOUT_S) as resp:
-            return resp.status < 500, f"HTTP {resp.status}"
-    except urllib.error.HTTPError as exc:
-        return exc.code < 500, f"HTTP {exc.code}"
-    except (urllib.error.URLError, OSError, ValueError) as exc:
-        return False, f"no answer: {exc}"
-
-
-def python_facts(model_endpoint: str, disk_path: Path) -> Facts:
+def python_facts(model: models.ModelConfig, disk_path: Path) -> Facts:
     chrome_path, chrome_version = probe_chrome()
     gpu_name, gpu_driver, gpu_total, gpu_used, gpu_source = probe_gpu()
     mem_total, mem_free = probe_memory()
     disk, disk_total, disk_free = probe_disk(disk_path)
-    reachable, detail = probe_model(model_endpoint)
+    reachable, detail = probe_model(model)
     return Facts(
         os_name=f"{platform.system()} {platform.release()}".strip(),
         os_version=platform.version(),
@@ -163,7 +157,8 @@ def python_facts(model_endpoint: str, disk_path: Path) -> Facts:
         disk_path=disk,
         disk_total_gb=disk_total,
         disk_free_gb=disk_free,
-        model_endpoint=model_endpoint,
+        model_endpoint=model.endpoint,
+        model_name=model.name,
         model_reachable=reachable,
         model_detail=detail,
     )

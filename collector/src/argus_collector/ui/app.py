@@ -1,4 +1,4 @@
-"""Panel wiring: data hooks (runtime, diagnostics, browser) around the view.
+"""Panel wiring: data hooks (runtime, diagnostics, browser, walk) around the view.
 
 Worker threads never touch tkinter: they put a callable on `self.ui_queue`
 and the main thread runs it from `pump()`, scheduled with `after`.
@@ -17,6 +17,7 @@ from argus_collector.browser import contract as browser
 from argus_collector.diagnostics import contract as diagnostics
 from argus_collector.runtime import contract as runtime
 from argus_collector.ui import service
+from argus_collector.ui.app_walk import WalkController
 from argus_collector.ui.repository import Messages
 from argus_collector.ui.service import LEVEL_ERROR, LEVEL_INFO, LEVEL_OK, Line
 from argus_collector.ui.view import PanelView
@@ -26,7 +27,7 @@ NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 class PanelApp:
-    """Owns the Tk root, the diagnostics thread and the browser launcher process."""
+    """Owns the Tk root, the diagnostics thread, the launcher process and the walk."""
 
     def __init__(self, root: tk.Tk, msgs: Messages, config: runtime.Config) -> None:
         self.root = root
@@ -36,7 +37,15 @@ class PanelApp:
         self.report_error: str | None = None
         self.proc: subprocess.Popen[str] | None = None
         self.ui_queue: queue.Queue[Callable[[], None]] = queue.Queue()
-        self.view = PanelView(root, self.props(), self.open_browser)
+        self.walk = WalkController(self)
+        self.view = PanelView(
+            root,
+            self.props(),
+            self.open_browser,
+            self.walk.start,
+            self.walk.stop,
+            self.walk.open_source,
+        )
 
     def props(self) -> service.PanelProps:
         return service.build_props(
@@ -45,10 +54,15 @@ class PanelApp:
             self.report,
             self.report_error,
             runtime.stop_reason(),
+            self.walk.walking,
         )
 
     def refresh(self) -> None:
         self.view.render(self.props())
+
+    def post(self, action: Callable[[], None]) -> None:
+        """Queue an action for the main thread (safe from any thread)."""
+        self.ui_queue.put(action)
 
     def pump(self) -> None:
         """Run queued UI actions and poll the launcher; main thread only."""
@@ -69,7 +83,8 @@ class PanelApp:
 
     def _collect(self) -> None:
         try:
-            self.report = diagnostics.collect(self.config.model_endpoint)
+            self.report = diagnostics.collect(self.config.model_endpoint, self.config.model_name)
+            self.report_error = None
         except diagnostics.DiagnosticsError as exc:
             self.report_error = str(exc)
         self.ui_queue.put(self.refresh)
@@ -77,9 +92,12 @@ class PanelApp:
     def test_site_url(self) -> str:
         return f"http://127.0.0.1:{self.config.test_site_port}/"
 
+    def work_browser_running(self) -> bool:
+        return self.proc is not None and self.proc.poll() is None
+
     def open_browser(self) -> None:
         """Start the detached launcher; the status line follows its stdout/exit code."""
-        if self.proc is not None and self.proc.poll() is None:
+        if self.work_browser_running():
             return
         cmd = browser.launcher_command(self.test_site_url(), self.config.test_site_port)
         try:

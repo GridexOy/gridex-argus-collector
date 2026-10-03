@@ -21,6 +21,7 @@ from argus_collector.diagnostics.service import (
     Report,
     States,
 )
+from argus_collector.models import contract as models
 from argus_collector.runtime import contract as runtime
 
 __all__ = [
@@ -37,7 +38,6 @@ __all__ = [
     "report_to_json",
 ]
 
-DEFAULT_MODEL_ENDPOINT = "http://127.0.0.1:8080"
 DIAGNOSE_SCRIPT = Path("scripts") / "diagnose.ps1"
 SOURCE_POWERSHELL = "diagnose.ps1"
 SOURCE_PYTHON = "python"
@@ -52,18 +52,23 @@ def report_to_json(report: Report) -> str:
 
 
 def collect(
-    model_endpoint: str = DEFAULT_MODEL_ENDPOINT, use_powershell: bool | None = None
+    model_endpoint: str = "", model_name: str = "", use_powershell: bool | None = None
 ) -> Report:
-    """Collect facts and derive states. Raises DiagnosticsError on Windows failures."""
+    """Collect facts and derive states. Raises DiagnosticsError on Windows failures.
+
+    Empty model strings mean the defaults of the `models` module (Ollama,
+    `qwen2.5:14b-instruct`); the same values go to `diagnose.ps1`.
+    """
+    model = models.resolve_config(model_endpoint, model_name)
     if use_powershell is None:
         use_powershell = os.name == "nt"
     if use_powershell:
         script = runtime.repo_root() / DIAGNOSE_SCRIPT
-        text = repository.run_powershell_diagnose(script, model_endpoint)
+        text = repository.run_powershell_diagnose(script, model.endpoint, model.name)
         try:
             return service.parse_report_json(text, SOURCE_POWERSHELL)
         except (ValueError, KeyError) as exc:
             raise DiagnosticsError(f"{script.name} output rejected: {exc}") from exc
     disk_path = runtime.user_data_dir().anchor or Path.home()
-    facts = repository.python_facts(model_endpoint, Path(disk_path))
+    facts = repository.python_facts(model, Path(disk_path))
     return Report(facts=facts, states=service.derive_states(facts), source=SOURCE_PYTHON)

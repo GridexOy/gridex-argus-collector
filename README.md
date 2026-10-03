@@ -14,19 +14,21 @@ language); code and this README stay in English. Start with `START_HERE.md`.
 
 ## Status
 
-Stage S0 (`VERSION` 0.0.1.0): diagnostics, fixture site, panel with version,
-work browser. See `docs/ARGUS20_COLLECTOR_CHANGELOG.md` and
-`docs/ARGUS20_COLLECTOR_MODULES.md`.
+`VERSION` 0.4.1.0 (owner decision 03.10.2026: local model + browser walk
+first): diagnostics, fixture site, panel with the Keruu block that walks a
+company site in the visible Chrome with the local model (Ollama,
+`qwen2.5:14b-instruct`) and lists verified contacts with evidence. See
+`docs/ARGUS20_COLLECTOR_CHANGELOG.md` and `docs/ARGUS20_COLLECTOR_MODULES.md`.
 
 ## Layout
 
 | Path | What |
 |---|---|
-| `collector/src/argus_collector/` | modules `runtime`, `diagnostics`, `browser`, `ui` (each: README, contract, service, repository, tests) |
+| `collector/src/argus_collector/` | modules `runtime`, `storage`, `normalization`, `evidence`, `models`, `discovery`, `extraction`, `browser`, `diagnostics`, `walk`, `ui` (each: README, contract, service, repository, tests) |
 | `collector/messages/fi.json` | every Finnish string of the panel and of `diagnose.ps1` |
-| `collector/tests/` | cross-module tests (gates) |
+| `collector/tests/` | cross-module tests (gates) and `fake_model_server.py` (test double of the model endpoint) |
 | `test_site/` | fixture site served by `python -m test_site.server`; gold files in `test_site/gold/` |
-| `scripts/` | `diagnose.ps1`, `install.ps1`, `start.ps1`, `run_gates.py` / `run_gates.ps1`, `check_*.ps1`, `gates/` |
+| `scripts/` | `diagnose.ps1`, `install.ps1`, `install_model.ps1` (Ollama + model on the GPU), `start.ps1`, `run_gates.py` / `run_gates.ps1`, `check_*.ps1`, `gates/` |
 | `config.example.yaml` | settings without secrets; copied to `%LOCALAPPDATA%\Gridex\ArgusCollector\config.yaml` on install |
 
 ## Windows (MAIN-PC), PowerShell 5.1
@@ -34,6 +36,7 @@ work browser. See `docs/ARGUS20_COLLECTOR_CHANGELOG.md` and
 ```
 & {
   Set-Location 'C:\dev\gridex-argus-collector' -ErrorAction Stop
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install_model.ps1; if ($LASTEXITCODE -ne 0) { Write-Host 'STOP: model install failed (see the lines above)'; return }
   powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install.ps1; if ($LASTEXITCODE -ne 0) { Write-Host 'STOP: install failed'; return }
   powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start.ps1
 }

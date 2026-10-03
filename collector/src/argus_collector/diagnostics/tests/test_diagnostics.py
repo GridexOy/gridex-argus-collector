@@ -33,7 +33,8 @@ def sample_document() -> dict[str, Any]:
         "memory": {"total_mb": 65432, "free_mb": 40000},
         "disk": {"path": "C:", "total_gb": 1863.0, "free_gb": 900.5, "used_pct": 52, "state": "ok"},
         "model": {
-            "endpoint": "http://127.0.0.1:8080",
+            "endpoint": "http://127.0.0.1:11434/v1",
+            "name": "qwen2.5:14b-instruct",
             "reachable": False,
             "detail": "no answer",
             "state": "none",
@@ -107,9 +108,24 @@ def test_report_json_roundtrip() -> None:
 
 
 def test_python_collect_runs_here() -> None:
-    report = contract.collect("http://127.0.0.1:9", use_powershell=False)
+    report = contract.collect("http://127.0.0.1:9/v1", use_powershell=False)
     assert report.source == "python"
     assert report.states.model is ModelState.NONE
+    assert report.facts.model_name == "qwen2.5:14b-instruct"
+    assert "no answer" in report.facts.model_detail
     assert report.facts.disk_total_gb > 0
     assert report.facts.memory_total_mb > 0
     assert report.facts.os_name
+
+
+def test_model_listed_counts_as_reachable() -> None:
+    from collector.tests.fake_model_server import FakeModelServer
+
+    fake = FakeModelServer(lambda s, u: "{}").start()
+    try:
+        ok = contract.collect(fake.endpoint, "fake-instruct", use_powershell=False)
+        other = contract.collect(fake.endpoint, "other", use_powershell=False)
+    finally:
+        fake.stop()
+    assert ok.facts.model_reachable and ok.states.model is not ModelState.NONE
+    assert not other.facts.model_reachable and other.states.model is ModelState.NONE
