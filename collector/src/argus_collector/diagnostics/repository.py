@@ -126,10 +126,15 @@ def probe_disk(path: Path) -> tuple[str, float, float]:
     return str(path), round(usage.total / gib, 1), round(usage.free / gib, 1)
 
 
+# The local model lives on this PC: never route it through the system proxy
+# (on Windows urllib takes the proxy from the registry, even for 127.0.0.1).
+DIRECT_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
 def probe_model(endpoint: str) -> tuple[bool, str]:
     url = endpoint.rstrip("/") + "/health"
     try:
-        with urllib.request.urlopen(url, timeout=MODEL_TIMEOUT_S) as resp:
+        with DIRECT_OPENER.open(url, timeout=MODEL_TIMEOUT_S) as resp:
             return resp.status < 500, f"HTTP {resp.status}"
     except urllib.error.HTTPError as exc:
         return exc.code < 500, f"HTTP {exc.code}"

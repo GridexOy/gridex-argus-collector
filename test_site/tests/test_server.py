@@ -13,6 +13,9 @@ import pytest
 from test_site import server
 
 GOLD = Path(__file__).resolve().parents[1] / "gold" / "fixture_oy.json"
+# The fixture site is local: bypass any system proxy (Windows registry proxy
+# otherwise answers 127.0.0.1 with 502 Bad Gateway).
+DIRECT_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
 @pytest.fixture
@@ -26,7 +29,7 @@ def site() -> Iterator[ThreadingHTTPServer]:
 
 
 def fetch(srv: ThreadingHTTPServer, page: str) -> str:
-    with urllib.request.urlopen(server.base_url(srv) + page, timeout=5) as resp:
+    with DIRECT_OPENER.open(server.base_url(srv) + page, timeout=5) as resp:
         assert resp.status == 200
         return resp.read().decode("utf-8")
 
