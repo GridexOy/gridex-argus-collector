@@ -89,7 +89,9 @@ def test_cli_no_wait_prints_opened_line(site: ThreadingHTTPServer, tmp_path: Pat
     ]
     env = contract.launcher_env()
     assert env["PYTHONPATH"].startswith(str(runtime.repo_root() / "collector" / "src"))
-    done = subprocess.run(cmd, capture_output=True, text=True, timeout=90, env=env, check=False)
+    done = subprocess.run(
+        cmd, capture_output=True, text=True, encoding="utf-8", timeout=90, env=env, check=False
+    )
     assert done.returncode == 0, done.stderr
     assert '"opened": true' in done.stdout
     assert "Fixture Oy" in done.stdout

@@ -17,6 +17,7 @@ from argus_collector.browser import contract as browser
 from argus_collector.diagnostics import contract as diagnostics
 from argus_collector.runtime import contract as runtime
 from argus_collector.ui import service
+from argus_collector.ui.app_connection import ConnectionController
 from argus_collector.ui.app_walk import WalkController
 from argus_collector.ui.repository import Messages
 from argus_collector.ui.service import LEVEL_ERROR, LEVEL_INFO, LEVEL_OK, Line
@@ -38,6 +39,7 @@ class PanelApp:
         self.proc: subprocess.Popen[str] | None = None
         self.ui_queue: queue.Queue[Callable[[], None]] = queue.Queue()
         self.walk = WalkController(self)
+        self.connection = ConnectionController(self)
         self.view = PanelView(
             root,
             self.props(),
@@ -45,6 +47,7 @@ class PanelApp:
             self.walk.start,
             self.walk.stop,
             self.walk.open_source,
+            self.connection.test_connection,
         )
 
     def props(self) -> service.PanelProps:
@@ -54,6 +57,7 @@ class PanelApp:
             self.report,
             self.report_error,
             runtime.stop_reason(),
+            self.connection.props(self.msgs),
             self.walk.walking,
         )
 

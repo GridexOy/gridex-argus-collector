@@ -1,11 +1,21 @@
-# ARGUS collector configuration (no secrets here; the collector token is
-# entered in the panel and stored with DPAPI from stage S1 on).
+# ARGUS collector configuration (no secrets here; the worker token is
+# entered in the panel's Yhteys block and stored with DPAPI, never here).
 # Copy to %LOCALAPPDATA%\Gridex\ArgusCollector\config.yaml (install.ps1 does
 # it on first install) or to the repo root as config.yaml (git-ignored).
 
 argus:
-  # Base URL of ARGUS, used from S1 (contract server during development).
-  base_url: ""
+  # Default shown in the Yhteys block's address field (ARGUS20_TZ_TANDEM.md
+  # pair A1); the owner can type a different one, e.g. the local
+  # contract_server/ while the real /api/collector is not up yet.
+  base_url: "https://argus.gridex.fi"
+
+network:
+  # "system": ARGUS requests use the Windows proxy settings (needed for the
+  # real external host). "direct": never use a proxy, even for ARGUS.
+  # Loopback (127.0.0.1/localhost, e.g. contract_server/) always bypasses the
+  # proxy regardless of this setting -- the Windows registry proxy otherwise
+  # answers 127.0.0.1 with 502 Bad Gateway.
+  proxy: "system"
 
 test_site:
   # Port of the local fixture site served by "Avaa tyoselain" and the tests.

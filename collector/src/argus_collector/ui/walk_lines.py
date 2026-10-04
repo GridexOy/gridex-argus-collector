@@ -28,6 +28,7 @@ MODEL_DETAIL_KEYS = {
 @dataclass(frozen=True)
 class CollectProps:
     site_url_label: str
+    manual_note: str
     start_label: str
     pause_label: str
     stop_label: str

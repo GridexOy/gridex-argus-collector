@@ -6,6 +6,7 @@ venv is used on Windows and in CI. A missing tool is a failure, not a skip.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -13,18 +14,25 @@ from pathlib import Path
 from gates.common import GateResult
 
 TIMEOUT_S = 600
-PYTHON_TARGETS = ("collector", "test_site", "scripts")
+PYTHON_TARGETS = ("collector", "contract_server", "test_site", "scripts")
+SOURCE_DIR = Path("collector") / "src"
 
 
-def _run(name: str, args: list[str], root: Path) -> tuple[int, str]:
+def _run_python(
+    name: str, python_args: list[str], root: Path, env: dict[str, str] | None = None
+) -> tuple[int, str]:
+    """Run `sys.executable <python_args>` (the caller includes `-m`/`-c` itself)."""
     try:
         done = subprocess.run(
-            [sys.executable, "-m", *args],
+            [sys.executable, *python_args],
             cwd=root,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=TIMEOUT_S,
             check=False,
+            env=env,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return 127, f"{name}: cannot run: {exc}"
@@ -32,6 +40,12 @@ def _run(name: str, args: list[str], root: Path) -> tuple[int, str]:
     if done.returncode != 0 and "No module named" in output:
         return 127, f"{name}: not installed in this environment ({output.splitlines()[-1]})"
     return done.returncode, output
+
+
+def _run(
+    name: str, module_args: list[str], root: Path, env: dict[str, str] | None = None
+) -> tuple[int, str]:
+    return _run_python(name, ["-m", *module_args], root, env)
 
 
 def _tail(output: str, limit: int = 15) -> list[str]:
@@ -57,9 +71,31 @@ def run_mypy(root: Path) -> GateResult:
     return result
 
 
+IMPORT_LINTER_SNIPPET = "from importlinter.cli import lint_imports_command; lint_imports_command()"
+
+
 def run_import_linter(root: Path) -> GateResult:
+    """Two fixes this gate needs to mean anything (both found while adding api_client):
+
+    1. `importlinter` has no `__main__.py`, so `python -m importlinter.cli
+       lint_imports` (the previous invocation) silently imports the module,
+       does nothing with the "lint_imports" argument and exits 0 -- it never
+       actually ran a single check. The console script (`lint-imports.exe`)
+       calls `importlinter.cli.lint_imports_command()`; running that same
+       call through `python -c` is the real equivalent.
+    2. `argus_collector` otherwise resolves through whatever the venv's
+       site-packages .pth already points at (the last `install.ps1`'s
+       `%LOCALAPPDATA%\\...\\app` copy), which lags behind this checkout --
+       a brand-new module (like `api_client`) is invisible there until
+       installed. Prepending collector/src to PYTHONPATH makes this checkout
+       win, the same way pytest's own `pythonpath` setting already does.
+    """
     result = GateResult("import_linter")
-    code, output = _run("import-linter", ["importlinter.cli", "lint_imports"], root)
+    env = dict(os.environ)
+    source = str(root / SOURCE_DIR)
+    existing = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = source if not existing else source + os.pathsep + existing
+    code, output = _run_python("import-linter", ["-c", IMPORT_LINTER_SNIPPET], root, env)
     if code != 0:
         for line in _tail(output):
             result.fail(line)

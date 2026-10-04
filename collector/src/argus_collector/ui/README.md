@@ -9,13 +9,14 @@ web server). Entry point: `contract.run_panel()` / `python -m argus_collector.ui
 | `repository.py` | loads the message catalogue; `Messages.t(key, **params)` raises on a missing key |
 | `service.py` | pure `build_props(...)`: facts from `runtime` and `diagnostics` in, `PanelProps` (strings + flags) out |
 | `walk_lines.py` | pure: `CollectProps`, walk events -> Finnish status lines and table rows |
-| `view.py` / `view_collect.py` | tkinter widgets rendered from props only; `render(props)` re-applies them; the Keruu block appends rows live |
-| `app.py` / `app_walk.py` | data hooks: version/STOP from `runtime`, diagnostics in a thread, work browser as a detached process, the walk in its own thread (events reach tkinter only through `ui_queue`) |
+| `connection_lines.py` | pure: `ConnectionProps`, `ConnectionState` -> Yhteys block strings |
+| `view.py` / `view_collect.py` / `view_connection.py` | tkinter widgets rendered from props only; `render(props)` re-applies them; the Keruu block appends rows live |
+| `app.py` / `app_walk.py` / `app_connection.py` | data hooks: version/STOP from `runtime`, diagnostics in a thread, work browser as a detached process, the walk in its own thread, the Yhteys heartbeat loop in its own thread (events reach tkinter only through `ui_queue`) |
 
 Blocks and states:
 
 - bottom-left: `cv0.4.1.0 (3.10.2026 klo 14.32) <commit>` from `VERSION` + `build.json`; a mismatch is shown in red.
-- Yhteys: `Ei yhteyttä` (no server connection exists before S1).
+- Yhteys (ARGUS20_TZ_TANDEM.md pair A1): address (default `config.yaml` `argus.base_url`), worker_id and token fields (token write-only, never pre-filled; stored via `worker_auth`), "Testaa yhteys" -> one heartbeat call through `api_client`; states `Ei yhteyttä` / `Tarkistetaan…` / `Yhdistetty` / `Tunnus hylätty` / `Ei verkkoa: <detail>`; a saved worker_id + token re-sends a heartbeat automatically every 30 s while the panel is open.
 - Keruu: field "Yrityksen verkkosivu", "Käynnistä" (live only when the model is listed, Chrome is available and no STOP file exists; the hint line says why otherwise), "Pysäytä" (live while a walk runs), "Keskeytä" and both autostart settings still disabled (S5); status line (page n/budget, step, model error, done / stopped / error in colour); "Löydetty: N yhteystietoa"; table Nimi · Titteli · Puhelin · Sähköposti · Lähde filled while walking, double-click opens the source URL in the default browser.
 - Resurssit: lines from `diagnostics` (OS, Chrome, model + its endpoint/detail line, disk, memory, NVIDIA); errors in red, `Tarkistetaan…` while collecting; re-collected after every walk (Ollama loads the model on first use, so `Malli` turns to GPU after the first walk).
 - "Avaa työselain": the launcher on the test site (disabled while a walk runs: both use the same Chrome profile).

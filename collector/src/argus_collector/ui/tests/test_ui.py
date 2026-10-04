@@ -13,12 +13,12 @@ from pathlib import Path
 import pytest
 
 from argus_collector.diagnostics import contract as diagnostics
-from argus_collector.diagnostics.tests.test_diagnostics import sample_document
 from argus_collector.extraction.contract import Contact, VerifiedField
 from argus_collector.runtime import contract as runtime
-from argus_collector.runtime import service as runtime_service
 from argus_collector.ui import contract, repository, service
-from argus_collector.ui.tests.conftest import make_tk_root
+from argus_collector.ui.connection_lines import ConnectionState
+from argus_collector.ui.connection_lines import connection_props as build_connection_props
+from argus_collector.ui.tests.conftest import make_tk_root, sample_document
 from argus_collector.walk.contract import WalkEvent
 
 
@@ -28,7 +28,7 @@ def msgs() -> repository.Messages:
 
 
 def _status(raw: dict[str, str] | None) -> runtime.VersionStatus:
-    return runtime_service.version_status("0.4.1.0", raw)
+    return runtime.version_status("0.4.1.0", raw)
 
 
 def version_ok() -> runtime.VersionStatus:
@@ -42,11 +42,15 @@ def ready_report() -> diagnostics.Report:
     return diagnostics.parse_report_json(json.dumps(doc))
 
 
+def disconnected(msgs: repository.Messages) -> service.ConnectionProps:
+    return build_connection_props(msgs, ConnectionState(address="", worker_id="", token=""))
+
+
 def test_props_show_required_states(msgs: repository.Messages) -> None:
     report = diagnostics.parse_report_json(json.dumps(sample_document()))
-    props = service.build_props(msgs, version_ok(), report, None, None)
+    props = service.build_props(msgs, version_ok(), report, None, None, disconnected(msgs))
     assert props.version.text == "cv0.4.1.0 (3.10.2026 klo 14.32) abc1234"
-    assert props.connection_state.text == "Ei yhteyttä"
+    assert props.connection.state_text == "Ei yhteyttä"
     assert props.collect.site_url_label == "Yrityksen verkkosivu"
     assert (props.collect.start_label, props.collect.stop_label) == ("Käynnistä", "Pysäytä")
     assert not props.collect.start_enabled and not props.collect.stop_enabled
@@ -61,12 +65,15 @@ def test_props_show_required_states(msgs: repository.Messages) -> None:
 
 
 def test_start_enabled_only_with_model_and_chrome(msgs: repository.Messages) -> None:
-    ready = service.build_props(msgs, version_ok(), ready_report(), None, None)
+    conn = disconnected(msgs)
+    ready = service.build_props(msgs, version_ok(), ready_report(), None, None, conn)
     assert ready.collect.start_enabled and ready.collect.hint == ""
-    walking = service.build_props(msgs, version_ok(), ready_report(), None, None, walking=True)
+    walking = service.build_props(
+        msgs, version_ok(), ready_report(), None, None, conn, walking=True
+    )
     assert not walking.collect.start_enabled and walking.collect.stop_enabled
     assert not walking.open_browser_enabled
-    stopped = service.build_props(msgs, version_ok(), ready_report(), None, "/x/STOP")
+    stopped = service.build_props(msgs, version_ok(), ready_report(), None, "/x/STOP", conn)
     assert (
         not stopped.collect.start_enabled and stopped.collect.hint == "STOP-tiedosto estää keruun"
     )
@@ -74,11 +81,12 @@ def test_start_enabled_only_with_model_and_chrome(msgs: repository.Messages) -> 
 
 
 def test_props_show_diagnostics_error_in_red(msgs: repository.Messages) -> None:
-    props = service.build_props(msgs, version_ok(), None, "diagnose.ps1 exit 1: boom", None)
+    conn = disconnected(msgs)
+    props = service.build_props(msgs, version_ok(), None, "diagnose.ps1 exit 1: boom", None, conn)
     assert props.resources == [
         service.Line("Resurssien tarkistus epäonnistui: diagnose.ps1 exit 1: boom", "error")
     ]
-    assert service.build_props(msgs, _status(None), None, None, None).version.text == (
+    assert service.build_props(msgs, _status(None), None, None, None, conn).version.text == (
         "cv0.4.1.0 (ei asennustietoa)"
     )
 
@@ -145,7 +153,7 @@ def test_window_renders_keruu_block_and_live_rows(
         for name in ("start", "pause", "stop"):
             assert not app.view.is_enabled(name), name
         assert app.view.is_enabled("open_browser")
-        assert app.view.connection_label.cget("text") == "Yhteys: Ei yhteyttä"
+        assert app.view.connection.state_label.cget("text") == "Ei yhteyttä"
         expected_prefix = f"cv{runtime.current_version_status().file_version} ("
         assert app.view.version_label.cget("text").startswith(expected_prefix)
         app.view.collect.url_var.set("not a url")

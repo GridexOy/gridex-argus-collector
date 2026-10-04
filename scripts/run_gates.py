@@ -1,7 +1,6 @@
 """Run the gates of TZ_SELAIN section 12.3: python scripts/run_gates.py [--only a b].
 
 Exit 0 when every gate is green (warnings allowed), 1 when any gate is red.
-Not wired yet (added with the module that needs it): gen_api_client diff (S1).
 """
 
 from __future__ import annotations
@@ -14,6 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from gates import (  # noqa: E402 - path set above
+    check_codegen,
     check_docs,
     check_i18n,
     check_legacy,
@@ -35,6 +35,7 @@ GATES: dict[str, Callable[[Path], GateResult]] = {
     "mypy": check_tools.run_mypy,
     "import_linter": check_tools.run_import_linter,
     "pip_audit": check_tools.run_pip_audit,
+    "gen_api_client": check_codegen.run,
 }
 MAX_WARNINGS_SHOWN = 10
 

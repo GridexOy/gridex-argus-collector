@@ -15,6 +15,7 @@ from argus_collector.runtime.service import (
     VersionStatus,
     finnish_stamp,
     version_line,
+    version_status,
 )
 
 __all__ = [
@@ -30,6 +31,7 @@ __all__ = [
     "stop_reason",
     "user_data_dir",
     "version_line",
+    "version_status",
 ]
 
 BROWSER_PROFILE_DIRNAME = "browser-profile"

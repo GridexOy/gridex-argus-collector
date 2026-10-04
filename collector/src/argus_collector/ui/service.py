@@ -16,6 +16,7 @@ from argus_collector.diagnostics.contract import (
     Report,
 )
 from argus_collector.runtime.contract import VersionStatus, finnish_stamp, version_line
+from argus_collector.ui.connection_lines import ConnectionProps
 from argus_collector.ui.repository import Messages
 from argus_collector.ui.walk_lines import CollectProps, contact_row, walk_event_line
 
@@ -40,6 +41,7 @@ __all__ = [
     "LEVEL_OK",
     "LEVEL_WARN",
     "CollectProps",
+    "ConnectionProps",
     "Line",
     "PanelProps",
     "build_props",
@@ -58,8 +60,7 @@ class Line:
 class PanelProps:
     title: str
     version: Line
-    connection_title: str
-    connection_state: Line
+    connection: ConnectionProps
     collecting_title: str
     collect: CollectProps
     resources_title: str
@@ -151,6 +152,7 @@ def collect_props(
         hint = msgs.t("collecting.notReady")
     return CollectProps(
         site_url_label=msgs.t("collecting.siteUrl"),
+        manual_note=msgs.t("collecting.manualNote"),
         start_label=msgs.t("collecting.start"),
         pause_label=msgs.t("collecting.pause"),
         stop_label=msgs.t("collecting.stop"),
@@ -177,14 +179,14 @@ def build_props(
     report: Report | None,
     report_error: str | None,
     stop_reason: str | None,
+    connection: ConnectionProps,
     walking: bool = False,
 ) -> PanelProps:
     banner = Line(msgs.t("stop.active", files=stop_reason), LEVEL_ERROR) if stop_reason else None
     return PanelProps(
         title=msgs.t("app.name"),
         version=version_props(msgs, version),
-        connection_title=msgs.t("connection.title"),
-        connection_state=Line(msgs.t("connection.state.disconnected"), LEVEL_WARN),
+        connection=connection,
         collecting_title=msgs.t("collecting.title"),
         collect=collect_props(msgs, report, stop_reason, walking),
         resources_title=msgs.t("resources.title"),

@@ -31,6 +31,7 @@ def run_panel() -> int:
         root.destroy()
         return 2
     app.start_diagnostics()
+    app.connection.start_if_saved()
     app.schedule_pump()
     root.mainloop()
     return 0

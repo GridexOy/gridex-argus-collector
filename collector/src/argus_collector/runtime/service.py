@@ -26,7 +26,8 @@ class Config:
     model_name: str = ""
     walk_page_budget: int = 15
     test_site_port: int = 8765
-    argus_base_url: str = ""
+    argus_base_url: str = "https://argus.gridex.fi"
+    network_proxy: str = "system"
     source: str = "defaults"
 
 
@@ -106,20 +107,30 @@ def _positive_int(section: dict[str, object], key: str, default: int, limit: int
     return value
 
 
+def _proxy_mode(section: dict[str, object], default: str) -> str:
+    value = str(section.get("proxy", default) or default)
+    if value not in ("system", "direct"):
+        raise ValueError(f"network.proxy must be 'system' or 'direct', got {value!r}")
+    return value
+
+
 def config_from_mapping(data: dict[str, object], source: str) -> Config:
     """Build Config from a parsed YAML mapping; unknown keys are ignored."""
-    model, site, argus, walk = (
+    model, site, argus, walk, network = (
         _section(data, "model"),
         _section(data, "test_site"),
         _section(data, "argus"),
         _section(data, "walk"),
+        _section(data, "network"),
     )
     defaults = Config()
+    base_url = str(argus.get("base_url", defaults.argus_base_url) or defaults.argus_base_url)
     return Config(
         model_endpoint=str(model.get("endpoint", defaults.model_endpoint) or ""),
         model_name=str(model.get("name", defaults.model_name) or ""),
         walk_page_budget=_positive_int(walk, "page_budget", defaults.walk_page_budget, 1000),
         test_site_port=_positive_int(site, "port", defaults.test_site_port, 65536),
-        argus_base_url=str(argus.get("base_url", defaults.argus_base_url) or ""),
+        argus_base_url=base_url,
+        network_proxy=_proxy_mode(network, defaults.network_proxy),
         source=source,
     )

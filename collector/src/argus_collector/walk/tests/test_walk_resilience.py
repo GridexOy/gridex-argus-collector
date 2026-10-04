@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 
 from argus_collector.browser import contract as browser
-from argus_collector.browser.session import PageState
+from argus_collector.browser.contract import PageState
 from argus_collector.walk import contract, runner, service
 from argus_collector.walk.tests.conftest import settings_for
 from argus_collector.walk.tests.fake_policy import GoldPolicy

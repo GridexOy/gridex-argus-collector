@@ -62,6 +62,10 @@ class CollectBlock:
         self.buttons["stop"] = ttk.Button(row, text=props.stop_label, command=on_stop)
         for name in ("start", "pause", "stop"):
             self.buttons[name].pack(side="left", padx=(0, 8))
+        self.manual_note_label = ttk.Label(
+            self.parent, text=props.manual_note, foreground=COLOURS["info"]
+        )
+        self.manual_note_label.pack(anchor="w", padx=PAD_X)
 
     def _build_settings(self, props: CollectProps) -> None:
         for name, label in (

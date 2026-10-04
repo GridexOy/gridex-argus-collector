@@ -15,6 +15,7 @@ from argus_collector.ui.service import (
     PanelProps,
 )
 from argus_collector.ui.view_collect import CollectBlock
+from argus_collector.ui.view_connection import ConnectionBlock
 
 BG = "#ffffff"
 FG = "#1f2328"
@@ -55,6 +56,7 @@ class PanelView:
         on_start_walk: Callable[[str], None],
         on_stop_walk: Callable[[], None],
         on_open_source: Callable[[str], None],
+        on_test_connection: Callable[[str, str, str], None],
     ) -> None:
         self.root = root
         self.buttons: dict[str, ttk.Button] = {}
@@ -64,7 +66,7 @@ class PanelView:
         root.minsize(MIN_WIDTH, MIN_HEIGHT)
         self.body = ttk.Frame(root)
         self.body.pack(fill="both", expand=True)
-        self._build_connection(props)
+        self._build_connection(props, on_test_connection)
         self._heading(props.collecting_title)
         self.collect = CollectBlock(
             self.body, props.collect, on_start_walk, on_stop_walk, on_open_source
@@ -81,10 +83,11 @@ class PanelView:
             anchor="w", padx=12, pady=(12, 2)
         )
 
-    def _build_connection(self, props: PanelProps) -> None:
-        self._heading(props.connection_title)
-        self.connection_label = ttk.Label(self.body)
-        self.connection_label.pack(anchor="w", padx=PAD_X, pady=PAD_Y)
+    def _build_connection(
+        self, props: PanelProps, on_test_connection: Callable[[str, str, str], None]
+    ) -> None:
+        self._heading(props.connection.title)
+        self.connection = ConnectionBlock(self.body, props.connection, on_test_connection)
 
     def _build_resources(self, props: PanelProps, on_open_browser: Callable[[], None]) -> None:
         self._heading(props.resources_title)
@@ -104,10 +107,7 @@ class PanelView:
 
     def render(self, props: PanelProps) -> None:
         """Apply props to existing widgets (safe to call again after a refresh)."""
-        self._set_line(self.connection_label, props.connection_state)
-        self.connection_label.configure(
-            text=f"{props.connection_title}: {props.connection_state.text}"
-        )
+        self.connection.render(props.connection)
         self.collect.render(props.collect)
         self.buttons["open_browser"].state(
             ["!disabled"] if props.open_browser_enabled else ["disabled"]
