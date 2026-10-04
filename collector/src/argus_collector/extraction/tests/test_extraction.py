@@ -100,3 +100,35 @@ def test_card_from_json() -> None:
     )
     assert contract.card_from_json({"title": "x"}) is None
     assert contract.card_from_json("Anna") is None
+
+
+def test_national_phone_numbers_use_the_page_region() -> None:
+    text = canonical_text("Thomas Vogel\nTel. 0711 123 4500")
+    channels = contract.extract_channels("<p>x</p>", text, "DE")
+    assert [c.value for c in channels] == ["+497111234500"]
+    card = PersonCard(name="Thomas Vogel", phone="0711 123 4500")
+    contact = contract.verify_card(card, text, channels, "DE")
+    assert contact is not None and contact.phone is not None
+    assert contact.phone.value == "+497111234500"
+
+
+def test_html_language() -> None:
+    assert contract.html_language('<!doctype html><html lang="de-DE"><head>') == "de-DE"
+    assert contract.html_language("<html><body>") == ""
+
+
+def test_unattached_channels_get_a_role() -> None:
+    text = canonical_text(
+        "Vaihde 09 555 1200 info.fi@nordtec.example\n"
+        "Norway office (Oslo): +47 22 12 34 50\n"
+        "Write to matti.meikalainen@x.example\n"
+        "+358 40 999 8888"
+    )
+    channels = {c.value: c for c in contract.extract_channels("<p></p>", text)}
+    role = contract.classify_unattached
+    assert role(channels["+35895551200"], text).entity_type == "organization_channel"
+    assert role(channels["+35895551200"], text).binding == "caption"
+    assert role(channels["info.fi@nordtec.example"], text).entity_type == "organization_channel"
+    assert role(channels["+4722123450"], text).entity_type == "office"
+    assert role(channels["matti.meikalainen@x.example"], text).entity_type == "unassigned_channel"
+    assert role(channels["+358409998888"], text).binding == "none"

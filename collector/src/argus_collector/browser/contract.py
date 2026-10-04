@@ -15,6 +15,7 @@ from pathlib import Path
 from playwright.sync_api import Error as ActionError
 
 from argus_collector.browser import repository, service
+from argus_collector.browser.binding import PersonProbe, ProbeValue
 from argus_collector.browser.repository import BrowserLaunchError
 from argus_collector.browser.service import LaunchPlan, LaunchResult
 from argus_collector.browser.session import PageState, WalkBrowser
@@ -26,6 +27,8 @@ __all__ = [
     "LaunchPlan",
     "LaunchResult",
     "PageState",
+    "PersonProbe",
+    "ProbeValue",
     "WalkBrowser",
     "launcher_command",
     "launcher_env",

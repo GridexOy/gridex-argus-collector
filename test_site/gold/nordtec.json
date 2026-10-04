@@ -1,0 +1,26 @@
+{
+  "fixture": "nordtec",
+  "host": "nordtec.localhost",
+  "case": "Swedish company with a Finland office: with priority_countries FI the walk switches to the Finnish site version (/fi/) and the Finland office before the Swedish version.",
+  "company": {
+    "name": "Nordtec AB",
+    "organization_channels": [
+      {"kind": "phone", "value": "+4681234560", "page": "index.html"},
+      {"kind": "email", "value": "info@nordtec.example", "page": "index.html"},
+      {"kind": "phone", "value": "+35895551200", "page": "fi/index.html"},
+      {"kind": "email", "value": "info.fi@nordtec.example", "page": "fi/index.html"}
+    ]
+  },
+  "priority_pages": ["fi/index.html", "fi/yhteystiedot.html"],
+  "later_pages": ["sv/index.html", "sv/kontakt.html"],
+  "persons": [
+    {"name": "Ville Nurmi", "title": "Maajohtaja, Suomi", "email": "ville.nurmi@nordtec.example",
+     "phone": "+358405551201", "source_page": "fi/yhteystiedot.html", "priority": true},
+    {"name": "Hanna Lahti", "title": "Myyntipäällikkö", "email": "hanna.lahti@nordtec.example",
+     "phone": "+358405551202", "source_page": "fi/yhteystiedot.html", "priority": true},
+    {"name": "Lars Berg", "title": "CEO", "email": "lars.berg@nordtec.example",
+     "phone": "+46812345670", "source_page": "contact.html", "priority": false},
+    {"name": "Karin Lind", "title": "Sales Director", "email": "karin.lind@nordtec.example",
+     "phone": "+46812345671", "source_page": "contact.html", "priority": false}
+  ]
+}

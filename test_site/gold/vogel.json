@@ -1,0 +1,29 @@
+{
+  "fixture": "vogel",
+  "host": "vogel.localhost",
+  "case": "German company without an office in Finland: the walk keeps to the native language (de) and English and goes first to export / Nordic / international sales and marketing people; the French version comes last.",
+  "company": {
+    "name": "Vogel Antriebstechnik GmbH",
+    "organization_channels": [
+      {"kind": "phone", "value": "+497111234000", "page": "index.html"},
+      {"kind": "email", "value": "info@vogel.example", "page": "index.html"}
+    ]
+  },
+  "priority_pages": ["export.html", "en/index.html", "en/contact.html"],
+  "later_pages": ["fr/index.html"],
+  "persons": [
+    {"name": "Jens Hartmann", "title": "Exportleiter Nordeuropa (Skandinavien, Finnland)",
+     "email": "j.hartmann@vogel.example", "phone": "+497111234520",
+     "source_page": "export.html", "priority": true},
+    {"name": "Anna Schmidt", "title": "Area Sales Manager Nordics", "email": "a.schmidt@vogel.example",
+     "phone": "+497111234530", "source_page": "en/contact.html", "priority": true},
+    {"name": "Peter Wolf", "title": "Marketing Manager International", "email": "p.wolf@vogel.example",
+     "phone": "+497111234540", "source_page": "en/contact.html", "priority": true},
+    {"name": "Thomas Vogel", "title": "Geschäftsführer", "email": "t.vogel@vogel.example",
+     "phone": "+497111234500", "phone_text": "0711 123 4500", "source_page": "kontakt.html",
+     "priority": false},
+    {"name": "Sabine Krüger", "title": "Vertrieb Inland", "email": "s.krueger@vogel.example",
+     "phone": "+497111234510", "phone_text": "0711 123 4510", "source_page": "kontakt.html",
+     "priority": false}
+  ]
+}

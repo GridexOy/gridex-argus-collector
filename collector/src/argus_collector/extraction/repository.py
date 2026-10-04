@@ -8,6 +8,7 @@ normalises and attaches locators.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from typing import Any
@@ -93,3 +94,32 @@ def jsonld_channels(blocks: list[str]) -> list[tuple[str, str, str]]:
             continue
         _walk_jsonld(data, f"jsonld:{i}", found)
     return found
+
+
+HTML_LANG_RE = re.compile(
+    r"<html\b[^>]*\blang\s*=\s*[\"']?([A-Za-z]{2,3}(?:[-_][A-Za-z]{2})?)", re.IGNORECASE
+)
+
+# An email whose local part starts with one of these is the company's, not a person's.
+GENERIC_LOCAL_PARTS: frozenset[str] = frozenset(
+    """info sales myynti office contact contacts kontakt asiakaspalvelu support tuki service
+    huolto orders order tilaukset invoice invoices laskutus hr rekry careers press media
+    marketing markkinointi export vienti mail post posti hello hei admin reception vaihde
+    customer customerservice webmaster noreply feedback palaute shop verkkokauppa tarjous
+    quote quotes purchasing hankinta osto finance talous accounting kirjanpito vertrieb
+    zentrale kundenservice kundservice""".split()
+)
+# A line naming a switchboard / general number makes its phone the company's.
+ORGANIZATION_PHONE_WORDS = (
+    "vaihde", "switchboard", "zentrale", "växel", "vaxel", "sentralbord", "central",
+    "asiakaspalvelu", "customer service", "kundenservice", "kundtjänst", "puh", "tel",
+    "phone", "puhelin", "telefon",
+)
+# A line naming an office / branch makes its channel an `office` entity.
+OFFICE_WORDS = ("office", "toimisto", "kontor", "niederlassung", "branch", "sivuliike")
+
+
+def html_language(html: str) -> str:
+    """The `lang` attribute of the `<html>` element, "" when absent."""
+    match = HTML_LANG_RE.search(html[:20000])
+    return match.group(1) if match else ""

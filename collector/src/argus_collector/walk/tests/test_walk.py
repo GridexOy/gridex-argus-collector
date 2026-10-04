@@ -7,7 +7,7 @@ from typing import Any
 
 from argus_collector.discovery.contract import Candidate
 from argus_collector.storage import contract as storage
-from argus_collector.walk import contract, service
+from argus_collector.walk import contract, prompts, service
 from argus_collector.walk.tests.conftest import settings_for
 from argus_collector.walk.tests.fake_policy import GoldPolicy
 from collector.tests.fake_model_server import FakeModelServer
@@ -27,20 +27,20 @@ def test_validate_start_url() -> None:
 
 def test_parse_action_validates_index_and_falls_back() -> None:
     cands = [link(3, "Contact", "http://h/contact"), Candidate(5, "button", "Show", "", "[x]")]
-    assert service.parse_action({"action": "navigate", "index": 3}, cands).candidate == cands[0]
-    assert service.parse_action({"action": "click", "index": "5"}, cands).kind == "click"
-    assert service.parse_action({"action": "finish"}, cands).kind == "finish"
-    assert service.parse_action({"action": "scroll"}, cands).kind == "scroll"
-    bad = service.parse_action({"action": "click", "index": 99}, cands)
+    assert prompts.parse_action({"action": "navigate", "index": 3}, cands).candidate == cands[0]
+    assert prompts.parse_action({"action": "click", "index": "5"}, cands).kind == "click"
+    assert prompts.parse_action({"action": "finish"}, cands).kind == "finish"
+    assert prompts.parse_action({"action": "scroll"}, cands).kind == "scroll"
+    bad = prompts.parse_action({"action": "click", "index": 99}, cands)
     assert bad.kind == "navigate" and bad.candidate == cands[0]
-    assert service.parse_action("garbage", []).kind == "finish"
-    assert service.parse_action({"action": "navigate", "index": 5}, cands).kind == "click"
+    assert prompts.parse_action("garbage", []).kind == "finish"
+    assert prompts.parse_action({"action": "navigate", "index": 5}, cands).kind == "click"
 
 
 def test_prompts_clip_text_and_number_elements() -> None:
-    system, user = service.action_prompt("u", "t", "x" * 20000, [link(0, "A", "http://h/a")], 3)
+    system, user = prompts.action_prompt("u", "t", "x" * 20000, [link(0, "A", "http://h/a")], 3)
     assert "[...]" in user and "[0] link: 'A' -> http://h/a" in user and "numbered list" in system
-    assert len(user) < service.MAX_TEXT_CHARS + 500
+    assert len(user) < prompts.MAX_TEXT_CHARS + 500
 
 
 def _rows(

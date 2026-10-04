@@ -7,7 +7,7 @@ import uuid
 from datetime import UTC, datetime
 
 from argus_collector.extraction.contract import Contact
-from argus_collector.walk.service import contact_json
+from argus_collector.walk.prompts import contact_json
 
 
 def _now() -> str:
@@ -34,25 +34,26 @@ def finish_run(
         )
 
 
-def insert_observation(
+def add_observation(
     conn: sqlite3.Connection, run_id: str, evidence_id: str, url: str, contact: Contact
 ) -> int:
-    with conn:
-        cursor = conn.execute(
-            "INSERT INTO observations (run_id, evidence_id, url, observed_at, name, title,"
-            " phone, email, fields_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                run_id,
-                evidence_id,
-                url,
-                _now(),
-                contact.name.value,
-                contact.title.value if contact.title else None,
-                contact.phone.value if contact.phone else None,
-                contact.email.value if contact.email else None,
-                contact_json(contact),
-            ),
-        )
+    """Insert one row without committing: the caller owns the transaction (the
+    outbox events of the same contact are written in it too)."""
+    cursor = conn.execute(
+        "INSERT INTO observations (run_id, evidence_id, url, observed_at, name, title,"
+        " phone, email, fields_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            run_id,
+            evidence_id,
+            url,
+            _now(),
+            contact.name.value,
+            contact.title.value if contact.title else None,
+            contact.phone.value if contact.phone else None,
+            contact.email.value if contact.email else None,
+            contact_json(contact),
+        ),
+    )
     return int(cursor.lastrowid or 0)
 
 

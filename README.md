@@ -14,19 +14,23 @@ language); code and this README stay in English. Start with `START_HERE.md`.
 
 ## Status
 
-`VERSION` 0.4.1.0 (owner decision 03.10.2026: local model + browser walk
-first): diagnostics, fixture site, panel with the Keruu block that walks a
-company site in the visible Chrome with the local model (Ollama,
-`qwen2.5:14b-instruct`) and lists verified contacts with evidence. See
+`VERSION` 0.4.3.0 (ARGUS20_TZ_TANDEM.md pairs A2 + A3): the panel claims
+ARGUS jobs on "Käynnistä", walks each company from its seed within its
+approved hosts and run budget (with the exhibition-country focus), and
+streams evidence and `contact.observed` / `model.called` / `job.finished`
+events through a SQLite outbox; leases, heartbeat commands, reconcile after
+restart or outage, STOP. Until block 6 ships it runs against
+`contract_server/` (the whole contract, every request schema-checked). See
 `docs/ARGUS20_COLLECTOR_CHANGELOG.md` and `docs/ARGUS20_COLLECTOR_MODULES.md`.
 
 ## Layout
 
 | Path | What |
 |---|---|
-| `collector/src/argus_collector/` | modules `runtime`, `storage`, `normalization`, `evidence`, `models`, `discovery`, `extraction`, `browser`, `diagnostics`, `walk`, `ui` (each: README, contract, service, repository, tests) |
+| `collector/src/argus_collector/` | modules `runtime`, `storage`, `worker_auth`, `normalization`, `evidence`, `models`, `api_client` (generated), `discovery`, `extraction`, `browser`, `diagnostics`, `delivery`, `walk`, `scheduler`, `ui` (each: README, contract, service, repository, tests) |
 | `collector/messages/fi.json` | every Finnish string of the panel and of `diagnose.ps1` |
-| `collector/tests/` | cross-module tests (gates) and `fake_model_server.py` (test double of the model endpoint) |
+| `collector/tests/` | cross-module tests (gates), `contract/` (contract tests of /api/collector through the generated client) and `fake_model_server.py` (test double of the model endpoint) |
+| `contract_server/` | reference server of the whole OpenAPI contract, test-only: `python -m contract_server.server`, owner CLI `python -m contract_server.stand` |
 | `test_site/` | fixture site served by `python -m test_site.server`; gold files in `test_site/gold/` |
 | `scripts/` | `diagnose.ps1`, `install.ps1`, `install_model.ps1` (Ollama + model on the GPU), `start.ps1`, `run_gates.py` / `run_gates.ps1`, `check_*.ps1`, `gates/` |
 | `config.example.yaml` | settings without secrets; copied to `%LOCALAPPDATA%\Gridex\ArgusCollector\config.yaml` on install |

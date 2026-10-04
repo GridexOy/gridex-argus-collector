@@ -7,14 +7,22 @@ Do not edit by hand. Other modules import api_client names only from here
 
 from __future__ import annotations
 
-from typing import Literal
-
-from argus_collector.api_client import repository
-from argus_collector.api_client.repository import ApiError
+from argus_collector.api_client.codec import from_json, to_json
+from argus_collector.api_client.repository import ApiError, ProxyMode
+from argus_collector.api_client.serialization_7 import locator_from_json, locator_to_json
+from argus_collector.api_client.serialization_12 import event_from_json, event_to_json
 from argus_collector.api_client.service import (
+    claim_jobs,
+    heartbeat,
+    post_events,
+    reconcile_job,
+    upload_evidence,
+)
+from argus_collector.api_client.types_1 import (
     ActiveLease,
     Capabilities,
     CapabilitiesReleaseLevel,
+    ClaimRequest,
     Command,
     CommandAck,
     CommandAckStatus,
@@ -22,43 +30,139 @@ from argus_collector.api_client.service import (
     Error,
     HeartbeatRequest,
     HeartbeatResponse,
+    HostApproval,
+    HostApprovalBasis,
     LeaseRenewal,
     LeaseRenewalStatus,
+    ParticipationStatus,
+    Policy,
     PolicyPatch,
+    Scope,
+    ScopeGeography,
+)
+from argus_collector.api_client.types_2 import (
+    ChannelStatus,
+    Checkpoint,
+    ClaimedJob,
+    ClaimResponse,
+    EvidenceMetadata,
+    EvidenceMetadataSourceKind,
+    FrontierItem,
+    FrontierItemMethod,
+    JobDefinition,
+    KnownContact,
+    KnownContactEntityType,
+    Lease,
+    Route,
+    RoutePurpose,
+    RouteSignature,
+    RouteStatus,
+    RouteStep,
+    RouteStepAction,
+)
+from argus_collector.api_client.types_3 import (
+    Binding,
+    ContactPayloadEntityType,
+    ContactPayloadRelationship,
+    EvidenceResponse,
+    EvidenceResponseStatus,
+    JobStartedEvent,
+    Locator,
+    LocatorBbox,
+    LocatorDocument,
+    LocatorDom,
+    LocatorJsonPointer,
+    LocatorTextSpan,
+    ObservationChangeKind,
+    ObservationExtractionStatus,
+    SourceBlockedEvent,
+    SourceDiscoveredEvent,
+    SourcePayload,
+    SourceProcessedEvent,
+    Stage,
+    StartedPayload,
+)
+from argus_collector.api_client.types_4 import (
+    ContactEnrichedEvent,
+    ContactMerge_ProposedEvent,
+    ContactObservedEvent,
+    ContactPayload,
+    Counts,
+    Coverage,
+    CoverageBasis,
+    CoverageConfirmation,
+    CoverageFrontierStatus,
+    FieldAudit,
+    FieldAuditItem,
+    FieldAuditItemDisposition,
+    JobProgressEvent,
+    MergePayload,
+    Observation,
+    ProgressPayload,
+    TransportState,
+)
+from argus_collector.api_client.types_5 import (
+    AttentionPayload,
+    BudgetState,
+    ContactFreshnessEvent,
+    FinishedPayload,
+    FinishedPayloadCompletionReason,
+    FinishedPayloadFreshnessSummary,
+    FinishedPayloadRunResultStatus,
+    FreshnessCheck,
+    FreshnessCheckStatus,
+    FreshnessPayload,
+    Gap,
+    GapReason,
+    JobFinishedEvent,
+    JobNeeds_AttentionEvent,
+    ModelUsage,
+    ModelUsagePurpose,
+    RouteRecordedPayload,
+)
+from argus_collector.api_client.types_6 import (
+    Event,
+    EventResult,
+    EventResultStatus,
+    EventsRequest,
+    EventsResponse,
+    JobState,
+    ModelCalledEvent,
+    ModelCalledPayload,
+    ReconcileRequest,
+    ReconcileResponse,
+    ReconcileResponseMode,
+    RouteRecordedEvent,
+    RouteVerifiedEvent,
+    RouteVerifiedPayload,
+    RouteVerifiedPayloadResult,
 )
 
-ProxyMode = Literal["system", "direct"]
-
 __all__ = [
-    "ActiveLease",
-    "ApiError",
-    "Capabilities",
-    "CapabilitiesReleaseLevel",
-    "Command",
-    "CommandAck",
-    "CommandAckStatus",
-    "CommandAction",
-    "Error",
-    "HeartbeatRequest",
-    "HeartbeatResponse",
-    "LeaseRenewal",
-    "LeaseRenewalStatus",
-    "PolicyPatch",
-    "ProxyMode",
-    "heartbeat",
+    "ActiveLease", "ApiError", "AttentionPayload", "Binding", "BudgetState", "Capabilities",
+    "CapabilitiesReleaseLevel", "ChannelStatus", "Checkpoint", "ClaimedJob", "ClaimRequest",
+    "ClaimResponse", "Command", "CommandAck", "CommandAckStatus", "CommandAction",
+    "ContactEnrichedEvent", "ContactFreshnessEvent", "ContactMerge_ProposedEvent",
+    "ContactObservedEvent", "ContactPayload", "ContactPayloadEntityType",
+    "ContactPayloadRelationship", "Counts", "Coverage", "CoverageBasis", "CoverageConfirmation",
+    "CoverageFrontierStatus", "Error", "Event", "EventResult", "EventResultStatus", "EventsRequest",
+    "EventsResponse", "EvidenceMetadata", "EvidenceMetadataSourceKind", "EvidenceResponse",
+    "EvidenceResponseStatus", "FieldAudit", "FieldAuditItem", "FieldAuditItemDisposition",
+    "FinishedPayload", "FinishedPayloadCompletionReason", "FinishedPayloadFreshnessSummary",
+    "FinishedPayloadRunResultStatus", "FreshnessCheck", "FreshnessCheckStatus", "FreshnessPayload",
+    "FrontierItem", "FrontierItemMethod", "Gap", "GapReason", "HeartbeatRequest",
+    "HeartbeatResponse", "HostApproval", "HostApprovalBasis", "JobDefinition", "JobFinishedEvent",
+    "JobNeeds_AttentionEvent", "JobProgressEvent", "JobStartedEvent", "JobState", "KnownContact",
+    "KnownContactEntityType", "Lease", "LeaseRenewal", "LeaseRenewalStatus", "Locator",
+    "LocatorBbox", "LocatorDocument", "LocatorDom", "LocatorJsonPointer", "LocatorTextSpan",
+    "MergePayload", "ModelCalledEvent", "ModelCalledPayload", "ModelUsage", "ModelUsagePurpose",
+    "Observation", "ObservationChangeKind", "ObservationExtractionStatus", "ParticipationStatus",
+    "Policy", "PolicyPatch", "ProgressPayload", "ProxyMode", "ReconcileRequest",
+    "ReconcileResponse", "ReconcileResponseMode", "Route", "RoutePurpose", "RouteRecordedEvent",
+    "RouteRecordedPayload", "RouteSignature", "RouteStatus", "RouteStep", "RouteStepAction",
+    "RouteVerifiedEvent", "RouteVerifiedPayload", "RouteVerifiedPayloadResult", "Scope",
+    "ScopeGeography", "SourceBlockedEvent", "SourceDiscoveredEvent", "SourcePayload",
+    "SourceProcessedEvent", "Stage", "StartedPayload", "TransportState", "claim_jobs",
+    "event_from_json", "event_to_json", "from_json", "heartbeat", "locator_from_json",
+    "locator_to_json", "post_events", "reconcile_job", "to_json", "upload_evidence",
 ]
-
-
-def heartbeat(
-    base_url: str,
-    token: str,
-    request: HeartbeatRequest,
-    *,
-    proxy_mode: ProxyMode = "system",
-    timeout_s: float = 10.0,
-) -> HeartbeatResponse:
-    """POST /workers/heartbeat (WorkerBearer).
-    Raises ApiError on a non-2xx response; see repository.py."""
-    return repository.heartbeat(
-        base_url, token, request, proxy_mode=proxy_mode, timeout_s=timeout_s
-    )

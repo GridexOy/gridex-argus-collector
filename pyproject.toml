@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "argus-collector"
-version = "0.4.2.0"
+version = "0.4.3.0"
 description = "ARGUS 2.0 local contact collector (Selain) for Windows"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -53,12 +53,13 @@ ignore_missing_imports = true
 root_package = "argus_collector"
 
 [[tool.importlinter.contracts]]
-name = "layers: ui > walk > browser|extraction|diagnostics > discovery|models|evidence > normalization|storage > runtime"
+name = "layers: ui > scheduler > walk > browser|extraction|diagnostics|delivery > discovery|models|evidence|api_client > normalization|storage|worker_auth > runtime"
 type = "layers"
 layers = [
   "argus_collector.ui",
+  "argus_collector.scheduler",
   "argus_collector.walk",
-  "argus_collector.browser | argus_collector.extraction | argus_collector.diagnostics",
+  "argus_collector.browser | argus_collector.extraction | argus_collector.diagnostics | argus_collector.delivery",
   "argus_collector.discovery | argus_collector.models | argus_collector.evidence | argus_collector.api_client",
   "argus_collector.normalization | argus_collector.storage | argus_collector.worker_auth",
   "argus_collector.runtime",
@@ -69,6 +70,8 @@ name = "modules talk to each other only through contract.py"
 type = "forbidden"
 source_modules = [
   "argus_collector.ui",
+  "argus_collector.scheduler",
+  "argus_collector.delivery",
   "argus_collector.walk",
   "argus_collector.browser",
   "argus_collector.extraction",
@@ -84,19 +87,23 @@ source_modules = [
 forbidden_modules = [
   "argus_collector.runtime.service",
   "argus_collector.runtime.repository",
+  "argus_collector.runtime.journal",
   "argus_collector.diagnostics.service",
   "argus_collector.diagnostics.repository",
   "argus_collector.browser.service",
   "argus_collector.browser.repository",
   "argus_collector.browser.session",
+  "argus_collector.browser.binding",
   "argus_collector.discovery.service",
   "argus_collector.discovery.repository",
+  "argus_collector.discovery.focus",
   "argus_collector.models.service",
   "argus_collector.models.repository",
   "argus_collector.evidence.service",
   "argus_collector.evidence.repository",
   "argus_collector.extraction.service",
   "argus_collector.extraction.repository",
+  "argus_collector.extraction.roles",
   "argus_collector.normalization.service",
   "argus_collector.normalization.repository",
   "argus_collector.storage.service",
@@ -104,9 +111,50 @@ forbidden_modules = [
   "argus_collector.walk.service",
   "argus_collector.walk.repository",
   "argus_collector.walk.runner",
+  "argus_collector.walk.decide",
+  "argus_collector.walk.findings",
+  "argus_collector.walk.page",
+  "argus_collector.walk.prompts",
+  "argus_collector.walk.sink",
+  "argus_collector.walk.state",
+  "argus_collector.scheduler.collector",
+  "argus_collector.scheduler.events",
+  "argus_collector.scheduler.finish",
+  "argus_collector.scheduler.hooks",
+  "argus_collector.scheduler.leases",
+  "argus_collector.scheduler.repository",
+  "argus_collector.scheduler.runner",
+  "argus_collector.scheduler.service",
+  "argus_collector.scheduler.sink",
+  "argus_collector.scheduler.views",
+  "argus_collector.delivery.hooks",
+  "argus_collector.delivery.loop",
+  "argus_collector.delivery.repository",
+  "argus_collector.delivery.service",
   "argus_collector.api_client.service",
-  "argus_collector.api_client.serialization",
   "argus_collector.api_client.repository",
+  "argus_collector.api_client.multipart",
+  "argus_collector.api_client.codec",
+  "argus_collector.api_client.wire",
+  "argus_collector.api_client.types_1",
+  "argus_collector.api_client.types_2",
+  "argus_collector.api_client.types_3",
+  "argus_collector.api_client.types_4",
+  "argus_collector.api_client.types_5",
+  "argus_collector.api_client.types_6",
+  "argus_collector.api_client.serialization_1",
+  "argus_collector.api_client.serialization_2",
+  "argus_collector.api_client.serialization_3",
+  "argus_collector.api_client.serialization_4",
+  "argus_collector.api_client.serialization_5",
+  "argus_collector.api_client.serialization_6",
+  "argus_collector.api_client.serialization_7",
+  "argus_collector.api_client.serialization_8",
+  "argus_collector.api_client.serialization_9",
+  "argus_collector.api_client.serialization_10",
+  "argus_collector.api_client.serialization_11",
+  "argus_collector.api_client.serialization_12",
+  "argus_collector.api_client.serialization_13",
   "argus_collector.worker_auth.service",
   "argus_collector.worker_auth.repository",
 ]
@@ -120,6 +168,8 @@ ignore_imports = [
   "argus_collector.normalization.* -> argus_collector.normalization.*",
   "argus_collector.storage.* -> argus_collector.storage.*",
   "argus_collector.walk.* -> argus_collector.walk.*",
+  "argus_collector.scheduler.* -> argus_collector.scheduler.*",
+  "argus_collector.delivery.* -> argus_collector.delivery.*",
   "argus_collector.api_client.* -> argus_collector.api_client.*",
   "argus_collector.runtime.* -> argus_collector.runtime.*",
   "argus_collector.worker_auth.* -> argus_collector.worker_auth.*",

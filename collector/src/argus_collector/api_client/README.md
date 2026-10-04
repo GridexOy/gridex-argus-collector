@@ -1,33 +1,33 @@
 # api_client
 
-Generated from `docs/ARGUS20_COLLECTOR_OPENAPI.json` by `scripts/gen_api_client.ps1`
-(`scripts/gen_api_client.py` does the work; Python logic lives under
-`scripts/codegen/`). Never edit the files below by hand -- rerun the
-generator instead; `scripts/gates/check_codegen.py` fails the build if a
-regeneration is not a no-op (CLAUDE.md rule 14, "one door").
+Generated from `docs/ARGUS20_COLLECTOR_OPENAPI.json` by `scripts/gen_api_client.ps1` (logic: `scripts/codegen/`).
+Never edit the files below by hand -- rerun the generator; `check_codegen` fails
+the build if a regeneration is not a no-op (CLAUDE.md rule 14, "one door").
+Covers the operationIds in `scripts/codegen/manifest.py`: `heartbeat`, `claimJobs`, `uploadEvidence`, `postEvents`, `reconcileJob`.
 
-Covers exactly the operationIds listed in `scripts/codegen/manifest.py`
-(today: `heartbeat` -- ARGUS20_TZ_TANDEM.md pair A1, "Connection"). The
-other operations in the OpenAPI document belong to later pairs; extend the
-manifest and rerun the generator when one of them is needed, nothing else
-has to change by hand.
+| File | Contents |
+|---|---|
+| `contract.py` | the only entry point: re-exports types, codecs, `ApiError`, `ProxyMode`, ops |
+| `service.py` | one function per operation: serialize, POST, parse any 2xx body |
+| `repository.py` | `urllib.request` transport, `ApiError`, the `system`/`direct` openers |
+| `multipart.py` | multipart/form-data encoding (no I/O) |
+| `types_1..6.py` | `StrEnum`s, frozen dataclasses, union aliases (dependencies first) |
+| `serialization_1..13.py` | `<snake>_to_json`/`_from_json` pairs, a class registry |
+| `codec.py` | generic `to_json(value)` / `from_json(kind, data)` over the registries |
+| `wire.py` | the small helpers the codecs share (`opt`, `const`, `or_none`, ...) |
+| `tests/` | hand-written: codec round trips, an embedded `http.server` double |
 
-| File | Generated | Contents |
-|---|---|---|
-| `service.py` | yes | the dataclasses and `StrEnum`s |
-| `serialization.py` | yes | `..._to_json`/`..._from_json` for required-only types (no I/O) |
-| `serialization_patch.py` | yes | the same, for patch-style (any-optional-field) types |
-| `repository.py` | yes | `urllib.request` transport, `ApiError`, the opener pair |
-| `contract.py` | yes | re-exports the types, one wrapper function per op |
-| `tests/test_api_client.py` | no | round-trip tests, an embedded `http.server` double |
-
-Conventions the generator follows:
-- A schema property required by the wire schema becomes a dataclass field
-  with no default; the whole object is a frozen dataclass.
-- A property outside `required` becomes a field defaulted to the schema's
-  own `default` when it states one, else `None`. Serializing such an object
-  (`PolicyPatch` today) omits every field still at its default/`None`, so
-  the wire only ever carries what was actually set.
+Conventions:
+- A component object is a frozen dataclass of the same name; field names are the
+  JSON property names. Field order: required, then optional, then `const` fields.
+- An optional property defaults to the schema's `default`, else `None`, and is left
+  out of the JSON while it still equals that default. A `const` property is always
+  written; reading it accepts a missing value but raises ValueError on another one.
+- Inline enums/objects are named `<Schema><Prop>` (array items add `Item`); a
+  component enum keeps its name. `oneOf` becomes a union alias whose variants are
+  dispatched on the property that is `const` in each (`kind`, `type`); `oneOf`
+  with `{type: null}` and `["T", "null"]` become `T | None`; `{}` becomes `Any`.
+- Path parameters are percent-encoded; a multipart object part is sent as JSON.
 - `proxy_mode` ("system" honors the OS proxy, "direct" never uses one) is a
   plain parameter the caller decides -- `api_client` never sniffs the host.
 

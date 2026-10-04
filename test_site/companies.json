@@ -1,0 +1,74 @@
+[
+  {
+    "company_id": "fixture_oy",
+    "company_name": "Fixture Oy",
+    "seed_urls": [
+      "http://127.0.0.1:8765/"
+    ],
+    "approved_hosts": [
+      "127.0.0.1"
+    ],
+    "priority_countries": [
+      "FI"
+    ],
+    "priority_languages": [
+      "fi",
+      "en"
+    ],
+    "project_id": "fixture-expo-2027"
+  },
+  {
+    "company_id": "nordtec",
+    "company_name": "Nordtec AB",
+    "seed_urls": [
+      "http://nordtec.localhost:8765/"
+    ],
+    "approved_hosts": [
+      "nordtec.localhost"
+    ],
+    "priority_countries": [
+      "FI"
+    ],
+    "priority_languages": [
+      "fi",
+      "en"
+    ],
+    "project_id": "fixture-expo-2027"
+  },
+  {
+    "company_id": "vogel",
+    "company_name": "Vogel Antriebstechnik GmbH",
+    "seed_urls": [
+      "http://vogel.localhost:8765/"
+    ],
+    "approved_hosts": [
+      "vogel.localhost"
+    ],
+    "priority_countries": [
+      "FI"
+    ],
+    "priority_languages": [
+      "fi",
+      "en"
+    ],
+    "project_id": "fixture-expo-2027"
+  },
+  {
+    "company_id": "katsa",
+    "company_name": "Katsa Oy",
+    "seed_urls": [
+      "http://katsa-oy.localhost:8765/"
+    ],
+    "approved_hosts": [
+      "katsa-oy.localhost"
+    ],
+    "priority_countries": [
+      "FI"
+    ],
+    "priority_languages": [
+      "fi",
+      "en"
+    ],
+    "project_id": "fixture-expo-2027"
+  }
+]

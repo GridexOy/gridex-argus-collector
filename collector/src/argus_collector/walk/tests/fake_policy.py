@@ -65,3 +65,22 @@ class GoldPolicy:
                 if word in text.lower():
                     return {"action": "navigate" if kind == "link" else "click", "index": index}
         return {"action": "finish", "index": None, "reason": "nothing promising left"}
+
+
+REVEAL_WORDS = ("näytä yhteystiedot", "show contact", "show more", "näytä lisää")
+
+
+class RankedPolicy(GoldPolicy):
+    """Takes the walk's own ranking: a button that reveals contacts first, else the
+    first element shown, so the visit order is the discovery ranking (with the
+    job's country focus)."""
+
+    def action(self, user: str) -> dict[str, Any]:
+        found = elements(user)
+        for index, kind, text, _ in found:
+            if kind == "button" and any(w in text.lower() for w in REVEAL_WORDS):
+                return {"action": "click", "index": index}
+        if not found:
+            return {"action": "finish", "index": None, "reason": "nothing left"}
+        index, kind, _, _ = found[0]
+        return {"action": "navigate" if kind == "link" else "click", "index": index}

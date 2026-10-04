@@ -14,6 +14,7 @@ from types import TracebackType
 
 from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
 
+from argus_collector.browser.binding import BINDING_JS, PersonProbe, parse_result, probe_payload
 from argus_collector.browser.service import launch_kwargs
 from argus_collector.discovery.contract import Candidate
 from argus_collector.runtime import contract as runtime
@@ -136,6 +137,18 @@ class WalkBrowser:
         self.page.evaluate("() => window.scrollTo(0, document.body.scrollHeight)")
         self.page.wait_for_timeout(SETTLE_MS)
         return self.observe()
+
+    def back(self) -> PageState:
+        """History back (after an action left the approved hosts), wait, observe."""
+        self.page.go_back(wait_until="domcontentloaded")
+        self._settle()
+        return self.observe()
+
+    def bindings(self, persons: list[PersonProbe]) -> list[tuple[str, ...]]:
+        """Structural binding of each probed value to its person on the current DOM."""
+        if not persons:
+            return []
+        return parse_result(self.page.evaluate(BINDING_JS, probe_payload(persons)), persons)
 
     def observe(self) -> PageState:
         """Current page without acting: html, visible text, candidates."""

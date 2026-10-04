@@ -9,8 +9,11 @@ from datetime import UTC, datetime
 from typing import Protocol, cast
 
 from argus_collector.api_client import contract as api
+from argus_collector.delivery import contract as delivery
 from argus_collector.diagnostics import contract as diagnostics
 from argus_collector.runtime import contract as runtime
+from argus_collector.scheduler import contract as scheduler
+from argus_collector.ui.app_collect import capabilities_of
 from argus_collector.ui.connection_lines import ConnectionProps, ConnectionState
 from argus_collector.ui.connection_lines import connection_props as build_connection_props
 from argus_collector.ui.repository import Messages
@@ -27,20 +30,15 @@ def _is_loopback(address: str) -> bool:
     return host in LOOPBACK_HOSTS
 
 
-class WalkHost(Protocol):
-    @property
-    def walking(self) -> bool: ...
-
-
 class Host(Protocol):
     config: runtime.Config
     report: diagnostics.Report | None
 
-    @property
-    def walk(self) -> WalkHost: ...
-
     def post(self, action: Callable[[], None]) -> None: ...
     def refresh(self) -> None: ...
+    def heartbeat_fields(self) -> scheduler.HeartbeatFields: ...
+    def heartbeat_answered(self, response: api.HeartbeatResponse, acks: list[str]) -> None: ...
+    def connection_ok(self) -> None: ...
 
 
 class ConnectionController:
@@ -58,8 +56,25 @@ class ConnectionController:
     def props(self, msgs: Messages) -> ConnectionProps:
         return build_connection_props(msgs, self.state)
 
+    @property
+    def connected(self) -> bool:
+        return self.state.status == "ok"
+
+    def proxy_mode(self, address: str) -> api.ProxyMode:
+        configured = cast("api.ProxyMode", self.host.config.network_proxy)
+        return "direct" if _is_loopback(address) else configured
+
+    def api_target(self) -> delivery.ApiTarget | None:
+        """Where delivery and claims go: the saved address, worker_id and token."""
+        state, token = self.state, worker_auth.load_token()
+        if not state.address or not state.worker_id or not token:
+            return None
+        base_url = state.address.rstrip("/") + API_SUFFIX
+        return delivery.ApiTarget(base_url, state.worker_id, token, self.proxy_mode(state.address))
+
     def start_if_saved(self) -> None:
         if self.state.worker_id and worker_auth.load_token():
+            self.host.connection_ok()
             self._start_loop()
 
     def test_connection(self, address: str, worker_id: str, token_input: str) -> None:
@@ -84,33 +99,27 @@ class ConnectionController:
         )
 
     def _call(self, address: str, worker_id: str, token: str) -> api.HeartbeatResponse:
-        report = self.host.report
-        chrome_ok = report is not None and report.states.chrome is diagnostics.ChromeState.AVAILABLE
-        model_ok = report is not None and report.states.model is not diagnostics.ModelState.NONE
+        """One heartbeat with the collector's leases, outbox, slots and command acks;
+        the answer (renewals, commands) goes back to the collector."""
+        caps = capabilities_of(self.host.report)
+        fields = self.host.heartbeat_fields()
         request = api.HeartbeatRequest(
             worker_id=worker_id,
             worker_version=runtime.current_version_status().file_version,
             schema_versions=SCHEMA_VERSIONS,
-            capabilities=api.Capabilities(
-                http=True,
-                browser=chrome_ok,
-                vision=False,
-                model=model_ok,
-                document_formats=[],
-                release_level=api.CapabilitiesReleaseLevel.M1,
-            ),
-            collecting=self.host.walk.walking,
-            active_jobs=[],
-            outbox_pending=0,
-            free_job_slots=0 if self.host.walk.walking else 1,
-            browser_available=chrome_ok,
-            model_available=model_ok,
-            acknowledgements=[],
+            capabilities=caps,
+            collecting=fields.collecting,
+            active_jobs=fields.active_jobs,
+            outbox_pending=fields.outbox_pending,
+            free_job_slots=fields.free_job_slots,
+            browser_available=caps.browser,
+            model_available=caps.model,
+            acknowledgements=fields.acknowledgements,
         )
-        configured = cast("api.ProxyMode", self.host.config.network_proxy)
-        proxy_mode: api.ProxyMode = "direct" if _is_loopback(address) else configured
         base_url = address.rstrip("/") + API_SUFFIX
-        return api.heartbeat(base_url, token, request, proxy_mode=proxy_mode)
+        response = api.heartbeat(base_url, token, request, proxy_mode=self.proxy_mode(address))
+        self.host.heartbeat_answered(response, [a.command_id for a in fields.acknowledgements])
+        return response
 
     def _apply_ok(self, address: str, worker_id: str, token: str, persist: bool) -> None:
         if persist:
@@ -124,6 +133,7 @@ class ConnectionController:
             last_heartbeat=datetime.now(UTC),
         )
         self.host.refresh()
+        self.host.connection_ok()
         self._start_loop()
 
     def _apply_error(self, address: str, worker_id: str, exc: api.ApiError) -> None:

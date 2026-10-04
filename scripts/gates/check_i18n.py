@@ -2,7 +2,10 @@
 
 A used key is a string literal in collector/src (outside tests) whose first
 segment is a namespace of fi.json (`resources.`, `browser.`, ...), or the
-argument of `Get-Msg '<key>'` in scripts/*.ps1.
+argument of `Get-Msg '<key>'` in scripts/*.ps1. The generated `api_client`
+is not scanned: its literals are wire values of the contract (event types
+such as `job.finished`), never panel strings, and they share the `job.`
+namespace with the keys `job.state.*` of TZ_SELAIN 6.1.
 """
 
 from __future__ import annotations
@@ -17,6 +20,7 @@ from gates.common import GateResult, rel
 MESSAGES = Path("collector") / "messages" / "fi.json"
 SOURCE = Path("collector") / "src"
 SCRIPTS = Path("scripts")
+NOT_UI = ("tests", "api_client")
 KEY_RE = re.compile(r"^[a-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$")
 PS_KEY_RE = re.compile(r"Get-Msg\s+'([A-Za-z0-9_.]+)'")
 
@@ -42,7 +46,7 @@ def used_keys(root: Path, namespaces: set[str]) -> dict[str, list[str]]:
     """key -> places, from Python literals in matching namespaces and Get-Msg calls."""
     used: dict[str, list[str]] = {}
     for path in sorted((root / SOURCE).rglob("*.py")):
-        if "tests" in path.relative_to(root).parts:
+        if any(part in NOT_UI for part in path.relative_to(root).parts):
             continue
         for line, value in python_literals(path):
             if value.split(".", 1)[0] in namespaces:

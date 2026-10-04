@@ -10,9 +10,11 @@ from argus_collector.evidence.service import Snapshot
 
 
 def _write_atomic(path: Path, content: str) -> None:
+    """Exact utf-8 bytes (no newline translation: on Windows `write_text` would turn
+    `\n` into `\r\n` and the file would no longer match its sha256)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
-    tmp.write_text(content, encoding="utf-8")
+    tmp.write_bytes(content.encode("utf-8"))
     os.replace(tmp, path)
 
 
@@ -47,3 +49,10 @@ def manifest_row(conn: sqlite3.Connection, evidence_id: str) -> dict[str, str] |
         "SELECT * FROM evidence_manifest WHERE evidence_id = ?", (evidence_id,)
     ).fetchone()
     return None if row is None else {k: str(row[k]) for k in row.keys()}
+
+
+def read_bytes(path: str) -> bytes | None:
+    try:
+        return Path(path).read_bytes()
+    except OSError:
+        return None

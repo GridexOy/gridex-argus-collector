@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from urllib.parse import urlsplit, urlunsplit
 
 from argus_collector.discovery import repository as tables
+from argus_collector.discovery.focus import Focus, focus_score
 
 KIND_LINK = "link"
 KIND_BUTTON = "button"
@@ -37,6 +38,10 @@ def _host(url: str) -> str:
         return ""
     host = (parts.hostname or "").lower()
     return host[4:] if host.startswith("www.") else host
+
+
+def host_of(url: str) -> str:
+    return _host(url)
 
 
 def normalize_url(url: str) -> str:
@@ -74,7 +79,7 @@ def is_allowed_url(url: str, hosts: frozenset[str]) -> bool:
     return not parts.path.lower().endswith(tables.DOCUMENT_SUFFIXES)
 
 
-def score_link(text: str, href: str) -> int:
+def score_link(text: str, href: str, focus: Focus | None = None) -> int:
     words = {w.lower() for w in WORD_RE.findall(text)}
     path_words = {w.lower() for w in WORD_RE.findall(urlsplit(href).path.replace("-", " "))}
     score = 0
@@ -88,11 +93,14 @@ def score_link(text: str, href: str) -> int:
             score += weight
     if any(w in text.lower() for w in tables.NEXT_WORDS):
         score += 5
-    return score
+    return score + focus_score(text, href, focus)
 
 
 def rank_candidates(
-    candidates: list[Candidate], visited: set[str], hosts: frozenset[str]
+    candidates: list[Candidate],
+    visited: set[str],
+    hosts: frozenset[str],
+    focus: Focus | None = None,
 ) -> list[Candidate]:
     seen = set(visited)
     links: list[tuple[int, int, Candidate]] = []
@@ -105,7 +113,7 @@ def rank_candidates(
         if key in seen or not is_allowed_url(cand.href, hosts):
             continue
         seen.add(key)
-        links.append((-score_link(cand.text, cand.href), cand.index, cand))
+        links.append((-score_link(cand.text, cand.href, focus), cand.index, cand))
     links.sort()
     return [c for _, _, c in links] + buttons
 

@@ -1,4 +1,4 @@
-"""Reference OpenAPI test double for ARGUS 2.0's /api/collector (TZ_TANDEM pair A1).
+"""Reference test stand for ARGUS 2.0's /api/collector (the whole OpenAPI contract).
 
 Test-only, never deployed. See README.md.
 """

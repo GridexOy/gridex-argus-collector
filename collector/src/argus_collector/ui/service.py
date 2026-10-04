@@ -17,8 +17,15 @@ from argus_collector.diagnostics.contract import (
 )
 from argus_collector.runtime.contract import VersionStatus, finnish_stamp, version_line
 from argus_collector.ui.connection_lines import ConnectionProps
+from argus_collector.ui.queue_lines import DeliveryProps, QueueProps
 from argus_collector.ui.repository import Messages
-from argus_collector.ui.walk_lines import CollectProps, contact_row, walk_event_line
+from argus_collector.ui.walk_lines import (
+    Activity,
+    CollectProps,
+    collect_props,
+    contact_row,
+    walk_event_line,
+)
 
 LEVEL_OK = "ok"
 LEVEL_WARN = "warn"
@@ -42,6 +49,9 @@ __all__ = [
     "LEVEL_WARN",
     "CollectProps",
     "ConnectionProps",
+    "DeliveryProps",
+    "QueueProps",
+    "Activity",
     "Line",
     "PanelProps",
     "build_props",
@@ -68,6 +78,8 @@ class PanelProps:
     open_browser_label: str = ""
     open_browser_enabled: bool = True
     stop_banner: Line | None = None
+    queue: QueueProps | None = None
+    delivery: DeliveryProps | None = None
 
 
 def version_props(msgs: Messages, status: VersionStatus) -> Line:
@@ -136,43 +148,6 @@ def resources_props(msgs: Messages, report: Report | None, error: str | None) ->
     return resource_lines(msgs, report)
 
 
-def collect_props(
-    msgs: Messages, report: Report | None, stop_reason: str | None, walking: bool
-) -> CollectProps:
-    """Kaynnista is live only with a listed model, an available Chrome and no STOP."""
-    ready = (
-        report is not None
-        and report.states.chrome is ChromeState.AVAILABLE
-        and report.states.model is not ModelState.NONE
-    )
-    hint = ""
-    if stop_reason:
-        hint = msgs.t("collecting.stopFile")
-    elif not ready:
-        hint = msgs.t("collecting.notReady")
-    return CollectProps(
-        site_url_label=msgs.t("collecting.siteUrl"),
-        manual_note=msgs.t("collecting.manualNote"),
-        start_label=msgs.t("collecting.start"),
-        pause_label=msgs.t("collecting.pause"),
-        stop_label=msgs.t("collecting.stop"),
-        autostart_label=msgs.t("collecting.autostartWindows"),
-        auto_collect_label=msgs.t("collecting.autoCollect"),
-        start_enabled=ready and not walking and not stop_reason,
-        stop_enabled=walking,
-        hint=hint,
-        open_source_hint=msgs.t("collecting.openSource"),
-        idle_status=msgs.t("collecting.status.idle"),
-        columns=[
-            msgs.t("collecting.col.name"),
-            msgs.t("collecting.col.title"),
-            msgs.t("collecting.col.phone"),
-            msgs.t("collecting.col.email"),
-            msgs.t("collecting.col.source"),
-        ],
-    )
-
-
 def build_props(
     msgs: Messages,
     version: VersionStatus,
@@ -180,18 +155,22 @@ def build_props(
     report_error: str | None,
     stop_reason: str | None,
     connection: ConnectionProps,
-    walking: bool = False,
+    now: Activity | None = None,
+    blocks: tuple[QueueProps, DeliveryProps] | None = None,
 ) -> PanelProps:
     banner = Line(msgs.t("stop.active", files=stop_reason), LEVEL_ERROR) if stop_reason else None
+    activity = now or Activity()
     return PanelProps(
         title=msgs.t("app.name"),
         version=version_props(msgs, version),
         connection=connection,
         collecting_title=msgs.t("collecting.title"),
-        collect=collect_props(msgs, report, stop_reason, walking),
+        collect=collect_props(msgs, report, stop_reason, activity),
         resources_title=msgs.t("resources.title"),
         resources=resources_props(msgs, report, report_error),
         open_browser_label=msgs.t("attention.openBrowser"),
-        open_browser_enabled=not walking,
+        open_browser_enabled=not (activity.walking or activity.collecting),
         stop_banner=banner,
+        queue=blocks[0] if blocks else None,
+        delivery=blocks[1] if blocks else None,
     )

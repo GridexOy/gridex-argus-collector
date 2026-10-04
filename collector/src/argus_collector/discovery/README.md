@@ -17,6 +17,8 @@ Entry point: `contract.py`.
 | `normalize_url(url)` | lower-case scheme and host, no fragment, no default port, no trailing slash on paths |
 | `page_key(url, text_sha256)` | state key = normalised URL + 16 hex of the content hash (section 8.5) |
 
-Other bases of K7 (`linked_from_contact_section`, `business_id_match`,
-`owner_known_url`) arrive with S2 jobs; a walk started from the panel knows
-only the seed and its redirect.
+| `make_focus(countries, languages)` / `focus_brief(focus)` | 0.4.3.0 (`focus.py`, owner 04.10.2026): scope.priority_countries / priority_languages. Links get +12 for the first language (`Suomi`, `/fi/`, `?lang=fi`) and for the exhibition country or its cities (`Finland office`), +4 for other priority languages, -8 for a third language; export / Nordic / international sales and marketing words up to +10 (a company without an office there). The brief tells the model the same order |
+
+A job walk takes its hosts from the job's `approved_hosts` (K7 ed. 02:
+basis `seed`; `redirect_from_seed` waits for the owner's "ok"); a walk
+started from the panel knows only the seed and its redirect.

@@ -12,15 +12,18 @@ import sqlite3
 from pathlib import Path
 
 from argus_collector.evidence import repository, service
-from argus_collector.evidence.service import Snapshot, TextSpan
+from argus_collector.evidence.service import Snapshot, StoredSnapshot, TextSpan
 from argus_collector.runtime import contract as runtime
 
 __all__ = [
     "Snapshot",
+    "StoredSnapshot",
     "TextSpan",
     "canonical_text",
     "evidence_dir",
     "find_span",
+    "load_snapshot",
+    "sha256_bytes",
     "sha256_text",
     "store_snapshot",
 ]
@@ -70,3 +73,20 @@ def store_snapshot(
     repository.write_files(snapshot, html, canonical)
     repository.insert_manifest(conn, snapshot)
     return snapshot
+
+
+def sha256_bytes(data: bytes) -> str:
+    return service.sha256_bytes(data)
+
+
+def load_snapshot(conn: sqlite3.Connection, evidence_id: str) -> StoredSnapshot | None:
+    """The stored html bytes and canonical text of a manifest row, for upload to
+    ARGUS; None when the row or one of its files is missing."""
+    row = repository.manifest_row(conn, evidence_id)
+    if row is None:
+        return None
+    html = repository.read_bytes(row["html_path"])
+    text = repository.read_bytes(row["text_path"])
+    if html is None or text is None:
+        return None
+    return service.stored_snapshot(row, html, text.decode("utf-8"))

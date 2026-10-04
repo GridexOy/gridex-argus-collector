@@ -13,6 +13,7 @@ Entry point: `contract.py`.
 | `find_span(text, quote)` | `TextSpan(start, end, quote, text_sha256)` in code points; exact match first, then whitespace-insensitive; None when absent |
 | `store_snapshot(conn, url, final_url, html, text, base_dir)` | writes `<base>/<sha[:2]>/<sha>.html` + `.txt` atomically (tmp + rename), inserts the `evidence_manifest` row; `evidence_id` = sha256 of the html, so the same page stored twice is one snapshot |
 | `evidence_dir()` | `<user_data_dir>/evidence` |
+| `load_snapshot(conn, evidence_id)` | 0.4.3.0: the stored bytes + canonical text for upload; files are written as exact utf-8 bytes (no `\r\n` translation on Windows), so the bytes match `sha256` |
 
 `service.py` is pure (hashes, spans, paths), `repository.py` touches the
 disk and the `evidence_manifest` table of the collector database

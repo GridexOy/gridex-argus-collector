@@ -96,3 +96,17 @@ def test_direct_opener_has_no_proxy_handler(monkeypatch: pytest.MonkeyPatch) -> 
     assert _has_proxy_handler(urllib.request.build_opener())
     assert not _has_proxy_handler(urllib.request.build_opener(urllib.request.ProxyHandler({})))
     assert not _has_proxy_handler(repository.DIRECT_OPENER)
+
+
+def test_listener_hears_every_call_success_and_failure(server: FakeModelServer) -> None:
+    heard: list[contract.CallRecord] = []
+    client = contract.ModelClient(
+        contract.ModelConfig(server.endpoint, "fake-instruct"), None, heard.append
+    )
+    client.chat_json("sys", "hello world", "walk.cards")
+    server.fail_next = 1
+    with pytest.raises(contract.ModelError):
+        client.chat("sys", "x", "walk.action")
+    assert [(r.purpose, r.ok) for r in heard] == [("walk.cards", True), ("walk.action", False)]
+    assert heard[0].model == "fake-instruct" and heard[0].prompt_tokens == 2
+    assert heard[0].started_at.endswith("+00:00") and "HTTP 500" in heard[1].error

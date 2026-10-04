@@ -14,6 +14,7 @@ Entry point: `contract.py`.
 | `current_version_status()` | VERSION file + `build.json`; a mismatch or a bad format is reported in `error` |
 | `version_line(status, text)` | `cv0.0.1.0 (3.10.2026 klo 14.32) a1b2c3d`, or `cv0.0.1.0 (<text>)` when not installed |
 | `stop_files()` / `stop_reason()` | kill switch: `STOP` in repo root or in the user data dir |
+| `journal(channel, message)` / `prune_journal()` / `safe_url(url)` | 0.4.3.0 (`journal.py`): `<user_data_dir>/logs/collector-YYYY-MM-DD.log`, lines `<UTC> <channel>: <message>` with the Lokit channels `http` / `browser` / `extraction` / `delivery` / `model`; no contact values, no tokens, URLs without query; 14 days |
 | `load_config()` | `Config(model_endpoint, model_name, walk_page_budget, test_site_port, argus_base_url)` from the first `config.yaml` found; empty model strings mean the `models` defaults |
 
 `repository.py` reads the disk on every call (no caching), `service.py` is

@@ -34,6 +34,38 @@ class Snapshot:
     text_sha256: str
     html_path: Path
     text_path: Path
+    html_bytes: int = 0  # length of the utf-8 html, the exact bytes uploaded to ARGUS
+
+
+@dataclass(frozen=True)
+class StoredSnapshot:
+    """A snapshot read back from disk: the exact bytes that were hashed."""
+
+    evidence_id: str
+    url: str
+    final_url: str
+    fetched_at: str
+    html: bytes
+    html_sha256: str
+    text: str
+    text_sha256: str
+
+
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def stored_snapshot(row: dict[str, str], html: bytes, text: str) -> StoredSnapshot:
+    return StoredSnapshot(
+        evidence_id=row["evidence_id"],
+        url=row["url"],
+        final_url=row["final_url"],
+        fetched_at=row["fetched_at"],
+        html=html,
+        html_sha256=sha256_bytes(html),
+        text=text,
+        text_sha256=sha256_text(text),
+    )
 
 
 def canonical_text(text: str) -> str:
@@ -87,4 +119,5 @@ def describe_snapshot(url: str, final_url: str, html: str, text: str, base_dir: 
         text_sha256=sha256_text(text),
         html_path=html_path,
         text_path=text_path,
+        html_bytes=len(html.encode("utf-8")),
     )

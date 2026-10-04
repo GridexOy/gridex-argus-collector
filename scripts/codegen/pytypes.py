@@ -1,103 +1,150 @@
-"""FieldSpec -> Python type / (de)serialization expression rendering.
+"""TypeRef -> Python annotation and (de)serialization expressions.
 
-Shared by render_service (class bodies, to_json/from_json bodies) so the
-mapping from a field's `kind` to Python code lives in exactly one place.
+Each function records the names its output uses in a Needs, so the file the
+expression lands in imports exactly what it needs. `dump`/`parse` return an
+inline expression over a value; `dumper`/`parser` return the callable form
+used as an argument of the wire.py helpers (`opt`, `or_none`, `list_of`...).
 """
 
 from __future__ import annotations
 
-from codegen.naming import pascal_to_snake
-from codegen.types import FieldSpec
+from codegen.chunking import Needs
+from codegen.naming import snake_case
+from codegen.types import FieldSpec, TypeRef
 
-SCALAR_CAST = ("str", "int", "float", "bool")  # also valid as a Python cast expression
-
-
-def json_key(field: FieldSpec) -> str:
-    return f'"{field.name}"'
-
-
-def field_type(field: FieldSpec) -> str:
-    base, nullable_by_kind = _base_type(field)
-    nullable = nullable_by_kind or (not field.required and field.default_literal == "None")
-    return f"{base} | None" if nullable else base
+NAMED = ("enum", "object", "union")
+ANY = ("typing", "Any")
+IDENTITY = ("scalar", "any", "bytes")
+SIMPLE_ITEMS = ("scalar", "any", "dict", "enum", "object", "union")
 
 
-def _base_type(field: FieldSpec) -> tuple[str, bool]:
-    kind = field.kind
-    if kind.endswith("_or_null"):
-        return kind[: -len("_or_null")], True
-    if kind in SCALAR_CAST:
-        return kind, False
-    if kind in ("enum", "object"):
-        assert field.ref is not None
-        return field.ref, False
-    if kind == "list_scalar":
-        assert field.scalar is not None
-        return f"list[{field.scalar}]", False
-    if kind == "list_object":
-        assert field.ref is not None
-        return f"list[{field.ref}]", False
-    raise ValueError(f"unknown field kind {kind!r}")
+def codec_name(type_name: str, direction: str) -> str:
+    """`ClaimRequest`, "to" -> `claim_request_to_json`."""
+    return f"{snake_case(type_name)}_{direction}_json"
 
 
-def to_json_expr(field: FieldSpec) -> str:
-    value = f"value.{field.name}"
-    kind = field.kind
-    if kind in SCALAR_CAST or kind.endswith("_or_null"):
-        return value
-    if kind == "enum":
-        return f"{value}.value"
-    if kind == "object":
-        assert field.ref is not None
-        return f"{pascal_to_snake(field.ref)}_to_json({value})"
-    if kind == "list_scalar":
-        return f"list({value})"
-    if kind == "list_object":
-        assert field.ref is not None
-        return f"[{pascal_to_snake(field.ref)}_to_json(v) for v in {value}]"
-    raise ValueError(f"unknown field kind {kind!r}")
+def annotation(t: TypeRef, needs: Needs) -> str:
+    if t.kind in ("scalar", "bytes"):
+        return "bytes" if t.kind == "bytes" else t.name
+    if t.kind in ("any", "dict"):
+        needs.stdlib.add(ANY)
+        return "Any" if t.kind == "any" else "dict[str, Any]"
+    if t.kind in NAMED:
+        needs.types.add(t.name)
+        return t.name
+    if t.kind == "list":
+        return f"list[{annotation(_item(t), needs)}]"
+    if t.kind == "nullable":
+        return f"{annotation(_item(t), needs)} | None"
+    raise ValueError(f"unknown type kind {t.kind!r}")
+
+
+def field_annotation(field: FieldSpec, needs: Needs) -> str:
+    base = annotation(field.type, needs)
+    implicit_none = not field.const and not field.required and field.default == "None"
+    if implicit_none and field.type.kind not in ("nullable", "any"):
+        return f"{base} | None"
+    return base
 
 
 def omit_condition(field: FieldSpec) -> str:
-    """Condition under which an optional field IS included on the wire."""
+    """Condition under which an optional field IS written to the wire."""
     value = f"value.{field.name}"
-    if field.default_literal == "None":
+    if field.default == "None":
         return f"{value} is not None"
-    if field.kind == "bool":
-        # `!= True`/`!= False` is ruff E712; identity is the idiomatic bool check.
-        return f"{value} is not {field.default_literal}"
-    return f"{value} != {field.default_literal}"
+    if field.default in ("True", "False"):
+        # `!= True` is ruff E712; identity is the idiomatic bool check.
+        return f"{value} is not {field.default}"
+    return f"{value} != {field.default}"
 
 
-def _cast_expr(field: FieldSpec, data_expr: str) -> str:
-    kind = field.kind
-    if kind in SCALAR_CAST:
-        return f"{kind}({data_expr})"
-    if kind.endswith("_or_null"):
-        scalar = kind[: -len("_or_null")]
-        return f"{scalar}({data_expr}) if {data_expr} is not None else None"
-    if kind == "enum":
-        return f"{field.ref}({data_expr})"
-    if kind == "object":
-        assert field.ref is not None
-        return f"{pascal_to_snake(field.ref)}_from_json({data_expr})"
-    if kind == "list_scalar":
-        assert field.scalar is not None
-        return f"[{field.scalar}(v) for v in {data_expr}]"
-    if kind == "list_object":
-        assert field.ref is not None
-        return f"[{pascal_to_snake(field.ref)}_from_json(v) for v in {data_expr}]"
-    raise ValueError(f"unknown field kind {kind!r}")
+def dump(t: TypeRef, value: str, needs: Needs) -> str:
+    """Inline expression turning `value` (of type t) into its JSON form."""
+    if t.kind in IDENTITY:
+        return value
+    if t.kind == "dict":
+        return f"dict({value})"
+    if t.kind == "enum":
+        return f"{value}.value"
+    if t.kind in ("object", "union"):
+        return f"{_codec(t.name, 'to', needs)}({value})"
+    item = _item(t)
+    if t.kind == "list" and item.kind not in SIMPLE_ITEMS:
+        return f"{_wire('list_of', needs)}({dumper(item, needs)})({value})"
+    if t.kind == "list":
+        inner = dump(item, "v", needs)
+        return f"list({value})" if inner == "v" else f"[{inner} for v in {value}]"
+    if item.kind in IDENTITY:
+        return value
+    return f"{_wire('or_none', needs)}({value}, {dumper(item, needs)})"
 
 
-def from_json_expr(field: FieldSpec) -> str:
-    key_expr = f"data[{json_key(field)}]"
-    cast = _cast_expr(field, key_expr)
-    if field.required:
-        return cast
-    # A conditional expression used as the true-branch of another one needs
-    # parens (Python grammar only allows an unparenthesized ternary in the
-    # else-branch position).
-    if " if " in cast:
-        cast = f"({cast})"
-    return f"{cast} if {json_key(field)} in data else {field.default_literal}"
+def dumper(t: TypeRef, needs: Needs) -> str:
+    if t.kind in IDENTITY:
+        return _wire("any_value", needs)
+    if t.kind == "dict":
+        return _wire("json_object", needs)
+    if t.kind == "enum":
+        return _wire("enum_value", needs)
+    if t.kind in ("object", "union"):
+        return _codec(t.name, "to", needs)
+    helper = "list_of" if t.kind == "list" else "nullable"
+    return f"{_wire(helper, needs)}({dumper(_item(t), needs)})"
+
+
+def parse(t: TypeRef, raw: str, needs: Needs) -> str:
+    """Inline expression turning the JSON value `raw` into a value of type t."""
+    if t.kind == "scalar":
+        return f"{t.name}({raw})"
+    if t.kind == "any":
+        return raw
+    if t.kind == "dict":
+        return f"dict({raw})"
+    if t.kind in NAMED:
+        return f"{parser(t, needs)}({raw})"
+    item = _item(t)
+    if t.kind == "list" and item.kind in SIMPLE_ITEMS:
+        inner = parse(item, "v", needs)
+        return f"list({raw})" if inner == "v" else f"[{inner} for v in {raw}]"
+    if t.kind == "list":
+        return f"{parser(t, needs)}({raw})"
+    if t.kind == "nullable" and item.kind == "any":
+        return raw
+    if t.kind == "nullable":
+        return f"{_wire('or_none', needs)}({raw}, {parser(item, needs)})"
+    raise ValueError(f"type kind {t.kind!r} cannot be read from JSON")
+
+
+def parser(t: TypeRef, needs: Needs) -> str:
+    if t.kind == "scalar":
+        return t.name
+    if t.kind == "any":
+        return _wire("any_value", needs)
+    if t.kind == "dict":
+        return _wire("json_object", needs)
+    if t.kind == "enum":
+        needs.types.add(t.name)
+        return t.name
+    if t.kind in ("object", "union"):
+        return _codec(t.name, "from", needs)
+    if t.kind in ("list", "nullable"):
+        helper = "list_of" if t.kind == "list" else "nullable"
+        return f"{_wire(helper, needs)}({parser(_item(t), needs)})"
+    raise ValueError(f"type kind {t.kind!r} cannot be read from JSON")
+
+
+def _item(t: TypeRef) -> TypeRef:
+    if t.item is None:
+        raise ValueError(f"{t.kind} type without an item type")
+    return t.item
+
+
+def _codec(type_name: str, direction: str, needs: Needs) -> str:
+    name = codec_name(type_name, direction)
+    needs.codecs.add(name)
+    return name
+
+
+def _wire(helper: str, needs: Needs) -> str:
+    needs.fixed.add(("wire", helper))
+    return helper

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 
@@ -37,3 +39,18 @@ def migrate(conn: sqlite3.Connection, migrations: list[tuple[int, str]]) -> None
 def table_names(conn: sqlite3.Connection) -> list[str]:
     rows = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
     return [str(r[0]) for r in rows]
+
+
+@contextmanager
+def transaction(conn: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
+    """BEGIN IMMEDIATE ... COMMIT; joins a transaction that is already open."""
+    if conn.in_transaction:
+        yield conn
+        return
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        yield conn
+    except BaseException:
+        conn.rollback()
+        raise
+    conn.commit()

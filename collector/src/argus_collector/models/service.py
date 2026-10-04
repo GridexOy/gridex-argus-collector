@@ -35,6 +35,20 @@ class ModelReply:
 
 
 @dataclass(frozen=True)
+class CallRecord:
+    """One model call as reported to a listener (ARGUS `model.called`, RULES E3)."""
+
+    purpose: str
+    model: str
+    started_at: str  # ISO 8601 UTC
+    elapsed_ms: int
+    prompt_tokens: int
+    completion_tokens: int
+    ok: bool
+    error: str = ""
+
+
+@dataclass(frozen=True)
 class Health:
     reachable: bool
     model_listed: bool

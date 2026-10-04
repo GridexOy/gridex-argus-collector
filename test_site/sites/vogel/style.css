@@ -1,0 +1,10 @@
+body { font-family: Arial, Helvetica, sans-serif; margin: 0; color: #222; background: #fff; }
+.site-header { display: flex; justify-content: space-between; padding: 12px 24px; border-bottom: 1px solid #ddd; }
+.site-header .logo { font-weight: bold; text-decoration: none; color: #124; }
+.site-header nav a { margin-left: 16px; color: #124; }
+main { max-width: 720px; margin: 24px auto; padding: 0 16px; }
+.people { list-style: none; padding: 0; }
+.person { padding: 8px 0; border-bottom: 1px solid #eee; }
+.person span, .person a { display: block; }
+.person .name { font-weight: bold; }
+.site-footer { margin-top: 48px; padding: 16px 24px; border-top: 1px solid #ddd; font-size: 14px; color: #555; }

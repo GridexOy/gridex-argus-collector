@@ -12,6 +12,7 @@ Entry point: `contract.py`.
 | `health(endpoint, name)` | `GET <endpoint>/models`; `reachable` when it answers, `model_listed` when `name` (or `name:latest`) is served. Feeds the `Malli` line of diagnostics |
 | `ModelClient(config, conn).chat_json(system, user, purpose)` | one chat completion with `response_format=json_object`, temperature 0, parsed to a dict; one retry on non-JSON, then `ModelError` |
 | `ModelClient.chat(...)` | same, plain text |
+| `ModelClient(config, conn, listener)` | 0.4.3.0: `listener(CallRecord)` hears every attempt (purpose, model, start, ms, tokens, ok): the job walk turns it into ARGUS `model.called` |
 | `ModelConfig(endpoint, name, timeout_s=180, max_tokens=1024)` | from `model.endpoint` / `model.name` in `config.yaml` |
 
 Rules:

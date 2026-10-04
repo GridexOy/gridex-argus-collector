@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from urllib.parse import urlsplit
 
 from argus_collector.normalization import repository as tables
 
@@ -84,13 +85,49 @@ def find_emails(text: str) -> list[str]:
     return [m.group(0) for m in tables.EMAIL_FIND_RE.finditer(text)]
 
 
-def find_phones(text: str) -> list[str]:
+def find_phones(text: str, region: str = DEFAULT_REGION) -> list[str]:
     found: list[str] = []
     for match in tables.PHONE_FIND_RE.finditer(text):
         raw = match.group(0).strip()
-        if normalize_phone(raw) is not None:
+        if normalize_phone(raw, region) is not None:
             found.append(raw)
     return found
+
+
+def _locale_region(tag: str) -> str | None:
+    """`de-DE`/`fi_fi` -> its region; a bare language -> None (handled by the caller)."""
+    match = tables.LOCALE_RE.match(tag.strip())
+    if match is None or match.group(2) is None:
+        return None
+    region = match.group(2).upper()
+    return region if region in tables.REGION_CODES else None
+
+
+def _language_region(tag: str) -> str | None:
+    match = tables.LOCALE_RE.match(tag.strip())
+    return tables.LANGUAGE_REGIONS.get(match.group(1).lower()) if match else None
+
+
+def region_for_page(url: str, html_lang: str, fallback: str | None) -> str | None:
+    """National phone context of a page: ccTLD, then the region of `<html lang>`,
+    then a locale path segment (`/fi/`, `/de-de/`), then the page language,
+    then `fallback` (the exhibition country of the job, FI for a manual walk)."""
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return fallback
+    host = (parts.hostname or "").lower()
+    tld = host.rsplit(".", 1)[-1] if "." in host else ""
+    segment = parts.path.strip("/").split("/", 1)[0]
+    for found in (
+        tables.TLD_REGIONS.get(tld),
+        _locale_region(html_lang),
+        _locale_region(segment) or _language_region(segment),
+        _language_region(html_lang),
+    ):
+        if found is not None:
+            return found
+    return fallback
 
 
 def same_value(kind: str, left: str, right: str) -> bool:

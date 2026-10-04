@@ -50,12 +50,16 @@ class Contact:
     email: VerifiedField | None
 
 
-def _normalize(kind: str, raw: str) -> str | None:
-    return norm.normalize_email(raw) if kind == KIND_EMAIL else norm.normalize_phone(raw)
+def _normalize(kind: str, raw: str, region: str = norm.DEFAULT_REGION) -> str | None:
+    if kind == KIND_EMAIL:
+        return norm.normalize_email(raw)
+    return norm.normalize_phone(raw, region)
 
 
-def _channel(kind: str, raw: str, locator: str, text: str, visible: str = "") -> Channel | None:
-    value = _normalize(kind, raw)
+def _channel(
+    kind: str, raw: str, locator: str, text: str, visible: str = "", region: str = "FI"
+) -> Channel | None:
+    value = _normalize(kind, raw, region)
     if value is None:
         return None
     span = find_span(text, visible) if visible else None
@@ -64,28 +68,28 @@ def _channel(kind: str, raw: str, locator: str, text: str, visible: str = "") ->
     return Channel(kind, value, visible or raw, locator, span)
 
 
-def _href_channels(finds: reader.RawFinds, text: str) -> list[Channel | None]:
+def _href_channels(finds: reader.RawFinds, text: str, region: str) -> list[Channel | None]:
     out: list[Channel | None] = []
     for href, visible in finds.tel_hrefs:
-        out.append(_channel(KIND_PHONE, href, "href:tel", text, visible))
+        out.append(_channel(KIND_PHONE, href, "href:tel", text, visible, region))
     for href, visible in finds.mailto_hrefs:
         out.append(_channel(KIND_EMAIL, href, "href:mailto", text, visible))
     return out
 
 
-def extract_channels(html: str, text: str) -> list[Channel]:
+def extract_channels(html: str, text: str, region: str = norm.DEFAULT_REGION) -> list[Channel]:
     finds = reader.raw_finds(html)
-    found = _href_channels(finds, text)
+    found = _href_channels(finds, text, region)
     for kind, raw, pointer in reader.jsonld_channels(finds.jsonld):
-        found.append(_channel(kind, raw, pointer, text))
+        found.append(_channel(kind, raw, pointer, text, region=region))
     for encoded in finds.cfemails:
         decoded = norm.decode_cfemail(encoded)
         if decoded:
             found.append(Channel(KIND_EMAIL, decoded, encoded, "cfemail", None))
     for raw in norm.find_emails(text):
         found.append(_channel(KIND_EMAIL, raw, LOCATOR_TEXT, text))
-    for raw in norm.find_phones(text):
-        found.append(_channel(KIND_PHONE, raw, LOCATOR_TEXT, text))
+    for raw in norm.find_phones(text, region):
+        found.append(_channel(KIND_PHONE, raw, LOCATOR_TEXT, text, region=region))
     unique: dict[tuple[str, str], Channel] = {}
     for channel in found:
         if channel is not None:
@@ -132,15 +136,15 @@ def _text_field(raw: str | None, text: str) -> VerifiedField | None:
 
 
 def _channel_field(
-    kind: str, raw: str | None, text: str, channels: list[Channel]
+    kind: str, raw: str | None, text: str, channels: list[Channel], region: str
 ) -> VerifiedField | None:
     if raw is None:
         return None
     span = find_span(text, raw)
-    value = _normalize(kind, span.quote) if span else None
+    value = _normalize(kind, span.quote, region) if span else None
     if span is not None and value is not None:
         return VerifiedField(value, span.quote, span.start, span.end, LOCATOR_TEXT)
-    wanted = _normalize(kind, raw)
+    wanted = _normalize(kind, raw, region)
     for channel in channels:
         if channel.kind == kind and wanted is not None and channel.value == wanted:
             if channel.span is not None:
@@ -150,7 +154,9 @@ def _channel_field(
     return None
 
 
-def verify_card(card: PersonCard, text: str, channels: list[Channel]) -> Contact | None:
+def verify_card(
+    card: PersonCard, text: str, channels: list[Channel], region: str = norm.DEFAULT_REGION
+) -> Contact | None:
     if norm.normalize_name(card.name) is None:
         return None
     name = _text_field(card.name, text)
@@ -159,6 +165,6 @@ def verify_card(card: PersonCard, text: str, channels: list[Channel]) -> Contact
     return Contact(
         name=name,
         title=_text_field(card.title, text),
-        phone=_channel_field(KIND_PHONE, card.phone, text, channels),
-        email=_channel_field(KIND_EMAIL, card.email, text, channels),
+        phone=_channel_field(KIND_PHONE, card.phone, text, channels, region),
+        email=_channel_field(KIND_EMAIL, card.email, text, channels, region),
     )

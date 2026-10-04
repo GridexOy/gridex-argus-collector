@@ -1,0 +1,112 @@
+"""Mutable state of one walk: budget, frontier, stop checks, gaps, ids."""
+
+from __future__ import annotations
+
+import sqlite3
+import time
+import uuid
+from collections.abc import Callable
+from dataclasses import dataclass, field
+
+from argus_collector.discovery import contract as discovery
+from argus_collector.models import contract as models
+from argus_collector.walk import service
+from argus_collector.walk.service import WalkEvent, WalkSettings
+from argus_collector.walk.sink import FrontierLink, WalkCheckpoint, WalkGap, WalkSink
+
+Emit = Callable[[WalkEvent], None]
+ShouldStop = Callable[[], bool]
+MAX_FRONTIER = 500
+MAX_FAILURES_IN_ROW = 3
+FRONTIER_INDEX_BASE = 10_000  # frontier links shown to the model get indexes from here
+
+
+class StopRequested(Exception):
+    """Raised between steps when the owner, the STOP file or the job asked to stop."""
+
+
+@dataclass
+class WalkState:
+    settings: WalkSettings
+    conn: sqlite3.Connection
+    client: models.ModelClient
+    emit: Emit
+    should_stop: ShouldStop
+    run_id: str
+    sink: WalkSink | None = None
+    hosts: frozenset[str] = frozenset()
+    focus: discovery.Focus | None = None
+    cp: WalkCheckpoint = field(default_factory=WalkCheckpoint)
+    emitted: set[str] = field(default_factory=set)
+    failed_targets: set[str] = field(default_factory=set)
+    failures_in_row: int = 0
+    contacts: int = 0
+    source_id: str | None = None
+    end_reason: str = service.END_FINISHED
+    _mark: float = field(default_factory=time.monotonic)
+
+    @property
+    def job_mode(self) -> bool:
+        return self.sink is not None
+
+    def check_stop(self) -> None:
+        if self.should_stop() or any(p.exists() for p in self.settings.stop_files):
+            raise StopRequested()
+
+    def step(self, step: str, detail: str = "", url: str = "") -> None:
+        self.emit(WalkEvent(service.EVENT_STEP, url=url, step=step, detail=detail))
+
+    def tick(self) -> None:
+        """Add the time since the last tick to the run's active seconds."""
+        now = time.monotonic()
+        self.cp.active_seconds += max(0.0, now - self._mark)
+        self._mark = now
+
+    def budget_spent(self) -> bool:
+        limits = self.settings.run_limits()
+        return (
+            self.cp.actions >= limits.actions
+            or self.cp.active_seconds >= limits.seconds
+            or len(self.cp.seen_keys) >= limits.states
+        )
+
+    def uid(self, kind: str, key: str) -> str:
+        """Stable id within the job (`id_namespace`), so a resumed run reuses it."""
+        space = uuid.uuid5(uuid.NAMESPACE_URL, "argus-collector:" + self.settings.id_namespace)
+        return str(uuid.uuid5(space, f"{kind}:{key}"))
+
+    def add_gap(self, url: str, reason: str, detail: str, resumable: bool) -> None:
+        key = discovery.normalize_url(url)
+        if any(g.state_key == key and g.reason == reason for g in self.cp.gaps):
+            return
+        gap = WalkGap(url, key, reason, detail[:300], resumable)
+        self.cp.gaps.append(gap)
+        if self.sink is not None:
+            self.sink.gap(self.conn, gap)
+
+    def remember_links(self, page_url: str, links: list[discovery.Candidate]) -> None:
+        for cand in links:
+            key = discovery.normalize_url(cand.href)
+            if key in self.cp.visited or key in self.cp.frontier or key in self.failed_targets:
+                continue
+            if len(self.cp.frontier) >= MAX_FRONTIER:
+                return
+            score = discovery.score_link(cand.text, cand.href, self.focus)
+            self.cp.frontier[key] = FrontierLink(cand.href, cand.text, score, page_url)
+
+    def frontier_candidates(self) -> list[discovery.Candidate]:
+        links = sorted(self.cp.frontier.values(), key=lambda link: -link.score)
+        return [
+            discovery.Candidate(FRONTIER_INDEX_BASE + i, "link", link.text, link.url, "")
+            for i, link in enumerate(links)
+        ]
+
+    def mark_visited(self, url: str) -> None:
+        key = discovery.normalize_url(url)
+        if key not in self.cp.visited:
+            self.cp.visited.append(key)
+        self.cp.frontier.pop(key, None)
+
+    def save_checkpoint(self) -> None:
+        if self.sink is not None:
+            self.sink.checkpoint(self.conn, self.cp)

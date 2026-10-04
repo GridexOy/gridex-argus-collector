@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from argus_collector.runtime import journal as journal_file
 from argus_collector.runtime import repository, service
 from argus_collector.runtime.service import (
     BuildInfo,
@@ -26,6 +27,9 @@ __all__ = [
     "current_version_status",
     "load_config",
     "finnish_stamp",
+    "journal",
+    "prune_journal",
+    "safe_url",
     "repo_root",
     "stop_files",
     "stop_reason",
@@ -81,3 +85,24 @@ def load_config() -> Config:
         if path.is_file():
             return service.config_from_mapping(repository.read_config_file(path), str(path))
     return Config()
+
+
+JOURNAL_CHANNELS = journal_file.CHANNELS
+
+
+def journal(channel: str, message: str) -> None:
+    """Append one line `<UTC time> <channel>: <message>` to today's journal file.
+
+    `channel` is one of http / browser / extraction / delivery / model (the
+    prefixes of ARGUS Lokit). Never pass contact values or tokens."""
+    journal_file.write(repository.user_data_dir(), channel, message)
+
+
+def prune_journal() -> int:
+    """Remove journal files older than 14 days."""
+    return journal_file.prune(repository.user_data_dir())
+
+
+def safe_url(url: str) -> str:
+    """URL fit for the journal: no query string, fragment or credentials."""
+    return journal_file.safe_url(url)

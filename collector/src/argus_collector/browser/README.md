@@ -7,7 +7,8 @@ Playwright driver of the work browser. Entry point: `contract.py`.
 | `plan_for_this_machine(headless, profile_dir)` | `LaunchPlan`: installed Chrome (`channel="chrome"`) on Windows, bundled Chromium elsewhere; profile `<user_data_dir>/browser-profile` |
 | `open_work_browser(url, ...)` | S0: opens the visible window on a URL, returns `LaunchResult`; raises `BrowserLaunchError` with one English line |
 | `launcher_command(url, serve_test_site_port)` | argv for the detached launcher `python -m argus_collector.browser` ("Avaa tyoselain") |
-| `WalkBrowser(headless, profile_dir)` | context manager of a walk (`session.py`): one persistent-profile context, one tab; `goto(url)`, `click(candidate)`, `scroll()`, `observe()` return `PageState(url, title, html, text, candidates)` |
+| `WalkBrowser(headless, profile_dir)` | context manager of a walk (`session.py`): one persistent-profile context, one tab; `goto(url)`, `click(candidate)`, `scroll()`, `back()`, `observe()` return `PageState(url, title, html, text, candidates)` |
+| `WalkBrowser.bindings(probes)` | 0.4.3.0 (`binding.py`): DOM binding of each verified person field: `card` / `table_row` (name and value meet in a small container with no other person) / `proximity_only` / `none` (TZ_SELAIN 8.11, 9.4) |
 
 `PageState.candidates` are the visible, enabled links (`a[href]` with an
 http(s) href, acted on by navigation) and buttons (`button`, `role=button`,

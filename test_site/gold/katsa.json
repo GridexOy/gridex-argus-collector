@@ -1,0 +1,9 @@
+{
+  "fixture": "katsa",
+  "host": "katsa-oy.localhost",
+  "case": "The seed redirects to katsa-group.localhost, which is not in approved_hosts (K7): the collector records a gap domain_ownership_unresolved and sends no contact of that host.",
+  "redirect_to": "katsa-group.localhost",
+  "expected_gap": "domain_ownership_unresolved",
+  "persons": [],
+  "forbidden_values": ["+358101234001", "+358101234000", "matti.katsa@katsa-group.example"]
+}

@@ -18,6 +18,7 @@ __all__ = [
     "normalize_name",
     "normalize_phone",
     "normalize_text",
+    "region_for_page",
     "same_value",
 ]
 
@@ -59,9 +60,17 @@ def find_emails(text: str) -> list[str]:
     return service.find_emails(text)
 
 
-def find_phones(text: str) -> list[str]:
-    """Raw phone-looking substrings in `text` (Finnish and international), in order."""
-    return service.find_phones(text)
+def find_phones(text: str, region: str = DEFAULT_REGION) -> list[str]:
+    """Raw phone-looking substrings in `text` that normalise in `region`, in order."""
+    return service.find_phones(text, region)
+
+
+def region_for_page(url: str, html_lang: str, fallback: str | None = DEFAULT_REGION) -> str | None:
+    """Region whose national numbers a page prints (TZ_SELAIN section 8.11: E.164
+    only with a confident country context): ccTLD (`.fi`, `.de`), `<html lang>`
+    region (`de-DE`), locale path (`/fi/`, `/en-gb/`), page language (`de`),
+    else `fallback`. None means: no context, national numbers stay unnormalised."""
+    return service.region_for_page(url, html_lang, fallback)
 
 
 def same_value(kind: str, left: str, right: str) -> bool:

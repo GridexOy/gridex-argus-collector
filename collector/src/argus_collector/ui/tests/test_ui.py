@@ -64,16 +64,30 @@ def test_props_show_required_states(msgs: repository.Messages) -> None:
     assert props.stop_banner is None
 
 
-def test_start_enabled_only_with_model_and_chrome(msgs: repository.Messages) -> None:
+def test_start_enabled_only_with_model_chrome_and_connection(msgs: repository.Messages) -> None:
     conn = disconnected(msgs)
-    ready = service.build_props(msgs, version_ok(), ready_report(), None, None, conn)
+    online = service.Activity(connected=True)
+    offline = service.build_props(msgs, version_ok(), ready_report(), None, None, conn)
+    assert not offline.collect.start_enabled and offline.collect.local_test_enabled
+    assert offline.collect.hint == "Keruu vaatii yhteyden ARGUSiin (Testaa yhteys)"
+    ready = service.build_props(msgs, version_ok(), ready_report(), None, None, conn, online)
     assert ready.collect.start_enabled and ready.collect.hint == ""
+    assert ready.collect.local_test_label == "Testaa paikallisesti"
     walking = service.build_props(
-        msgs, version_ok(), ready_report(), None, None, conn, walking=True
+        msgs, version_ok(), ready_report(), None, None, conn,
+        service.Activity(walking=True, connected=True),
     )
     assert not walking.collect.start_enabled and walking.collect.stop_enabled
-    assert not walking.open_browser_enabled
-    stopped = service.build_props(msgs, version_ok(), ready_report(), None, "/x/STOP", conn)
+    assert not walking.open_browser_enabled and not walking.collect.local_test_enabled
+    collecting = service.build_props(
+        msgs, version_ok(), ready_report(), None, None, conn,
+        service.Activity(collecting=True, connected=True),
+    )
+    assert not collecting.collect.start_enabled and collecting.collect.stop_enabled
+    assert not collecting.collect.local_test_enabled and not collecting.open_browser_enabled
+    stopped = service.build_props(
+        msgs, version_ok(), ready_report(), None, "/x/STOP", conn, online
+    )
     assert (
         not stopped.collect.start_enabled and stopped.collect.hint == "STOP-tiedosto estää keruun"
     )
@@ -150,8 +164,10 @@ def test_window_renders_keruu_block_and_live_rows(
         app = contract.create_app(root)
         root.update()
         assert root.title() == "ARGUS Selain"
-        for name in ("start", "pause", "stop"):
+        for name in ("start", "pause", "stop", "local"):
             assert not app.view.is_enabled(name), name
+        assert app.view.queue.state_label.cget("text") == "Ei tehtäviä"
+        assert app.view.delivery.counts_label.cget("text").startswith("Odottaa lähetystä: 0")
         assert app.view.is_enabled("open_browser")
         assert app.view.connection.state_label.cget("text") == "Ei yhteyttä"
         expected_prefix = f"cv{runtime.current_version_status().file_version} ("

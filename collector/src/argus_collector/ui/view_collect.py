@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import tkinter as tk
-from collections.abc import Callable
 from tkinter import ttk
+from typing import TYPE_CHECKING
 
 from argus_collector.ui.walk_lines import CollectProps
+
+if TYPE_CHECKING:
+    from argus_collector.ui.view import Callbacks
 
 COLOURS = {"ok": "#1a7f37", "warn": "#9a6700", "error": "#b42318", "info": "#57606a"}
 FG = "#1f2328"
 COLUMN_WIDTHS = (160, 160, 120, 200, 240)
-TABLE_ROWS = 8
+TABLE_ROWS = 5
 URL_WIDTH = 60
 PAD_X = 12
 PAD_Y = 4
@@ -20,21 +23,15 @@ PAD_Y = 4
 class CollectBlock:
     """Renders `CollectProps`; rows are appended live through `add_contact`."""
 
-    def __init__(
-        self,
-        parent: ttk.Frame,
-        props: CollectProps,
-        on_start: Callable[[str], None],
-        on_stop: Callable[[], None],
-        on_open_source: Callable[[str], None],
-    ) -> None:
+    def __init__(self, parent: ttk.Frame, props: CollectProps, on: Callbacks) -> None:
         self.parent = parent
-        self.on_open_source = on_open_source
+        self.on_open_source = on.open_source
         self.buttons: dict[str, ttk.Button] = {}
         self.checks: dict[str, ttk.Checkbutton] = {}
         self.check_vars: dict[str, tk.BooleanVar] = {}
         self.url_var = tk.StringVar(parent)
-        self._build_url_row(props, on_start, on_stop)
+        self._build_buttons(props, on)
+        self._build_url_row(props, on)
         self._build_settings(props)
         self.hint_label = ttk.Label(parent, text="", foreground=COLOURS["warn"])
         self.hint_label.pack(anchor="w", padx=PAD_X)
@@ -45,23 +42,27 @@ class CollectBlock:
         self._build_table(props)
         self.render(props)
 
-    def _build_url_row(
-        self, props: CollectProps, on_start: Callable[[str], None], on_stop: Callable[[], None]
-    ) -> None:
+    def _build_buttons(self, props: CollectProps, on: Callbacks) -> None:
+        row = ttk.Frame(self.parent)
+        row.pack(anchor="w", fill="x", padx=PAD_X, pady=PAD_Y)
+        self.buttons["start"] = ttk.Button(row, text=props.start_label, command=on.start_collect)
+        self.buttons["pause"] = ttk.Button(row, text=props.pause_label)
+        self.buttons["stop"] = ttk.Button(row, text=props.stop_label, command=on.stop)
+        for name in ("start", "pause", "stop"):
+            self.buttons[name].pack(side="left", padx=(0, 8))
+
+    def _build_url_row(self, props: CollectProps, on: Callbacks) -> None:
         row = ttk.Frame(self.parent)
         row.pack(anchor="w", fill="x", padx=PAD_X, pady=PAD_Y)
         self.url_label = ttk.Label(row, text=props.site_url_label)
         self.url_label.pack(side="left", padx=(0, 6))
         self.url_entry = ttk.Entry(row, textvariable=self.url_var, width=URL_WIDTH)
         self.url_entry.pack(side="left", padx=(0, 8))
-        self.url_entry.bind("<Return>", lambda _e: on_start(self.url_var.get()))
-        self.buttons["start"] = ttk.Button(
-            row, text=props.start_label, command=lambda: on_start(self.url_var.get())
+        self.url_entry.bind("<Return>", lambda _e: on.local_test(self.url_var.get()))
+        self.buttons["local"] = ttk.Button(
+            row, text=props.local_test_label, command=lambda: on.local_test(self.url_var.get())
         )
-        self.buttons["pause"] = ttk.Button(row, text=props.pause_label)
-        self.buttons["stop"] = ttk.Button(row, text=props.stop_label, command=on_stop)
-        for name in ("start", "pause", "stop"):
-            self.buttons[name].pack(side="left", padx=(0, 8))
+        self.buttons["local"].pack(side="left", padx=(0, 8))
         self.manual_note_label = ttk.Label(
             self.parent, text=props.manual_note, foreground=COLOURS["info"]
         )
@@ -107,6 +108,7 @@ class CollectBlock:
         self.buttons["start"].state(["!disabled"] if props.start_enabled else ["disabled"])
         self.buttons["stop"].state(["!disabled"] if props.stop_enabled else ["disabled"])
         self.buttons["pause"].state(["disabled"])
+        self.buttons["local"].state(["!disabled"] if props.local_test_enabled else ["disabled"])
         self.url_entry.state(["disabled"] if props.stop_enabled else ["!disabled"])
         self.hint_label.configure(text=props.hint)
 

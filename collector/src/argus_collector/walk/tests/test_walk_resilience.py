@@ -15,7 +15,7 @@ from argus_collector.walk.tests.fake_policy import GoldPolicy
 from collector.tests.fake_model_server import FakeModelServer
 
 
-def test_a_failed_click_ends_the_walk_cleanly_with_what_was_found(
+def test_a_failed_action_is_a_gap_and_the_walk_goes_on(
     site: str, tmp_path: Path, gold: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     policy = GoldPolicy(gold["persons"])
@@ -42,3 +42,5 @@ def test_a_failed_click_ends_the_walk_cleanly_with_what_was_found(
     assert summary.pages >= 2, "pages visited before the failed click must survive"
     assert events[-1].kind == service.EVENT_DONE
     assert not any(e.kind == service.EVENT_ERROR for e in events)
+    assert [g.reason for g in summary.gaps] == ["timeout"], "the failed step is a gap"
+    assert calls["n"] > 2, "the walk went on after the failure"

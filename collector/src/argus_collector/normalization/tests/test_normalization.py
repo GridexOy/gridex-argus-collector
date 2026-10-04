@@ -76,3 +76,26 @@ def test_same_value() -> None:
     assert contract.same_value("email", "A@B.example", "a@b.example")
     assert contract.same_value("text", "Sales  Director", "sales director")
     assert not contract.same_value("phone", "abc", "abc")
+
+
+@pytest.mark.parametrize(
+    ("url", "lang", "fallback", "expected"),
+    [
+        ("https://www.abb.fi/yhteystiedot", "en", "SE", "FI"),
+        ("http://vogel.localhost:8765/kontakt.html", "de", "FI", "DE"),
+        ("https://example.com/contact", "en-GB", "FI", "GB"),
+        ("https://example.com/fi/yhteystiedot", "en", "SE", "FI"),
+        ("https://example.com/de-de/kontakt", "", "FI", "DE"),
+        ("https://example.com/contact", "en", "FI", "FI"),
+        ("https://example.com/contact", "en", None, None),
+        ("http://127.0.0.1:8765/", "", "FI", "FI"),
+    ],
+)
+def test_region_for_page(url: str, lang: str, fallback: str | None, expected: str | None) -> None:
+    assert contract.region_for_page(url, lang, fallback) == expected
+
+
+def test_national_numbers_follow_the_page_region() -> None:
+    assert contract.normalize_phone("0711 123 4500", "DE") == "+497111234500"
+    assert contract.normalize_phone("08-123 456 70", "SE") == "+46812345670"
+    assert contract.find_phones("Tel. 0711 123 4500", "DE") == ["0711 123 4500"]

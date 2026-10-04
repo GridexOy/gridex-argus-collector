@@ -12,15 +12,20 @@ callers verify every value it returns against the page text.
 from __future__ import annotations
 
 import sqlite3
+import time
+from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Any
 
 from argus_collector.models import repository, service
 from argus_collector.models.repository import ModelError
-from argus_collector.models.service import Health, ModelConfig, ModelReply
+from argus_collector.models.service import CallRecord, Health, ModelConfig, ModelReply
 
 __all__ = [
     "DEFAULT_ENDPOINT",
     "DEFAULT_MODEL",
+    "CallRecord",
+    "CallListener",
     "Health",
     "ModelClient",
     "ModelConfig",
@@ -30,6 +35,7 @@ __all__ = [
     "resolve_config",
 ]
 
+CallListener = Callable[[CallRecord], None]
 DEFAULT_ENDPOINT = service.DEFAULT_ENDPOINT
 DEFAULT_MODEL = service.DEFAULT_MODEL
 PROVIDER = "local"
@@ -52,9 +58,15 @@ def health(endpoint: str, name: str, timeout_s: float = service.HEALTH_TIMEOUT_S
 class ModelClient:
     """Chat completions in JSON mode against the configured local endpoint."""
 
-    def __init__(self, config: ModelConfig, conn: sqlite3.Connection | None = None) -> None:
+    def __init__(
+        self,
+        config: ModelConfig,
+        conn: sqlite3.Connection | None = None,
+        listener: CallListener | None = None,
+    ) -> None:
         self.config = config
         self.conn = conn
+        self.listener = listener
 
     def chat(self, system: str, user: str, purpose: str) -> ModelReply:
         """One chat completion (plain text). Raises ModelError; the call is logged either way."""
@@ -74,12 +86,25 @@ class ModelClient:
         return parsed
 
     def _send(self, body: dict[str, Any], purpose: str) -> ModelReply:
+        started_at = datetime.now(UTC).isoformat(timespec="milliseconds")
+        started = time.monotonic()
         try:
             reply = repository.post_chat(self.config, body)
         except ModelError as exc:
             if self.conn is not None:
                 repository.log_call(self.conn, self.config, purpose, None, str(exc))
+            elapsed = int((time.monotonic() - started) * 1000)
+            self._notify(CallRecord(purpose, self.config.name, started_at, elapsed, 0, 0, False,
+                                    str(exc)))
             raise
         if self.conn is not None:
             repository.log_call(self.conn, self.config, purpose, reply, "")
+        self._notify(
+            CallRecord(purpose, reply.model or self.config.name, started_at, reply.elapsed_ms,
+                       reply.prompt_tokens, reply.completion_tokens, True)
+        )
         return reply
+
+    def _notify(self, record: CallRecord) -> None:
+        if self.listener is not None:
+            self.listener(record)

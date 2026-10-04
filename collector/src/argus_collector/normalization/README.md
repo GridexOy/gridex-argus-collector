@@ -12,6 +12,7 @@ Entry point: `contract.py`.
 | `normalize_text(raw)` | NFC, whitespace runs -> one space, stripped |
 | `normalize_name(raw)` | normalised text, or None when it has digits/@/brackets, no letters or > 80 chars |
 | `normalize_email(raw)` | decodes `(at)`, `[at]`, ` at `, `(a)`, `(dot)`, `[dot]`, ` dot `, `(piste)`; drops `mailto:` and `?subject`; whole address lower-cased (raw quote keeps the case); None when not an address |
+| `region_for_page(url, lang, fallback)` | 0.4.3.0: national phone context of a page: ccTLD, `lang` region (`de-DE`), locale path (`/fi/`), page language (`de`), else the job's exhibition country |
 | `normalize_phone(raw, region="FI")` | E.164: `0xx` -> `+358xx`, `+`/`00` kept, `(0)` dropped, `ext`/`x` cut; None unless 7-15 digits and a confident prefix |
 | `decode_cfemail(hex)` | Cloudflare `data-cfemail` -> address |
 | `find_emails(text)` / `find_phones(text)` | raw substrings (obfuscated included) in order of appearance |

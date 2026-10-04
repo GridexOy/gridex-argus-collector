@@ -13,17 +13,21 @@ import threading
 import tkinter as tk
 from collections.abc import Callable
 
+from argus_collector.api_client import contract as api
 from argus_collector.browser import contract as browser
 from argus_collector.diagnostics import contract as diagnostics
 from argus_collector.runtime import contract as runtime
-from argus_collector.ui import service
+from argus_collector.scheduler import contract as scheduler
+from argus_collector.ui import queue_lines, service
+from argus_collector.ui.app_collect import CollectController
 from argus_collector.ui.app_connection import ConnectionController
 from argus_collector.ui.app_walk import WalkController
 from argus_collector.ui.repository import Messages
-from argus_collector.ui.service import LEVEL_ERROR, LEVEL_INFO, LEVEL_OK, Line
-from argus_collector.ui.view import PanelView
+from argus_collector.ui.service import LEVEL_ERROR, LEVEL_INFO, LEVEL_OK, Activity, Line
+from argus_collector.ui.view import Callbacks, PanelView
 
 POLL_MS = 250
+BLOCKS_EVERY = 4  # Jono and Lahetys re-read the local SQLite once a second
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
@@ -38,17 +42,41 @@ class PanelApp:
         self.report_error: str | None = None
         self.proc: subprocess.Popen[str] | None = None
         self.ui_queue: queue.Queue[Callable[[], None]] = queue.Queue()
+        self._pumps = 0
         self.walk = WalkController(self)
         self.connection = ConnectionController(self)
-        self.view = PanelView(
-            root,
-            self.props(),
-            self.open_browser,
-            self.walk.start,
-            self.walk.stop,
-            self.walk.open_source,
-            self.connection.test_connection,
+        self.collect = CollectController(self, self.connection.api_target)
+        callbacks = Callbacks(
+            self.open_browser, self.collect.start, self.local_test, self.collect.stop,
+            self.walk.open_source, self.connection.test_connection,
         )
+        self.view = PanelView(root, self.props(), callbacks)
+
+    def local_test(self, url: str) -> None:
+        """Testaa paikallisesti: one site walk, nothing sent (not while collecting)."""
+        if not self.collect.collecting:
+            self.walk.start(url)
+
+    def heartbeat_fields(self) -> scheduler.HeartbeatFields:
+        return self.collect.collector.heartbeat_fields()
+
+    def heartbeat_answered(self, response: api.HeartbeatResponse, acks: list[str]) -> None:
+        self.collect.collector.apply_heartbeat(response, acks)
+
+    def connection_ok(self) -> None:
+        """A heartbeat passed: the outbox may be sent (also when not collecting)."""
+        self.collect.collector.deliverer.start()
+
+    def activity(self) -> Activity:
+        return Activity(
+            walking=self.walk.walking, collecting=self.collect.collecting,
+            connected=self.connection.connected,
+        )
+
+    def blocks(self) -> tuple[service.QueueProps, service.DeliveryProps]:
+        collector = self.collect.collector
+        return (queue_lines.queue_props(self.msgs, collector.queue_view()),
+                queue_lines.delivery_props(self.msgs, collector.delivery_view()))
 
     def props(self) -> service.PanelProps:
         return service.build_props(
@@ -58,11 +86,15 @@ class PanelApp:
             self.report_error,
             runtime.stop_reason(),
             self.connection.props(self.msgs),
-            self.walk.walking,
+            self.activity(),
+            self.blocks(),
         )
 
     def refresh(self) -> None:
         self.view.render(self.props())
+
+    def refresh_blocks(self) -> None:
+        self.view.render_blocks(*self.blocks())
 
     def post(self, action: Callable[[], None]) -> None:
         """Queue an action for the main thread (safe from any thread)."""
@@ -77,6 +109,9 @@ class PanelApp:
                 break
             action()
         self._poll_browser()
+        self._pumps += 1
+        if self._pumps % BLOCKS_EVERY == 0:
+            self.refresh_blocks()
 
     def schedule_pump(self) -> None:
         self.pump()

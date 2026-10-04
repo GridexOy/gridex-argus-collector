@@ -43,3 +43,15 @@ def test_store_snapshot_writes_files_and_manifest(tmp_path: Path) -> None:
     count = conn.execute("SELECT COUNT(*) FROM evidence_manifest").fetchone()[0]
     assert count == 1
     assert not list(tmp_path.glob("**/*.tmp"))
+
+
+def test_stored_snapshot_bytes_match_their_hash(tmp_path: Path) -> None:
+    conn = storage.connect(tmp_path / "c.db")
+    html = "<html>\n<body>Anna Virtanen\r\n</body></html>\n"
+    snap = contract.store_snapshot(conn, "http://x/", "http://x/", html, "Anna  Virtanen", tmp_path)
+    stored = contract.load_snapshot(conn, snap.evidence_id)
+    assert stored is not None
+    assert stored.html == html.encode("utf-8"), "no newline translation on any OS"
+    assert stored.html_sha256 == snap.evidence_id == contract.sha256_bytes(stored.html)
+    assert stored.text == "Anna Virtanen" and stored.text_sha256 == snap.text_sha256
+    assert contract.load_snapshot(conn, "missing") is None
