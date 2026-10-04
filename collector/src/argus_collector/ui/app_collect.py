@@ -18,6 +18,7 @@ from argus_collector.diagnostics import contract as diagnostics
 from argus_collector.models import contract as models
 from argus_collector.runtime import contract as runtime
 from argus_collector.scheduler import contract as scheduler
+from argus_collector.ui import walk_lines
 from argus_collector.ui.repository import Messages
 from argus_collector.ui.view import PanelView
 from argus_collector.walk import contract as walk
@@ -65,6 +66,7 @@ class CollectController:
         )
         settings = scheduler.Settings(env=env, stop_files=runtime.stop_files)
         self._dirty = threading.Event()
+        self._job_contacts = 0
         self.collector = scheduler.Collector(
             settings, target, lambda: capabilities_of(self.host.report), self._changed,
             self._walk_event,
@@ -85,7 +87,18 @@ class CollectController:
         self.host.refresh()
 
     def _walk_event(self, event: walk.WalkEvent) -> None:
-        self.host.post(functools.partial(self.host.walk.on_event, event))
+        self.host.post(functools.partial(self._on_walk_event, event))
+
+    def _on_walk_event(self, event: walk.WalkEvent) -> None:
+        """Main thread: the lines of the local walk, plus the end line of each job walk."""
+        self.host.walk.on_event(event)
+        if event.kind == walk.EVENT_CONTACT:
+            self._job_contacts += 1
+        elif event.kind == walk.EVENT_DONE:
+            text, level = walk_lines.done_line(self.host.msgs, event.page_no, self._job_contacts)
+            self.host.view.collect.set_status(text, level)
+        if event.kind in (walk.EVENT_DONE, walk.EVENT_STOPPED, walk.EVENT_ERROR):
+            self._job_contacts = 0
 
     def start(self) -> None:
         """Kaynnista: claim ARGUS jobs and walk them."""

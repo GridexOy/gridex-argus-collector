@@ -63,6 +63,9 @@ class PanelApp:
     def heartbeat_answered(self, response: api.HeartbeatResponse, acks: list[str]) -> None:
         self.collect.collector.apply_heartbeat(response, acks)
 
+    def heartbeat_failed(self, status: int) -> None:
+        self.collect.collector.heartbeat_failed(status)
+
     def connection_ok(self) -> None:
         """A heartbeat passed: the outbox may be sent (also when not collecting)."""
         self.collect.collector.deliverer.start()

@@ -90,3 +90,30 @@ def test_testaa_yhteys_shows_rejected_for_a_bad_token(
         assert worker_auth.load_token() is None
     finally:
         root.destroy()
+
+
+def test_argus_down_keeps_the_last_heartbeat_and_shows_ei_verkkoa(
+    display: str,  # noqa: F811 - pytest fixture
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    srv = contract_server.start(port=0, tokens={TOKEN: WORKER_ID})
+    address = contract_server.base_url(srv)
+    monkeypatch.setenv("ARGUS_COLLECTOR_HOME", str(tmp_path))
+    write_config(tmp_path, address)
+    root = make_tk_root()
+    try:
+        app = contract.create_app(root)
+        app.connection.test_connection(address, WORKER_ID, TOKEN)
+        pump_until(app, root, lambda: app.view.delivery.state_label.cget("text") == "Lähetetty")
+        seen = app.view.connection.heartbeat_label.cget("text")
+        assert seen.startswith("Viimeksi:")
+        srv.shutdown()
+        srv.server_close()
+        app.connection.test_connection(address, WORKER_ID, "")
+        pump_until(app, root, lambda: app.view.delivery.state_label.cget("text") == "Ei verkkoa")
+        assert app.view.delivery.state_label.cget("text") == "Ei verkkoa", "nothing pending"
+        assert app.view.connection.state_label.cget("text").startswith("Ei verkkoa")
+        assert app.view.connection.heartbeat_label.cget("text") == seen
+    finally:
+        root.destroy()

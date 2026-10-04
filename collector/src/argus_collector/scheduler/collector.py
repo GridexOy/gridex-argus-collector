@@ -69,6 +69,14 @@ class Collector(CollectorHooks):
     def wake(self) -> None:
         self._wake.set()
 
+    def apply_heartbeat(self, resp: api.HeartbeatResponse, sent_acks: list[str]) -> None:
+        self.deliverer.link(True)
+        super().apply_heartbeat(resp, sent_acks)
+
+    def heartbeat_failed(self, status: int) -> None:
+        """A heartbeat failed; status 0 (no answer at all) shows Lahetys `offline`."""
+        self.deliverer.link(status != 0)
+
     def _stopped(self) -> bool:
         if self.settings.stop_files():
             if self.collecting:

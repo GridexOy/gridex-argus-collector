@@ -38,6 +38,7 @@ class Host(Protocol):
     def refresh(self) -> None: ...
     def heartbeat_fields(self) -> scheduler.HeartbeatFields: ...
     def heartbeat_answered(self, response: api.HeartbeatResponse, acks: list[str]) -> None: ...
+    def heartbeat_failed(self, status: int) -> None: ...
     def connection_ok(self) -> None: ...
 
 
@@ -81,17 +82,24 @@ class ConnectionController:
         token = token_input.strip() or worker_auth.load_token() or ""
         address, worker_id = address.strip(), worker_id.strip()
         self.state = ConnectionState(
-            address=address, worker_id=worker_id, token=self.state.token, testing=True
+            address=address, worker_id=worker_id, token=self.state.token, testing=True,
+            last_heartbeat=self._last_heartbeat(address, worker_id),
         )
         self.host.refresh()
         threading.Thread(
             target=self._attempt, args=(address, worker_id, token, True), name="heartbeat-test"
         ).start()
 
+    def _last_heartbeat(self, address: str, worker_id: str) -> datetime | None:
+        """The last answered heartbeat stays shown while the same worker is tried again."""
+        same = (address, worker_id) == (self.state.address, self.state.worker_id)
+        return self.state.last_heartbeat if same else None
+
     def _attempt(self, address: str, worker_id: str, token: str, persist_on_success: bool) -> None:
         try:
             self._call(address, worker_id, token)
         except api.ApiError as exc:
+            self.host.heartbeat_failed(exc.status)
             self.host.post(functools.partial(self._apply_error, address, worker_id, exc))
             return
         self.host.post(
@@ -142,6 +150,7 @@ class ConnectionController:
         self.state = ConnectionState(
             address=address, worker_id=worker_id, token=self.state.token,
             status=status, error_detail=detail,
+            last_heartbeat=self._last_heartbeat(address, worker_id),
         )
         self.host.refresh()
 

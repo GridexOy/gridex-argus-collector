@@ -16,7 +16,7 @@ from typing import cast
 
 from argus_collector.api_client import contract as api
 from argus_collector.delivery import repository as repo
-from argus_collector.delivery import service
+from argus_collector.delivery import results, service
 from argus_collector.delivery.hooks import ApiTarget, DeliveryHooks, Failed
 from argus_collector.evidence import contract as evidence
 from argus_collector.runtime import contract as runtime
@@ -25,7 +25,6 @@ from argus_collector.storage import contract as storage
 TICK_S = 0.5
 UPLOADS_PER_TICK = 20
 HTML_MIME = "text/html; charset=utf-8"
-KEEP_PENDING = ("evidence_missing", "sequence_gap")
 
 
 class Deliverer:
@@ -39,12 +38,25 @@ class Deliverer:
         self.db_path, self.target, self.hooks = db_path, target, hooks
         self.on_change = on_change or (lambda: None)
         self.error, self.failures, self.connected, self.pending = "", 0, False, 0
+        self.link_down = False  # the last heartbeat got no answer at all
         self._stop, self._wake, self._flush = threading.Event(), threading.Event(), False
         self._thread: threading.Thread | None = None
 
     @property
     def state(self) -> str:
-        return service.transport_state(self.error, self.pending, self.connected)
+        connected = self.connected and not self.link_down
+        return service.transport_state(self.error, self.pending, connected)
+
+    def link(self, answered: bool) -> None:
+        """Heartbeat outcome: no answer is `offline` also with an empty outbox; the
+        first answer after an outage sends what is pending now, not after the backoff."""
+        before, self.link_down = self.state, not answered
+        if answered and self.error == service.ERROR_OFFLINE:
+            self.failures = 0
+            self.flush()
+        if self.state != before:
+            runtime.journal("delivery", f"transport {before} -> {self.state} (heartbeat)")
+            self.on_change()
 
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
@@ -104,6 +116,7 @@ class Deliverer:
         retryable = exc.error.retryable if exc.error is not None else False
         kind = service.classify(exc.status, code, retryable)
         runtime.journal("delivery", f"job {job_id}: HTTP {exc.status} {code or kind}")
+        self.link_down = self.link_down and exc.status == 0
         if kind == service.ERROR_LEASE:
             self.hooks.lease_problem(job_id, run_id, code, token)
         if kind in (service.ERROR_PERMANENT, service.ERROR_CONFLICT):
@@ -130,6 +143,7 @@ class Deliverer:
                 code = self._api_error(exc, job_id, run_id, token)
                 self._reject_upload(conn, job_id, evidence_id, code)
                 continue
+            self.link_down = False
             repo.mark_upload(conn, evidence_id, resp.status.value, "")
 
     def _reject_upload(
@@ -161,35 +175,8 @@ class Deliverer:
                 code = self._api_error(exc, job_id, run_id, token)
                 repo.mark_events(conn, [(chunk[0].event_id, "rejected", code, None, None)])
                 continue
-            self._apply(conn, job_id, rows, resp)
-
-    def _apply(
-        self,
-        conn: sqlite3.Connection,
-        job_id: str,
-        rows: dict[str, sqlite3.Row],
-        resp: api.EventsResponse,
-    ) -> None:
-        updates: list[tuple[str, str, str, str | None, str | None]] = []
-        for result in resp.results:
-            code, status = result.code or "", result.status.value
-            if status == "rejected" and code in KEEP_PENDING:
-                if code == "evidence_missing":
-                    ids = json.loads(rows[result.event_id]["evidence_ids_json"])
-                    repo.reset_upload(conn, ids)
-                continue
-            if status == "rejected":
-                self.hooks.rejected(conn, job_id, str(rows[result.event_id]["type"]), code)
-            channel = result.channel_status.value if result.channel_status else None
-            updates.append((result.event_id, status, code, result.canonical_contact_id, channel))
-        repo.mark_events(conn, updates)
-        accepted = sum(1 for u in updates if u[1] != "rejected")
-        runtime.journal(
-            "delivery",
-            f"job {job_id}: {len(resp.results)} events sent, {accepted} accepted/duplicate,"
-            f" {len(updates) - accepted} rejected, last_contiguous_seq={resp.last_contiguous_seq}",
-        )
-        self.hooks.applied(conn, job_id, resp)
+            self.link_down = False
+            results.apply(conn, self.hooks, job_id, rows, resp)
 
 
 def _mode(target: ApiTarget) -> api.ProxyMode:

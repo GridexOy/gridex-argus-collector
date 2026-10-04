@@ -99,7 +99,7 @@
   "job.state.waitingLease": "Odottaa yhteyttä ARGUSiin",
   "job.reason.no_contacts_in_checked_scope": "ei yhteystietoja tarkistetussa laajuudessa",
   "job.reason.budget_reached": "ajoraja täyttyi",
-  "job.reason.unresolved_access": "sivustolle ei päästy (verkkotunnusta ei hyväksytty)",
+  "job.reason.unresolved_access": "pääsy sivustolle jäi ratkaisematta",
   "job.reason.unsupported_source": "lähdettä ei tueta",
   "job.reason.technical_failure": "tekninen virhe",
   "delivery.title": "Lähetys",

@@ -40,6 +40,10 @@ __all__ = [
     "END_FINISHED",
     "END_START_FAILED",
     "END_STOPPED",
+    "EVENT_CONTACT",
+    "EVENT_DONE",
+    "EVENT_ERROR",
+    "EVENT_STOPPED",
     "AuditEntry",
     "EntityFinding",
     "FieldFinding",
@@ -65,6 +69,10 @@ END_ERROR = service.END_ERROR
 END_DOMAIN = service.END_DOMAIN
 END_START_FAILED = service.END_START_FAILED
 END_FAILURES = service.END_FAILURES
+EVENT_CONTACT = service.EVENT_CONTACT
+EVENT_DONE = service.EVENT_DONE
+EVENT_STOPPED = service.EVENT_STOPPED
+EVENT_ERROR = service.EVENT_ERROR
 
 
 def validate_start_url(raw: str) -> str | None:

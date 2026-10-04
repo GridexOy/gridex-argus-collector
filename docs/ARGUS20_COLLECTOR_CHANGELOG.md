@@ -1,5 +1,21 @@
 # ARGUS20_COLLECTOR_CHANGELOG
 
+## 0.4.3.1 — 2026-10-04
+
+**Правка 1 шага `stage-5/step-2-a2-a3` — расхождения, найденные живой проверкой по тест-карте TZ_TANDEM §7 и TZ_SELAIN §13.5 стр. 5 (указание владельца: «расхождения исправь, не подгоняй»).**
+
+**Чек-лист правки.**
+1. Строка состояния Keruu после обхода задания оставалась на последней странице (`Ladataan sivua http://katsa-oy.localhost:8765/`) — теперь, как у локального теста, `Keruu valmis: N sivua, M yhteystietoa` по каждому заданию — **сделано**.
+2. Причина `unresolved_access` в Jono была частным случаем (`sivustolle ei päästy (verkkotunnusta ei hyväksytty)`), а код покрывает любой неразрешённый доступ — теперь `pääsy sivustolle jäi ratkaisematta` — **сделано**.
+3. ARGUS остановлен, а отправлять нечего: Lähetys показывал `Lähetetty`, хотя тест-карта §13.5 стр. 5 ждёт `Ei verkkoa`. Теперь heartbeat без ответа (HTTP 0) переводит Lähetys в `Ei verkkoa` и при пустом outbox; первый ответ после обрыва сразу отправляет ожидающее, не дожидаясь backoff (`Ei verkkoa` → `Lähetetään` → `Lähetetty`) — **сделано**.
+4. Yhteys после неудачного heartbeat писал `Ei vielä heartbeatia`, хотя heartbeat были: теперь строка `Viimeksi: <время>` последнего ответа сохраняется, пока проверяется тот же worker — **сделано**.
+
+**Модули.** `ui` (`app_collect`, `app_connection`, `app`), `delivery` (новый файл `results.py` — разбор ответа на пакет событий вынесен из `loop.py`, иначе файл > 200 строк), `scheduler` (`collector`), `walk` (`contract` экспортирует виды событий). Новые тесты: `delivery/tests/test_link.py`, `ui/tests/test_queue_lines.py`, `ui/tests/test_ui_connection.py::test_argus_down_keeps_the_last_heartbeat_and_shows_ei_verkkoa`; `test_ui_collect` проверяет строку `Keruu valmis`.
+
+**Решения (поправь, если не так).**
+1. `Ei verkkoa` в Lähetys — только когда ARGUS не ответил вовсе (HTTP 0, как у самой доставки); ответ с кодом (401, 5xx) — это связь есть, его класс показывает доставка.
+2. Слова Jono для команд ARGUS — по таблице i18n TZ_SELAIN §5: pause → `Tauolla`, cancel → `Keskeytetty`. В тест-карте TZ_TANDEM §7 стр. 3/5 (сторона ARGUS) — `Keskeytetty` для «Pysäytä» и `Peruttu` для «Peruuta»; это слова ARGUS, не панели сборщика — вопрос Архивариусу в отчёте.
+
 ## 0.4.3.0 — 2026-10-04
 
 **Пары 2 и 3 из `docs/ARGUS20_TZ_TANDEM.md` 1.1 — шаги A2 «Пакет и контакты» и A3 «Надёжность и управление» одним шагом `stage-5/step-2-a2-a3` (указание владельца 04.10.2026), плюс дополнение владельца по стране выставки.** Прод `/api/collector` (B2/B3) ещё не принят; сборщик проверен против своего `contract_server/`, который теперь реализует весь контракт и проверяет каждый запрос по OpenAPI.
