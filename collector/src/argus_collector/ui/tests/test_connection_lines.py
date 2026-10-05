@@ -10,6 +10,7 @@ from argus_collector.ui.connection_lines import (
     ConnectionState,
     connection_props,
     heartbeat_line,
+    timed_out,
 )
 from argus_collector.ui.repository import load_messages
 
@@ -33,3 +34,12 @@ def test_a_server_error_is_palvelinvirhe_not_ei_verkkoa() -> None:
     assert bare.state_text == "ARGUS vastasi 404: HTTP-virhe 404 ilman syytä"
     down = connection_props(msgs, replace(base, error_detail="HTTP 0: refused"))
     assert down.state_text == "Ei verkkoa: HTTP 0: refused"
+
+
+def test_only_a_socket_time_out_is_slow() -> None:
+    late = api.ApiError(0, None, None, "http://127.0.0.1:9/api: timed out")
+    assert timed_out(late, 30.2) == 30
+    refused = api.ApiError(0, None, None, "<urlopen error [WinError 10061] No connection could"
+                           " be made because the target machine actively refused it>")
+    assert timed_out(refused, 2.1) == 0, "Windows takes ~2 s to refuse: still no answer"
+    assert timed_out(api.ApiError(502, None, None, "timed out"), 31.0) == 0

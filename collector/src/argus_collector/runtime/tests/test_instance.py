@@ -22,10 +22,10 @@ def test_second_lock_is_refused_until_the_first_is_closed(tmp_path: Path) -> Non
     assert first is not None
     assert instance.acquire(tmp_path) is None, "a second panel in the same machine"
     assert instance.owner(tmp_path) == str(os.getpid())
-    first.close()
+    instance.release(first)
     again = instance.acquire(tmp_path)
     assert again is not None
-    again.close()
+    instance.release(again)
 
 
 def test_a_panel_process_holds_the_lock_and_its_end_frees_it(tmp_path: Path) -> None:
@@ -45,4 +45,4 @@ def test_a_panel_process_holds_the_lock_and_its_end_frees_it(tmp_path: Path) -> 
         time.sleep(0.05)
         lock = instance.acquire(tmp_path)
     assert lock is not None, "a killed panel leaves no lock behind"
-    lock.close()
+    instance.release(lock)

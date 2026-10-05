@@ -8,6 +8,9 @@ import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+# never the Windows system proxy: MAIN-PC has one, and loopback must stay local
+DIRECT = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 class SlowArgus:
     def __init__(self, upstream: str) -> None:
@@ -26,7 +29,7 @@ class SlowArgus:
                     if self.headers.get(key):
                         req.add_header(key, self.headers[key])
                 try:
-                    with urllib.request.urlopen(req, timeout=10) as resp:
+                    with DIRECT.open(req, timeout=10) as resp:
                         status, data = resp.status, resp.read()
                 except urllib.error.HTTPError as exc:
                     status, data = exc.code, exc.read()

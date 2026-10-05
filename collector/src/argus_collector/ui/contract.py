@@ -42,7 +42,7 @@ def run_panel() -> int:
     app.schedule_pump()
     root.mainloop()
     runtime.journal("http", f"panel closed: pid {os.getpid()}")
-    lock.close()
+    runtime.panel_release(lock)
     return 0
 
 

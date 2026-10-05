@@ -146,7 +146,7 @@ class ConnectionController:
             heartbeat_call.send(self.host, address, worker_id, token,
                                 self.proxy_mode(address))
         except api.ApiError as exc:
-            slow_s = timed_out(exc, time.monotonic() - started, heartbeat_loop.HEARTBEAT_TIMEOUT_S)
+            slow_s = timed_out(exc, time.monotonic() - started)
             self._journal(heartbeat_line(exc.status, exc.error, slow_s))
             if not slow_s:  # slow is not Ei verkkoa, in Lahetys neither
                 self.host.heartbeat_failed(exc.status)

@@ -29,6 +29,7 @@ __all__ = [
     "load_config",
     "panel_lock",
     "panel_owner",
+    "panel_release",
     "finnish_stamp",
     "journal",
     "prune_journal",
@@ -119,3 +120,8 @@ def panel_lock() -> IO[str] | None:
 def panel_owner() -> str:
     """Process id of the panel that holds the lock."""
     return instance.owner(repository.user_data_dir())
+
+
+def panel_release(lock: IO[str]) -> None:
+    """Free the one-panel lock when the panel closes."""
+    instance.release(lock)

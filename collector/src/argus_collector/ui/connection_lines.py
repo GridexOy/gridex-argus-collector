@@ -124,11 +124,11 @@ def connection_props(msgs: Messages, state: ConnectionState) -> ConnectionProps:
     )
 
 
-def timed_out(exc: api.ApiError, elapsed_s: float, timeout_s: float) -> int:
-    """Seconds waited when a heartbeat got no answer within its time-out, else 0."""
-    if exc.status != 0:
-        return 0
-    if "timed out" in exc.raw.lower() or elapsed_s >= 0.9 * timeout_s:
+def timed_out(exc: api.ApiError, elapsed_s: float) -> int:
+    """Seconds waited when a heartbeat got no answer within its time-out (the socket says
+    `timed out`), else 0. A refused connection is no answer at all, however long Windows
+    takes to say so (about 2 s on MAIN-PC, 0.4.8.3)."""
+    if exc.status == 0 and "timed out" in exc.raw.lower():
         return max(1, round(elapsed_s))
     return 0
 
