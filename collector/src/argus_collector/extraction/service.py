@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from argus_collector.evidence.contract import TextSpan, find_span
 from argus_collector.extraction import repository as reader
+from argus_collector.extraction.sections import is_fax
 from argus_collector.normalization import contract as norm
 
 KIND_EMAIL = "email"
@@ -56,19 +58,29 @@ def _normalize(kind: str, raw: str, region: str = norm.DEFAULT_REGION) -> str | 
     return norm.normalize_phone(raw, region)
 
 
+Region = Callable[[int], str]  # phone region of a text offset (country sections)
+
+
+def _fixed(region: str) -> Region:
+    return lambda _offset: region
+
+
 def _channel(
-    kind: str, raw: str, locator: str, text: str, visible: str = "", region: str = "FI"
+    kind: str, raw: str, locator: str, text: str, visible: str = "", region: Region | None = None
 ) -> Channel | None:
-    value = _normalize(kind, raw, region)
-    if value is None:
-        return None
     span = find_span(text, visible) if visible else None
     if span is None:
         span = find_span(text, raw)
+    if kind == KIND_PHONE and span is not None and is_fax(text, span.start):
+        return None
+    where = region or _fixed(norm.DEFAULT_REGION)
+    value = _normalize(kind, raw, where(span.start if span else -1))
+    if value is None:
+        return None
     return Channel(kind, value, visible or raw, locator, span)
 
 
-def _href_channels(finds: reader.RawFinds, text: str, region: str) -> list[Channel | None]:
+def _href_channels(finds: reader.RawFinds, text: str, region: Region) -> list[Channel | None]:
     out: list[Channel | None] = []
     for href, visible in finds.tel_hrefs:
         out.append(_channel(KIND_PHONE, href, "href:tel", text, visible, region))
@@ -77,11 +89,14 @@ def _href_channels(finds: reader.RawFinds, text: str, region: str) -> list[Chann
     return out
 
 
-def extract_channels(html: str, text: str, region: str = norm.DEFAULT_REGION) -> list[Channel]:
+def extract_channels(
+    html: str, text: str, region: str = norm.DEFAULT_REGION, region_at: Region | None = None
+) -> list[Channel]:
     finds = reader.raw_finds(html)
-    found = _href_channels(finds, text, region)
+    where = region_at or _fixed(region)
+    found = _href_channels(finds, text, where)
     for kind, raw, pointer in reader.jsonld_channels(finds.jsonld):
-        found.append(_channel(kind, raw, pointer, text, region=region))
+        found.append(_channel(kind, raw, pointer, text, region=where))
     for encoded in finds.cfemails:
         decoded = norm.decode_cfemail(encoded)
         if decoded:
@@ -89,7 +104,7 @@ def extract_channels(html: str, text: str, region: str = norm.DEFAULT_REGION) ->
     for raw in norm.find_emails(text):
         found.append(_channel(KIND_EMAIL, raw, LOCATOR_TEXT, text))
     for raw in norm.find_phones(text, region):
-        found.append(_channel(KIND_PHONE, raw, LOCATOR_TEXT, text, region=region))
+        found.append(_channel(KIND_PHONE, raw, LOCATOR_TEXT, text, region=where))
     unique: dict[tuple[str, str], Channel] = {}
     for channel in found:
         if channel is not None:

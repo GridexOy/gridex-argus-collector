@@ -3,6 +3,8 @@
 Optimistic `expected_state_revision` (409 "state revision is N"), replay of
 `client_request_id` returns the stored response. Every applied action bumps
 `state_revision` and queues a Command for the pinned worker (heartbeat).
+`resume` works from paused (-> leased with a live lease) and from
+needs_attention (-> running with a live lease); without one -> queued.
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ from contract_server.util import Json, caller_key, canonical_hash, new_id
 
 ALLOWED_FROM = {
     "pause": frozenset({"queued", "leased", "running", "needs_attention"}),
-    "resume": frozenset({"paused"}),
+    "resume": frozenset({"paused", "needs_attention"}),
     "cancel": frozenset({"queued", "leased", "running", "paused", "needs_attention"}),
     "continue": frozenset({"partial", "completed", "failed"}),
 }
@@ -26,7 +28,8 @@ def transition(stand: Stand, job: Json, action: str, patch: Json) -> None:
     elif action == "resume":
         run = current_run(stand.state, job)
         live = run is not None and lease_active(run, stand.now())
-        job["state"] = "leased" if live else "queued"
+        held = "running" if job["state"] == "needs_attention" else "leased"
+        job["state"] = held if live else "queued"
     elif action == "cancel":
         job["state"] = "cancelled"
         job["continuation"] = "none"

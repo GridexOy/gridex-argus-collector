@@ -21,8 +21,9 @@ RUNNING = "running"  # the browser walks it now
 STOPPED = "stopped"  # Pysayta / STOP / panel closed mid-walk: resumes on Kaynnista
 PAUSED = "paused"  # paused from ARGUS (command pause)
 WAITING_LEASE = "waiting_lease"  # lease expired or mismatched: reconcile first
+NEEDS_ATTENTION = "needs_attention"  # a bot check did not clear: the owner solves it
 COMPLETED, PARTIAL, FAILED, CANCELLED = "completed", "partial", "failed", "cancelled"
-ACTIVE = (QUEUED, RUNNING, STOPPED, PAUSED, WAITING_LEASE)
+ACTIVE = (QUEUED, RUNNING, STOPPED, PAUSED, WAITING_LEASE, NEEDS_ATTENTION)
 RUNNABLE = (QUEUED, STOPPED)
 TERMINAL = (COMPLETED, PARTIAL, FAILED, CANCELLED)
 

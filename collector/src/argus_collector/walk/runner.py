@@ -23,6 +23,7 @@ from argus_collector.walk.state import (
 
 RETRY_BACKOFF_S = 2.0  # one retry of a failed navigation (TZ_SELAIN 8.5)
 DOMAIN_GAP = "domain_ownership_unresolved"
+CHALLENGE_GAP = "captcha"  # a bot check that did not clear: needs_attention (8.5)
 
 __all__ = ["StopRequested", "WalkState", "run"]
 
@@ -63,7 +64,7 @@ def run(
         state.save_checkpoint()
         repository.finish_run(state.conn, state.run_id, state.cp.pages, state.contacts, result)
         state.conn.close()
-    if not stopped and not error:
+    if not stopped and not error and state.end_reason != service.END_ATTENTION:
         on_event(WalkEvent(service.EVENT_DONE, detail=result, page_no=state.cp.pages))
     visited = tuple(sorted(state.cp.visited))
     return WalkSummary(
@@ -76,6 +77,9 @@ def _walk(state: WalkState) -> None:
     with browser.WalkBrowser(settings.headless, settings.profile_dir) as wb:
         page = _open(state, wb)
         while page is not None:
+            if page.challenge:
+                _attention(state, page)
+                return
             state.check_stop()
             state.tick()
             if state.budget_spent() or not page_step.enter(state, page):
@@ -88,6 +92,15 @@ def _walk(state: WalkState) -> None:
                 return
             state.check_stop()
             page = _perform_safely(state, wb, page, action)
+
+
+def _attention(state: WalkState, page: browser.PageState) -> None:
+    """The owner passes the check in the work browser; the run resumes on this URL."""
+    detail = f"a bot check on {page.url} did not clear within 20 s"
+    state.add_gap(page.url, CHALLENGE_GAP, detail, True)
+    state.cp.last_url = page.url
+    state.end_reason = service.END_ATTENTION
+    state.step(service.STEP_ATTENTION, page.url, page.url)
 
 
 def _gap_reason(exc: Exception) -> str:
@@ -176,6 +189,9 @@ def _perform(
         state.step(service.STEP_SCROLL, "", page.url)
         return wb.scroll()
     assert action.candidate is not None
+    if action.kind == service.ACTION_SELECT:
+        state.step(service.STEP_CLICK, f"{action.candidate.text}: {action.option}", page.url)
+        return wb.select(action.candidate, action.option)
     if action.kind == service.ACTION_NAVIGATE:
         state.step(service.STEP_NAVIGATE, action.candidate.href, page.url)
         return _goto(wb, action.candidate.href)

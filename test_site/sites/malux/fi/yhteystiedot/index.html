@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="fi-FI">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yhteystiedot - Malux Finland Oy</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="logo" href="/fi/">Malux</a>
+    <nav>
+      <a href="/fi/tuotteet/">Tuotteet</a>
+      <a href="/fi/yhteystiedot/">Yhteystiedot</a>
+    </nav>
+    <nav class="languages">
+      <a href="/fi/" hreflang="fi" aria-current="true">FI</a>
+      <a href="http://malux-se.localhost:__PORT__/sv/" hreflang="sv" title="Malux Sverige">SE</a>
+    </nav>
+  </header>
+  <main>
+    <h1>Yhteystiedot</h1>
+    <section class="office">
+      <h2>Malux Finland Oy</h2>
+      <p>Testitie 1<br>00100 Helsinki</p>
+      <p>Vaihde 020 123 4567<br><a href="mailto:info@malux.example">info@malux.example</a></p>
+    </section>
+    <h2>Henkilöt osastoittain</h2>
+    <div role="tablist" aria-label="Osastot">
+      <button role="tab" id="t-atex" aria-selected="true" aria-controls="p-atex">ATEX/Teollisuus</button>
+      <button role="tab" id="t-hallinto" aria-selected="false" aria-controls="p-hallinto">Hallinto</button>
+      <button role="tab" id="t-valaistus" aria-selected="false" aria-controls="p-valaistus">Valaistus</button>
+      <button role="tab" id="t-varasto" aria-selected="false" aria-controls="p-varasto">Varasto</button>
+    </div>
+    <div role="tabpanel" id="p-atex" aria-labelledby="t-atex">
+      <section class="group">
+        <h3>Myynti</h3>
+        <div class="person">
+          <p class="name">Mikael Salonen</p> <p class="title">Myyntipäällikkö, ATEX</p>
+          <p class="phone">040 551 2301</p> <a class="email" href="mailto:mikael.salonen@malux.example">mikael.salonen@malux.example</a>
+        </div>
+        <div class="person">
+          <p class="name">Laura Nyström</p> <p class="title">Myynti-insinööri</p>
+          <p class="phone">040 551 2302</p> <a class="email" href="mailto:laura.nystrom@malux.example">laura.nystrom@malux.example</a>
+        </div>
+        <div class="person">
+          <p class="name">Antti Kallio</p> <p class="title">Myynti-insinööri</p>
+          <p class="phone">020 123 4511</p> <a class="email" href="mailto:antti.kallio@malux.example">antti.kallio@malux.example</a>
+        </div>
+      </section>
+      <section class="group">
+        <h3>Tekninen tuki</h3>
+        <div class="person">
+          <p class="name">Ville Hakala</p> <p class="title">Tekninen asiantuntija</p>
+          <p class="phone">020 123 4512</p> <a class="email" href="mailto:ville.hakala@malux.example">ville.hakala@malux.example</a>
+        </div>
+        <div class="person">
+          <p class="name">Jari Toivonen</p> <p class="title">Huoltoinsinööri</p>
+          <p class="phone">040 551 2305</p> <a class="email" href="mailto:jari.toivonen@malux.example">jari.toivonen@malux.example</a>
+        </div>
+      </section>
+    </div>
+    <div role="tabpanel" id="p-hallinto" aria-labelledby="t-hallinto" hidden>
+      <section class="group">
+        <h3>Johto</h3>
+        <div class="person">
+          <p class="name">Joakim Flakholm</p> <p class="title">Maajohtaja</p>
+          <p class="phone">040 551 2310</p> <a class="email" href="mailto:joakim.flakholm@malux.example">joakim.flakholm@malux.example</a>
+        </div>
+        <div class="person">
+          <p class="name">Riikka Lindqvist</p> <p class="title">Talousjohtaja</p>
+          <p class="phone">040 551 2311</p> <a class="email" href="mailto:riikka.lindqvist@malux.example">riikka.lindqvist@malux.example</a>
+        </div>
+      </section>
+      <section class="group">
+        <h3>Talous</h3>
+        <div class="person">
+          <p class="name">Päivi Mattila</p> <p class="title">Controller</p>
+          <p class="phone">020 123 4521</p> <a class="email" href="mailto:paivi.mattila@malux.example">paivi.mattila@malux.example</a>
+        </div>
+        <div class="person">
+          <p class="name">Heikki Peltonen</p> <p class="title">Kirjanpitäjä</p>
+          <p class="phone">020 123 4522</p> <a class="email" href="mailto:heikki.peltonen@malux.example">heikki.peltonen@malux.example</a>
+        </div>
+      </section>
+      <section class="group">
+        <h3>Henkilöstö</h3>
+        <div class="person">
+          <p class="name">Satu Väisänen</p> <p class="title">Henkilöstöpäällikkö</p>
+          <p class="phone">040 551 2314</p> <a class="email" href="mailto:satu.vaisanen@malux.example">satu.vaisanen@malux.example</a>
+        </div>
+      </section>
+    </div>
+    <div role="tabpanel" id="p-valaistus" aria-labelledby="t-valaistus" hidden>
+      <section class="group">
+        <h3>Myynti</h3>
+        <div class="person">
+          <p class="name">Teemu Aaltonen</p> <p class="title">Myyntipäällikkö, valaistus</p>
+          <p class="phone">040 551 2320</p> <a class="email" href="mailto:teemu.aaltonen@malux.example">teemu.aaltonen@malux.example</a>
+        </div>
+        <div class="person">
+          <p class="name">Johanna Karjalainen</p> <p class="title">Myyntineuvottelija</p>
+          <p class="phone">040 551 2321</p> <a class="email" href="mailto:johanna.karjalainen@malux.example">johanna.karjalainen@malux.example</a>
+        </div>
+        <div class="person">
+          <p class="name">Markus Heino</p> <p class="title">Aluemyyntipäällikkö</p>
+          <p class="phone">020 123 4531</p> <a class="email" href="mailto:markus.heino@malux.example">markus.heino@malux.example</a>
+        </div>
+      </section>
+      <section class="group">
+        <h3>Markkinointi</h3>
+        <div class="person">
+          <p class="name">Emilia Saarinen</p> <p class="title">Markkinointipäällikkö</p>
+          <p class="phone">040 551 2323</p> <a class="email" href="mailto:emilia.saarinen@malux.example">emilia.saarinen@malux.example</a>
+        </div>
+        <div class="person">
+          <p class="name">Oskari Lehto</p> <p class="title">Markkinointikoordinaattori</p>
+          <p class="phone">020 123 4532</p> <a class="email" href="mailto:oskari.lehto@malux.example">oskari.lehto@malux.example</a>
+        </div>
+      </section>
+    </div>
+    <div role="tabpanel" id="p-varasto" aria-labelledby="t-varasto" hidden>
+      <section class="group">
+        <h3>Logistiikka</h3>
+        <div class="person">
+          <p class="name">Timo Räsänen</p> <p class="title">Logistiikkapäällikkö</p>
+          <p class="phone">040 551 2330</p> <a class="email" href="mailto:timo.rasanen@malux.example">timo.rasanen@malux.example</a>
+        </div>
+        <div class="person">
+          <p class="name">Kimmo Ahonen</p> <p class="title">Varastoesimies</p>
+          <p class="phone">040 551 2331</p> <a class="email" href="mailto:kimmo.ahonen@malux.example">kimmo.ahonen@malux.example</a>
+        </div>
+        <div class="person">
+          <p class="name">Niina Jokinen</p> <p class="title">Logistiikkakoordinaattori</p>
+          <p class="phone">020 123 4541</p> <a class="email" href="mailto:niina.jokinen@malux.example">niina.jokinen@malux.example</a>
+        </div>
+        <div class="person">
+          <p class="name">Pasi Hyvönen</p> <p class="title">Varastotyöntekijä</p>
+          <p class="phone">020 123 4542</p> <a class="email" href="mailto:pasi.hyvonen@malux.example">pasi.hyvonen@malux.example</a>
+        </div>
+        <div class="person">
+          <p class="name">Eero Mustonen</p> <p class="title">Lähetyskoordinaattori</p>
+          <p class="phone">040 551 2334</p> <a class="email" href="mailto:eero.mustonen@malux.example">eero.mustonen@malux.example</a>
+        </div>
+      </section>
+    </div>
+  </main>
+  <footer class="site-footer">
+    <p>Malux Finland Oy &middot; Testitie 1, 00100 Helsinki</p>
+  </footer>
+  <script>
+    // Tabs: only the selected department's panel is visible; the others carry `hidden`.
+    var tabs = document.querySelectorAll('[role="tab"]');
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        tabs.forEach(function (other) {
+          var on = other === tab;
+          other.setAttribute('aria-selected', on ? 'true' : 'false');
+          document.getElementById(other.getAttribute('aria-controls')).hidden = !on;
+        });
+      });
+    });
+  </script>
+</body>
+</html>

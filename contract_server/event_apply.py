@@ -1,14 +1,16 @@
-"""Effects of the non-contact event types (contacts.py and finish.py do the rest).
+"""Effects of the non-contact event types (contacts, freshness, finish do the rest).
 
 State changes (job state, stage) happen only when the batch `applies`;
 data (progress snapshots, sources, records, model calls) is stored either way.
+A job in needs_attention returns to running when its current run delivers an
+accepted job.progress or content event (source.*, contact.*).
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
 
-from contract_server import contacts, finish
+from contract_server import contacts, finish, freshness
 from contract_server.event_context import Batch, Outcome
 from contract_server.state import LEASE_STATES
 from contract_server.util import Json
@@ -72,8 +74,25 @@ APPLIERS: dict[str, Applier] = {
     "contact.observed": contacts.apply,
     "contact.enriched": contacts.apply,
     "contact.merge_proposed": stored,
-    "contact.freshness": stored,
+    "contact.freshness": freshness.apply,
     "route.recorded": stored,
     "route.verified": stored,
     "model.called": model_called,
 }
+
+
+def resumes_work(kind: str) -> bool:
+    return kind == "job.progress" or kind.startswith(("source.", "contact."))
+
+
+def apply_event(batch: Batch, event: Json) -> Outcome:
+    """Run the type's applier; work delivered while waiting for attention resumes the job."""
+    outcome = APPLIERS[event["type"]](batch, event)
+    if (
+        outcome.status == "accepted"
+        and batch.applies
+        and batch.job["state"] == "needs_attention"
+        and resumes_work(event["type"])
+    ):
+        batch.job["state"] = "running"
+    return outcome

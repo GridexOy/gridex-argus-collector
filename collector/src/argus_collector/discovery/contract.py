@@ -7,25 +7,42 @@ javascript, no documents (M2), contact-word ranking of links, page keys.
 
 from __future__ import annotations
 
+from argus_collector.discovery import countries, service
 from argus_collector.discovery import focus as focus_rules
-from argus_collector.discovery import service
 from argus_collector.discovery.focus import Focus
-from argus_collector.discovery.service import Candidate
+from argus_collector.discovery.service import (
+    COUNTRY_LIST_MIN,
+    KIND_BUTTON,
+    KIND_LINK,
+    KIND_SELECT,
+    Candidate,
+)
 
 __all__ = [
+    "COUNTRY_LIST_MIN",
+    "KIND_BUTTON",
+    "KIND_LINK",
+    "KIND_SELECT",
     "Candidate",
     "Focus",
     "approved_hosts_for",
+    "country_members",
+    "department_rank",
     "focus_brief",
     "host_of",
+    "is_allowed_url",
+    "is_local_seed",
+    "is_social_url",
+    "label_country",
+    "link_country",
     "link_language",
     "make_focus",
-    "is_allowed_url",
-    "is_social_url",
     "normalize_url",
     "page_key",
     "rank_candidates",
     "score_link",
+    "strong_link",
+    "url_country",
 ]
 
 
@@ -78,6 +95,41 @@ def link_language(text: str, href: str) -> str | None:
 def focus_brief(focus: Focus | None) -> str:
     """The focus as English instructions for the model's action prompt."""
     return focus_rules.focus_brief(focus)
+
+
+def strong_link(text: str, href: str, focus: Focus | None) -> bool:
+    """A link the model may not skip before finishing: contact link, the exhibition-
+    country version, and with a local seed another country version (walked after)."""
+    return service.strong_link(text, href, focus)
+
+
+def country_members(candidates: list[Candidate]) -> dict[str, list[Candidate]]:
+    """Country -> its controls/links when the page lists >= 3 countries, else {}."""
+    return service.country_members(candidates)
+
+
+def label_country(label: str) -> str | None:
+    """ISO code of a label that names a country (`Finland`, `Suomi`, `FI`)."""
+    return countries.label_country(label)
+
+
+def url_country(url: str) -> str | None:
+    """Country version of a URL: ccTLD, `fi.` sub-domain, `/fi-fi/`, `/fi/`."""
+    return countries.url_country(url)
+
+
+def link_country(text: str, href: str) -> str | None:
+    return countries.link_country(text, href)
+
+
+def is_local_seed(seed_url: str, country: str) -> bool:
+    """The seed is already the exhibition-country version (`.fi`, `/fi/`, `fi.`)."""
+    return countries.is_local_seed(seed_url, country)
+
+
+def department_rank(label: str) -> int:
+    """Order of department tabs: 0 sales/marketing, 1 other units, 2 support functions."""
+    return countries.department_rank(label)
 
 
 def host_of(url: str) -> str:

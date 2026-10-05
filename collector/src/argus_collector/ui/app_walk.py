@@ -102,7 +102,8 @@ class WalkController:
             view.collect.set_status(*line)
 
     def _finished(self, summary: walk.WalkSummary) -> None:
-        if not summary.stopped and not summary.error:
+        ended = not summary.stopped and not summary.error
+        if ended and summary.end_reason != walk.END_ATTENTION:
             text, level = walk_lines.done_line(self.host.msgs, summary.pages, summary.contacts)
             self.host.view.collect.set_status(text, level)
         self.thread = None

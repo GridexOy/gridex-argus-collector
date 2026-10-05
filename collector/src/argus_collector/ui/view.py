@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from tkinter import ttk
 
+from argus_collector.ui.attention_lines import AttentionProps
 from argus_collector.ui.queue_lines import DeliveryProps, QueueProps
 from argus_collector.ui.service import (
     LEVEL_ERROR,
@@ -16,6 +17,7 @@ from argus_collector.ui.service import (
     Line,
     PanelProps,
 )
+from argus_collector.ui.view_attention import AttentionBlock
 from argus_collector.ui.view_collect import CollectBlock
 from argus_collector.ui.view_connection import ConnectionBlock
 from argus_collector.ui.view_queue import DeliveryBlock, QueueBlock
@@ -42,6 +44,8 @@ class Callbacks:
     stop: Callable[[], None]  # Pysayta: both
     open_source: Callable[[str], None]
     test_connection: Callable[[str, str, str], None]
+    open_attention: Callable[[], None]  # Huomio: work browser on the blocked page
+    attention_done: Callable[[], None]  # Huomio: Jatka kasin tehdyn toimen jalkeen
 
 
 def _style(root: tk.Tk) -> None:
@@ -87,6 +91,9 @@ class PanelView:
         self._build_resources(props, on.open_browser)
         self.stop_label = ttk.Label(self.body, text="", wraplength=MIN_WIDTH - 40)
         self.stop_label.pack(anchor="w", padx=PAD_X, pady=PAD_Y)
+        self.attention = AttentionBlock(
+            self.body, self.stop_label, on.open_attention, on.attention_done
+        )
         self.version_label = ttk.Label(root, style="Version.TLabel")
         self.version_label.pack(side="bottom", anchor="w", padx=12, pady=6)
         self.render(props)
@@ -144,6 +151,10 @@ class PanelView:
         """Jono and Lahetys only (refreshed every second from the local SQLite)."""
         self.queue.render(queue)
         self.delivery.render(delivery)
+
+    def render_attention(self, props: AttentionProps | None) -> None:
+        """Huomio: shown only while a job needs the owner."""
+        self.attention.render(props)
 
     def set_browser_status(self, line: Line) -> None:
         self._set_line(self.browser_status, line)

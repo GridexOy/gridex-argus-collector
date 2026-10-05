@@ -6,15 +6,20 @@ One company-site walk: the local model drives the visible Chrome (TZ_SELAIN
 Per page (`runner.py` loop, `page.py`, `decide.py`):
 1. `enter`: a new URL counts against the page budget; `observe`: a page state
    (URL + content hash) not seen before is snapshotted (`evidence.store_snapshot`).
-2. Channels (`extraction.extract_channels`, phone region from the page), model
-   cards (`walk.cards`) verified verbatim, DOM binding of each field
-   (`browser.bindings`, job mode), findings (`findings.py`): persons
-   new/enriched, unclaimed channels as organization / office / unassigned,
-   the page's field audit; local `observations` rows + the sink in one transaction.
-3. Links of the page join a frontier of the whole site; the model (`walk.action`,
-   with the job's country focus brief) picks from the page's links, frontier
-   links and buttons; invalid answers fall back to the best link. In job mode
-   the model may not finish while a link scoring >= 10 is unvisited.
+2. Channels (`extraction.extract_channels`, phone region from the page or its
+   country section), model cards (`walk.cards`) verified verbatim, DOM binding
+   and group heading of each person (`browser.bindings`, job mode), findings
+   (`findings.py`, `entities.py`): persons with department and country
+   (`context.py`), the office of each opened country section (`offices.py`),
+   other channels as organization / office / unassigned, the field audit;
+   local `observations` rows + the sink in one transaction.
+3. `structure.py` first (owner 05.10.2026): on a country list only the
+   exhibition country is opened / selected, the others are not offered; every
+   department tab is opened, sales and marketing first. Then links join a
+   frontier of the whole site and the model (`walk.action`, focus brief) picks;
+   in job mode it may not finish while a strong link (`discovery.strong_link`)
+   is unvisited. A bot check that does not clear in 20 s ends the walk as
+   `attention` (gap `captcha`, resumes on that URL).
 4. A failed action is a gap (`timeout` / `network_error` / `unsupported_widget`)
    and the walk goes on; three in a row end it. A navigation is retried once.
 
@@ -24,7 +29,7 @@ ARGUS20_TZ_TANDEM.md A2): hosts from the job, a seed landing elsewhere is gap
 active seconds / states of the run, ids stable within the job, checkpoint after
 every page (visited, seen states, frontier, entities, observation ids, counters),
 resume from it after a restart, a stop or a lost lease (tabs are not restored).
-`WalkSummary.end_reason`: finished / budget / stopped / error /
+`WalkSummary.end_reason`: finished / budget / stopped / error / attention /
 domain_unresolved / start_failed / action_failures.
 
 The sink (`sink.py`, implemented by `scheduler`) gets `page_stored`,

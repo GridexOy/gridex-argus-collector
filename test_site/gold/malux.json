@@ -1,0 +1,362 @@
+{
+  "fixture": "malux",
+  "host": "malux.localhost",
+  "hosts": [
+    "malux.localhost",
+    "malux-se.localhost"
+  ],
+  "case": "Finnish company with a Swedish sister site. The seed is under /fi/, so the walk starts with the Finnish version; fi/yhteystiedot/ has 4 department tabs (ATEX/Teollisuus, Hallinto, Valaistus, Varasto), only the first open: every tab is walked and its people taken, sales and marketing (priority_departments) first. The Swedish site malux-se.localhost (approved host, linked as SE) comes after the Finnish pages and its people carry country SE. Every person below must be found; priority marks the people of the Finnish (priority country) pages.",
+  "company": {
+    "name": "Malux Finland Oy",
+    "offices": [
+      {
+        "name": "Malux Finland Oy",
+        "address_lines": [
+          "Testitie 1",
+          "00100 Helsinki"
+        ],
+        "phone": "+358201234567",
+        "phone_text": "020 123 4567",
+        "email": "info@malux.example",
+        "country": "FI",
+        "page": "malux.localhost/fi/yhteystiedot/"
+      },
+      {
+        "name": "Malux Sverige AB",
+        "address_lines": [
+          "Provgatan 2",
+          "117 43 Stockholm"
+        ],
+        "phone": "+46812345600",
+        "phone_text": "08-123 456 00",
+        "email": "info.se@malux.example",
+        "country": "SE",
+        "page": "malux-se.localhost/sv/kontakt/"
+      }
+    ]
+  },
+  "tabs": {
+    "page": "malux.localhost/fi/yhteystiedot/",
+    "labels": [
+      "ATEX/Teollisuus",
+      "Hallinto",
+      "Valaistus",
+      "Varasto"
+    ],
+    "open": "ATEX/Teollisuus"
+  },
+  "priority_departments": [
+    "Myynti",
+    "Markkinointi"
+  ],
+  "priority_pages": [
+    "malux.localhost/fi/",
+    "malux.localhost/fi/yhteystiedot/"
+  ],
+  "later_pages": [
+    "malux-se.localhost/sv/",
+    "malux-se.localhost/sv/kontakt/"
+  ],
+  "persons": [
+    {
+      "name": "Mikael Salonen",
+      "title": "Myyntipäällikkö, ATEX",
+      "email": "mikael.salonen@malux.example",
+      "phone": "+358405512301",
+      "phone_text": "040 551 2301",
+      "department": "Myynti",
+      "tab": "ATEX/Teollisuus",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Laura Nyström",
+      "title": "Myynti-insinööri",
+      "email": "laura.nystrom@malux.example",
+      "phone": "+358405512302",
+      "phone_text": "040 551 2302",
+      "department": "Myynti",
+      "tab": "ATEX/Teollisuus",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Antti Kallio",
+      "title": "Myynti-insinööri",
+      "email": "antti.kallio@malux.example",
+      "phone": "+358201234511",
+      "phone_text": "020 123 4511",
+      "department": "Myynti",
+      "tab": "ATEX/Teollisuus",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Ville Hakala",
+      "title": "Tekninen asiantuntija",
+      "email": "ville.hakala@malux.example",
+      "phone": "+358201234512",
+      "phone_text": "020 123 4512",
+      "department": "Tekninen tuki",
+      "tab": "ATEX/Teollisuus",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Jari Toivonen",
+      "title": "Huoltoinsinööri",
+      "email": "jari.toivonen@malux.example",
+      "phone": "+358405512305",
+      "phone_text": "040 551 2305",
+      "department": "Tekninen tuki",
+      "tab": "ATEX/Teollisuus",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Joakim Flakholm",
+      "title": "Maajohtaja",
+      "email": "joakim.flakholm@malux.example",
+      "phone": "+358405512310",
+      "phone_text": "040 551 2310",
+      "department": "Johto",
+      "tab": "Hallinto",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Riikka Lindqvist",
+      "title": "Talousjohtaja",
+      "email": "riikka.lindqvist@malux.example",
+      "phone": "+358405512311",
+      "phone_text": "040 551 2311",
+      "department": "Johto",
+      "tab": "Hallinto",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Päivi Mattila",
+      "title": "Controller",
+      "email": "paivi.mattila@malux.example",
+      "phone": "+358201234521",
+      "phone_text": "020 123 4521",
+      "department": "Talous",
+      "tab": "Hallinto",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Heikki Peltonen",
+      "title": "Kirjanpitäjä",
+      "email": "heikki.peltonen@malux.example",
+      "phone": "+358201234522",
+      "phone_text": "020 123 4522",
+      "department": "Talous",
+      "tab": "Hallinto",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Satu Väisänen",
+      "title": "Henkilöstöpäällikkö",
+      "email": "satu.vaisanen@malux.example",
+      "phone": "+358405512314",
+      "phone_text": "040 551 2314",
+      "department": "Henkilöstö",
+      "tab": "Hallinto",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Teemu Aaltonen",
+      "title": "Myyntipäällikkö, valaistus",
+      "email": "teemu.aaltonen@malux.example",
+      "phone": "+358405512320",
+      "phone_text": "040 551 2320",
+      "department": "Myynti",
+      "tab": "Valaistus",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Johanna Karjalainen",
+      "title": "Myyntineuvottelija",
+      "email": "johanna.karjalainen@malux.example",
+      "phone": "+358405512321",
+      "phone_text": "040 551 2321",
+      "department": "Myynti",
+      "tab": "Valaistus",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Markus Heino",
+      "title": "Aluemyyntipäällikkö",
+      "email": "markus.heino@malux.example",
+      "phone": "+358201234531",
+      "phone_text": "020 123 4531",
+      "department": "Myynti",
+      "tab": "Valaistus",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Emilia Saarinen",
+      "title": "Markkinointipäällikkö",
+      "email": "emilia.saarinen@malux.example",
+      "phone": "+358405512323",
+      "phone_text": "040 551 2323",
+      "department": "Markkinointi",
+      "tab": "Valaistus",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Oskari Lehto",
+      "title": "Markkinointikoordinaattori",
+      "email": "oskari.lehto@malux.example",
+      "phone": "+358201234532",
+      "phone_text": "020 123 4532",
+      "department": "Markkinointi",
+      "tab": "Valaistus",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Timo Räsänen",
+      "title": "Logistiikkapäällikkö",
+      "email": "timo.rasanen@malux.example",
+      "phone": "+358405512330",
+      "phone_text": "040 551 2330",
+      "department": "Logistiikka",
+      "tab": "Varasto",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Kimmo Ahonen",
+      "title": "Varastoesimies",
+      "email": "kimmo.ahonen@malux.example",
+      "phone": "+358405512331",
+      "phone_text": "040 551 2331",
+      "department": "Logistiikka",
+      "tab": "Varasto",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Niina Jokinen",
+      "title": "Logistiikkakoordinaattori",
+      "email": "niina.jokinen@malux.example",
+      "phone": "+358201234541",
+      "phone_text": "020 123 4541",
+      "department": "Logistiikka",
+      "tab": "Varasto",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Pasi Hyvönen",
+      "title": "Varastotyöntekijä",
+      "email": "pasi.hyvonen@malux.example",
+      "phone": "+358201234542",
+      "phone_text": "020 123 4542",
+      "department": "Logistiikka",
+      "tab": "Varasto",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Eero Mustonen",
+      "title": "Lähetyskoordinaattori",
+      "email": "eero.mustonen@malux.example",
+      "phone": "+358405512334",
+      "phone_text": "040 551 2334",
+      "department": "Logistiikka",
+      "tab": "Varasto",
+      "country": "FI",
+      "source_page": "malux.localhost/fi/yhteystiedot/",
+      "priority": true
+    },
+    {
+      "name": "Erik Johansson",
+      "title": "Försäljningschef",
+      "email": "erik.johansson@malux.example",
+      "phone": "+46701234567",
+      "phone_text": "070-123 45 67",
+      "department": "Försäljning",
+      "tab": null,
+      "country": "SE",
+      "source_page": "malux-se.localhost/sv/kontakt/",
+      "priority": false
+    },
+    {
+      "name": "Anna Lindberg",
+      "title": "Säljare",
+      "email": "anna.lindberg@malux.example",
+      "phone": "+46812345681",
+      "phone_text": "08-123 456 81",
+      "department": "Försäljning",
+      "tab": null,
+      "country": "SE",
+      "source_page": "malux-se.localhost/sv/kontakt/",
+      "priority": false
+    },
+    {
+      "name": "Johan Nilsson",
+      "title": "Säljare",
+      "email": "johan.nilsson@malux.example",
+      "phone": "+46702345678",
+      "phone_text": "070-234 56 78",
+      "department": "Försäljning",
+      "tab": null,
+      "country": "SE",
+      "source_page": "malux-se.localhost/sv/kontakt/",
+      "priority": false
+    },
+    {
+      "name": "Karl Åkesson",
+      "title": "Teknisk säljare",
+      "email": "karl.akesson@malux.example",
+      "phone": "+46733456789",
+      "phone_text": "073-345 67 89",
+      "department": "Försäljning",
+      "tab": null,
+      "country": "SE",
+      "source_page": "malux-se.localhost/sv/kontakt/",
+      "priority": false
+    },
+    {
+      "name": "Maria Svensson",
+      "title": "Marknadsansvarig",
+      "email": "maria.svensson@malux.example",
+      "phone": "+46812345682",
+      "phone_text": "08-123 456 82",
+      "department": "Marknad",
+      "tab": null,
+      "country": "SE",
+      "source_page": "malux-se.localhost/sv/kontakt/",
+      "priority": false
+    }
+  ]
+}

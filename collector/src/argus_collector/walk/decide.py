@@ -6,11 +6,9 @@ from argus_collector.browser import contract as browser
 from argus_collector.discovery import contract as discovery
 from argus_collector.models import contract as models
 from argus_collector.walk import page as page_step
-from argus_collector.walk import prompts, service
+from argus_collector.walk import prompts, service, structure
 from argus_collector.walk.service import Action
 from argus_collector.walk.state import WalkState
-
-STRONG_LINK_SCORE = 10  # a contact/team/country link the model may not skip (guard-rail)
 
 
 def end_budget(state: WalkState) -> None:
@@ -24,13 +22,15 @@ def end_budget(state: WalkState) -> None:
 def _guard_finish(state: WalkState, candidates: list[discovery.Candidate]) -> Action:
     """In job mode the model may not finish while a strong contact link is unvisited."""
     for cand in candidates:
-        if cand.kind == "link":
-            if discovery.score_link(cand.text, cand.href, state.focus) >= STRONG_LINK_SCORE:
-                return Action(service.ACTION_NAVIGATE, cand)
+        if cand.kind == "link" and discovery.strong_link(cand.text, cand.href, state.focus):
+            return Action(service.ACTION_NAVIGATE, cand)
     return Action(service.ACTION_FINISH)
 
 
 def decide(state: WalkState, page: browser.PageState, text: str) -> Action:
+    built = structure.structural_action(state, page)
+    if built is not None:
+        return built
     candidates = page_step.ranked(state, page)
     pages_left = state.settings.run_limits().pages - state.cp.pages
     if not candidates:

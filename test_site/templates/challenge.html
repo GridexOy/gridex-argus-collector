@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+  <!-- test_site fixture: JS challenge interstitial (bot check emulation, pages.py) -->
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Just a moment...</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; margin: 0; color: #313131; background: #fff; }
+    .main-wrapper { max-width: 640px; margin: 15vh auto 0; padding: 0 16px; }
+    h1 { font-size: 2em; font-weight: 500; }
+    .spinner { width: 28px; height: 28px; border: 3px solid #ddd; border-top-color: #555;
+               border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="main-wrapper" role="main">
+    <h1>__HOST__</h1>
+    <div id="challenge-running">
+      <div class="spinner"></div>
+      <p>Checking your browser before accessing __HOST__.</p>
+      <p>This process is automatic. Your browser will redirect to your requested content shortly.</p>
+    </div>
+    <noscript>Enable JavaScript and cookies to continue</noscript>
+  </div>
+  <script>
+    setTimeout(function () {
+      __PASS__
+      location.reload();
+    }, 3000);
+  </script>
+</body>
+</html>

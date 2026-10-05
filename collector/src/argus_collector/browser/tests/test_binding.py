@@ -29,7 +29,7 @@ def probe(name: str, *values: tuple[str, str, str]) -> browser.PersonProbe:
 
 
 @pytest.fixture(scope="module")
-def bindings(tmp_path_factory: pytest.TempPathFactory) -> list[tuple[str, ...]]:
+def bindings(tmp_path_factory: pytest.TempPathFactory) -> list[browser.PersonBinding]:
     profile = tmp_path_factory.mktemp("profile") / "p"
     page = tmp_path_factory.mktemp("site") / "people.html"
     page.write_text(HTML, encoding="utf-8")
@@ -49,8 +49,8 @@ def bindings(tmp_path_factory: pytest.TempPathFactory) -> list[tuple[str, ...]]:
         return wb.bindings(persons)
 
 
-def test_card_row_proximity_and_none(bindings: list[tuple[str, ...]]) -> None:
-    anna, mikko, sari, elina, katri, nobody, ojala = bindings
+def test_card_row_proximity_and_none(bindings: list[browser.PersonBinding]) -> None:
+    anna, mikko, sari, elina, katri, nobody, ojala = (b.values for b in bindings)
     assert ojala == ("card",), "the heading with the same words is not the card"
     assert anna == ("card", "card", "card"), "split name, title, mailto and tel: href"
     assert mikko == ("card",)
@@ -60,7 +60,13 @@ def test_card_row_proximity_and_none(bindings: list[tuple[str, ...]]) -> None:
     assert nobody == ("none",)
 
 
+def test_group_heading_of_a_card(bindings: list[browser.PersonBinding]) -> None:
+    assert bindings[6].group == "Customer service", "the heading before Sari Ojala's card"
+    assert bindings[0].group == "", "no heading before Anna's card"
+
+
 def test_parse_result_is_defensive() -> None:
     persons = [probe("A", ("x", "text", "x"), ("y", "text", "y"))]
-    assert parse_result([["card", "bogus"]], persons) == [("card", "none")]
-    assert parse_result(None, persons) == [("none", "none")]
+    parsed = parse_result([{"values": ["card", "bogus"], "group": "Myynti"}], persons)
+    assert parsed == [browser.PersonBinding(("card", "none"), "Myynti")]
+    assert parse_result(None, persons) == [browser.PersonBinding(("none", "none"), "")]

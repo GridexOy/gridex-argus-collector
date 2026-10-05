@@ -33,6 +33,7 @@ from argus_collector.walk.sink import (
 
 __all__ = [
     "DEFAULT_PAGE_BUDGET",
+    "END_ATTENTION",
     "END_BUDGET",
     "END_DOMAIN",
     "END_ERROR",
@@ -63,6 +64,7 @@ __all__ = [
 
 DEFAULT_PAGE_BUDGET = service.DEFAULT_PAGE_BUDGET
 END_FINISHED = service.END_FINISHED
+END_ATTENTION = service.END_ATTENTION
 END_BUDGET = service.END_BUDGET
 END_STOPPED = service.END_STOPPED
 END_ERROR = service.END_ERROR

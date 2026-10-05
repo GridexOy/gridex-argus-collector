@@ -15,7 +15,7 @@ from argus_collector.scheduler.collector import Collector
 from argus_collector.scheduler.hooks import Settings
 from argus_collector.scheduler.leases import HeartbeatFields
 from argus_collector.scheduler.runner import WalkEnv
-from argus_collector.scheduler.views import DeliveryView, QueueRow, QueueView
+from argus_collector.scheduler.views import AttentionItem, DeliveryView, QueueRow, QueueView
 
 __all__ = [
     "ACTIVE_STATES",
@@ -23,6 +23,7 @@ __all__ = [
     "STAGE_BROWSER",
     "STAGE_FINALIZING",
     "STAGE_QUEUED",
+    "AttentionItem",
     "Collector",
     "DeliveryView",
     "HeartbeatFields",

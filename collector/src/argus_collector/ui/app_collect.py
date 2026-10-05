@@ -64,7 +64,8 @@ class CollectController:
             profile_dir=None, evidence_dir=None, db_path=None, stop_files=(),
             version=runtime.current_version_status().file_version,
         )
-        settings = scheduler.Settings(env=env, stop_files=runtime.stop_files)
+        settings = scheduler.Settings(env=env, stop_files=runtime.stop_files,
+                                      browser_free=lambda: not host.work_browser_running())
         self._dirty = threading.Event()
         self._job_contacts = 0
         self.collector = scheduler.Collector(

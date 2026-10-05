@@ -2,13 +2,15 @@
 
 An unfinished current run is re-leased (same run_id and seq, generation+1);
 otherwise a new run starts from the previous finished run's checkpoint.
-The job is pinned to the first worker that claims it (M1).
+The job is pinned to the first worker that claims it (M1). known_contacts are
+the company's contacts accepted from its other jobs (`known.py`).
 """
 
 from __future__ import annotations
 
 from contract_server.context import Request, Stand
 from contract_server.errors import invalid
+from contract_server.known import known_contacts
 from contract_server.leases import issue_lease
 from contract_server.state import claimable, current_run
 from contract_server.util import Json, iso, new_id
@@ -74,7 +76,7 @@ def claim_job(stand: Stand, job: Json, worker_id: str, now: float) -> Json:
         "lease": lease,
         "checkpoint": run["checkpoint"],
         "routes": [],
-        "known_contacts": [],
+        "known_contacts": known_contacts(stand.state, job),
     }
 
 

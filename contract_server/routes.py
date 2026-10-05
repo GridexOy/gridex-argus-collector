@@ -44,6 +44,7 @@ ROUTE_SPECS: tuple[tuple[str, str, str, Handler], ...] = (
     ("POST", BASE_PATH + "/jobs/{job_id}/control", SYSTEM, control.handle),
     ("GET", BASE_PATH + "/jobs/{job_id}", SYSTEM, status.get_job),
     ("GET", "/_stand/jobs/{job_id}/contacts", SYSTEM, stand_views.contacts),
+    ("GET", "/_stand/companies/{company_id}/contacts", SYSTEM, stand_views.company_contacts),
     ("GET", "/_stand/evidence/{evidence_id}", SYSTEM, stand_views.evidence),
 )
 

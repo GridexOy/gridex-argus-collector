@@ -27,10 +27,12 @@ STEP_MODEL = "model"
 STEP_NAVIGATE = "navigate"
 STEP_CLICK = "click"
 STEP_SCROLL = "scroll"
+STEP_ATTENTION = "attention"  # a bot check did not clear: detail = url
 
 ACTION_NAVIGATE = "navigate"
 ACTION_CLICK = "click"
 ACTION_SCROLL = "scroll"
+ACTION_SELECT = "select"  # choose `Action.option` in a dropdown (a country list)
 ACTION_FINISH = "finish"
 
 # Why a walk ended (WalkSummary.end_reason).
@@ -41,6 +43,7 @@ END_ERROR = "error"  # unexpected exception
 END_DOMAIN = "domain_unresolved"  # the seed landed on a host outside approved_hosts
 END_START_FAILED = "start_failed"  # the start page did not load
 END_FAILURES = "action_failures"  # too many failed actions in a row
+END_ATTENTION = "attention"  # a bot check did not clear: the owner solves it (8.5)
 
 
 @dataclass(frozen=True)
@@ -101,6 +104,7 @@ class WalkSummary:
 class Action:
     kind: str
     candidate: Candidate | None = None
+    option: str = ""  # ACTION_SELECT: the option label to choose
 
 
 def validate_start_url(raw: str) -> str | None:

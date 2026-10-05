@@ -6,29 +6,26 @@ and the main thread runs it from `pump()`, scheduled with `after`.
 
 from __future__ import annotations
 
-import functools
 import queue
-import subprocess
 import threading
 import tkinter as tk
 from collections.abc import Callable
 
 from argus_collector.api_client import contract as api
-from argus_collector.browser import contract as browser
 from argus_collector.diagnostics import contract as diagnostics
 from argus_collector.runtime import contract as runtime
 from argus_collector.scheduler import contract as scheduler
-from argus_collector.ui import queue_lines, service
+from argus_collector.ui import attention_lines, queue_lines, service
+from argus_collector.ui.app_browser import WorkBrowserController
 from argus_collector.ui.app_collect import CollectController
 from argus_collector.ui.app_connection import ConnectionController
 from argus_collector.ui.app_walk import WalkController
 from argus_collector.ui.repository import Messages
-from argus_collector.ui.service import LEVEL_ERROR, LEVEL_INFO, LEVEL_OK, Activity, Line
+from argus_collector.ui.service import Activity
 from argus_collector.ui.view import Callbacks, PanelView
 
 POLL_MS = 250
-BLOCKS_EVERY = 4  # Jono and Lahetys re-read the local SQLite once a second
-NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+BLOCKS_EVERY = 4  # Jono, Lahetys and Huomio re-read the local SQLite once a second
 
 
 class PanelApp:
@@ -40,7 +37,7 @@ class PanelApp:
         self.config = config
         self.report: diagnostics.Report | None = None
         self.report_error: str | None = None
-        self.proc: subprocess.Popen[str] | None = None
+        self.browser = WorkBrowserController(self)
         self.ui_queue: queue.Queue[Callable[[], None]] = queue.Queue()
         self._pumps = 0
         self.walk = WalkController(self)
@@ -48,9 +45,11 @@ class PanelApp:
         self.collect = CollectController(self, self.connection.api_target)
         callbacks = Callbacks(
             self.open_browser, self.collect.start, self.local_test, self.collect.stop,
-            self.walk.open_source, self.connection.test_connection,
+            self.walk.open_source, self.connection.test_connection, self.open_attention,
+            self.attention_done,
         )
         self.view = PanelView(root, self.props(), callbacks)
+        self.render_attention()
 
     def local_test(self, url: str) -> None:
         """Testaa paikallisesti: one site walk, nothing sent (not while collecting)."""
@@ -95,9 +94,11 @@ class PanelApp:
 
     def refresh(self) -> None:
         self.view.render(self.props())
+        self.render_attention()
 
     def refresh_blocks(self) -> None:
         self.view.render_blocks(*self.blocks())
+        self.render_attention()
 
     def post(self, action: Callable[[], None]) -> None:
         """Queue an action for the main thread (safe from any thread)."""
@@ -111,7 +112,7 @@ class PanelApp:
             except queue.Empty:
                 break
             action()
-        self._poll_browser()
+        self.browser.poll()
         self._pumps += 1
         if self._pumps % BLOCKS_EVERY == 0:
             self.refresh_blocks()
@@ -135,48 +136,36 @@ class PanelApp:
         return f"http://127.0.0.1:{self.config.test_site_port}/"
 
     def work_browser_running(self) -> bool:
-        return self.proc is not None and self.proc.poll() is None
+        return self.browser.running()
+
+    @property
+    def status_view(self) -> PanelView:
+        return self.view
 
     def open_browser(self) -> None:
-        """Start the detached launcher; the status line follows its stdout/exit code."""
-        if self.work_browser_running():
-            return
-        cmd = browser.launcher_command(self.test_site_url(), self.config.test_site_port)
-        try:
-            self.proc = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                encoding="utf-8",
-                cwd=str(runtime.repo_root()),
-                env=browser.launcher_env(),
-                creationflags=NO_WINDOW,
-            )
-        except OSError as exc:
-            self.view.set_browser_status(
-                Line(self.msgs.t("browser.failed", error=exc), LEVEL_ERROR)
-            )
-            return
-        self.view.set_browser_status(Line(self.msgs.t("browser.opening"), LEVEL_INFO))
-        threading.Thread(target=self._read_opened, args=(self.proc,), daemon=True).start()
+        """Resurssit: the work browser on the test site."""
+        self.browser.open(self.test_site_url(), self.config.test_site_port)
 
-    def _read_opened(self, proc: subprocess.Popen[str]) -> None:
-        assert proc.stdout is not None
-        for raw in proc.stdout:
-            if '"opened": true' in raw:
-                line = Line(self.msgs.t("browser.opened", url=self.test_site_url()), LEVEL_OK)
-                self.ui_queue.put(functools.partial(self.view.set_browser_status, line))
-                return
+    def _attention_item(self) -> scheduler.AttentionItem | None:
+        items = self.collect.collector.attention_view()
+        return items[0] if items else None
 
-    def _poll_browser(self) -> None:
-        proc = self.proc
-        if proc is None or proc.poll() is None:
-            return
-        self.proc = None
-        if proc.returncode == 0:
-            self.view.set_browser_status(Line(self.msgs.t("browser.closed"), LEVEL_INFO))
-            return
-        err = proc.stderr.read().strip() if proc.stderr else ""
-        detail = err.splitlines()[-1] if err else f"exit code {proc.returncode}"
-        self.view.set_browser_status(Line(self.msgs.t("browser.failed", error=detail), LEVEL_ERROR))
+    def open_attention(self) -> None:
+        """Huomio: the work browser on the page the owner has to pass by hand."""
+        item = self._attention_item()
+        if item is not None and not self.collect.collector.walking:
+            self.browser.open(item.url)
+
+    def attention_done(self) -> None:
+        """Huomio: Jatka kasin tehdyn toimen jalkeen -> the job walks on."""
+        item = self._attention_item()
+        if item is not None:
+            self.collect.collector.attention_done(item.job_id)
+        self.refresh()
+
+    def render_attention(self) -> None:
+        walking = self.walk.walking or self.collect.collector.walking
+        props = attention_lines.attention_props(
+            self.msgs, self.collect.collector.attention_view(), walking, self.browser.running()
+        )
+        self.view.render_attention(props)

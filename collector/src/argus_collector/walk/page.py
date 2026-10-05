@@ -9,7 +9,8 @@ from argus_collector.extraction import contract as extraction
 from argus_collector.models import contract as models
 from argus_collector.normalization import contract as norm
 from argus_collector.storage import contract as storage
-from argus_collector.walk import findings, prompts, repository, service
+from argus_collector.walk import findings, prompts, repository, service, structure
+from argus_collector.walk.context import PageContext
 from argus_collector.walk.service import WalkEvent
 from argus_collector.walk.sink import PageFindings, PageSource
 from argus_collector.walk.state import WalkState
@@ -34,7 +35,7 @@ def enter(state: WalkState, page: browser.PageState) -> bool:
 
 def ranked(state: WalkState, page: browser.PageState) -> list[discovery.Candidate]:
     """Page links plus frontier links from earlier pages, then the page's buttons."""
-    pool = page.candidates + state.frontier_candidates()
+    pool = structure.offered(state, page.candidates) + state.frontier_candidates()
     ordered = discovery.rank_candidates(pool, set(state.cp.visited), state.hosts, state.focus)
     links = [c for c in ordered if c.kind == "link"][:MAX_LINKS_SHOWN]
     buttons = [c for c in ordered if c.kind == "button" and c.selector not in state.failed_targets]
@@ -45,7 +46,8 @@ def observe(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState) 
     """Snapshot and extract a page state not seen before; returns its canonical text."""
     text = evidence.canonical_text(page.text)
     key = discovery.page_key(page.url, evidence.sha256_text(text))
-    links = discovery.rank_candidates(page.candidates, set(state.cp.visited), state.hosts)
+    offered = structure.offered(state, page.candidates)
+    links = discovery.rank_candidates(offered, set(state.cp.visited), state.hosts)
     state.remember_links(page.url, [c for c in links if c.kind == "link"])
     if key not in state.cp.seen_keys:
         state.cp.seen_keys.append(key)
@@ -79,12 +81,18 @@ def _extract(
     lang = extraction.html_language(page.html)
     _learn_language(state, lang)
     region = norm.region_for_page(page.url, lang, settings.region_fallback)
-    channels = extraction.extract_channels(page.html, text, region or settings.region_fallback)
+    region = region or settings.region_fallback
+    sections = extraction.country_sections(text)
+    channels = extraction.extract_channels(
+        page.html, text, region, extraction.region_resolver(sections, region)
+    )
     contacts: list[extraction.Contact] = []
     if extraction.has_contact_signals(text, channels):
-        contacts = _parse_cards(state, page, text, channels, region or settings.region_fallback)
+        contacts = _parse_cards(state, page, text, channels, region)
+    state.page_has_contacts = bool(contacts or channels)
     bindings = wb.bindings(findings.probes(contacts)) if state.job_mode and contacts else []
-    found, keys = findings.build_findings(state, source, contacts, bindings, channels)
+    context = PageContext(tuple(sections), lang)
+    found, keys = findings.build_findings(state, source, contacts, bindings, channels, context)
     _record(state, source, found, list(zip(keys, contacts, strict=True)))
 
 

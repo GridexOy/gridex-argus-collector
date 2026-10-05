@@ -1,0 +1,13 @@
+body { font-family: Arial, Helvetica, sans-serif; margin: 0; color: #222; background: #fff; }
+.site-header { display: flex; gap: 24px; align-items: center; padding: 12px 24px; border-bottom: 3px solid #c00; }
+.site-header .logo { font-weight: bold; text-decoration: none; color: #c00; margin-right: auto; }
+.site-header nav a { margin-left: 12px; color: #222; }
+main { max-width: 760px; margin: 24px auto; padding: 0 16px; }
+[role="tablist"] { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid #ccc; }
+[role="tab"] { padding: 8px 12px; border: 1px solid #ccc; border-bottom: 0; background: #f4f4f4; cursor: pointer; }
+[role="tab"][aria-selected="true"] { background: #fff; font-weight: bold; }
+.group h3 { margin: 16px 0 4px; }
+.person { padding: 6px 0; border-bottom: 1px solid #eee; }
+.person p { display: inline; margin: 0 8px 0 0; }
+.person .name { font-weight: bold; }
+.site-footer { margin-top: 48px; padding: 16px 24px; border-top: 1px solid #ddd; font-size: 14px; color: #555; }

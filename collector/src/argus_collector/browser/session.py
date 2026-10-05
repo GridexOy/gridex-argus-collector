@@ -8,14 +8,23 @@ decided by the caller), buttons by clicking the numbered element.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
 
 from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
+from playwright.sync_api import Error as PlaywrightError
 
-from argus_collector.browser.binding import BINDING_JS, PersonProbe, parse_result, probe_payload
-from argus_collector.browser.service import launch_kwargs
+from argus_collector.browser.binding import (
+    BINDING_JS,
+    PersonBinding,
+    PersonProbe,
+    parse_result,
+    probe_payload,
+)
+from argus_collector.browser.scripts import CANDIDATES_JS, CHALLENGE_JS, IDX_ATTR
+from argus_collector.browser.service import is_challenge, launch_kwargs
 from argus_collector.discovery.contract import Candidate
 from argus_collector.runtime import contract as runtime
 
@@ -23,40 +32,8 @@ NAVIGATION_TIMEOUT_MS = 45_000
 LOAD_TIMEOUT_MS = 10_000
 CLICK_TIMEOUT_MS = 10_000
 SETTLE_MS = 800
-MAX_TEXT_LEN = 120
-IDX_ATTR = "data-argus-idx"
-
-# Visible, actionable elements; mailto:/tel: links are values, not actions
-# (TZ section 8.4), submit buttons are never pressed (no forms in this step).
-CANDIDATES_JS = """
-() => {
-  const out = [];
-  const seen = new Set();
-  const nodes = document.querySelectorAll(
-    'a[href], button, [role="button"], summary, input[type="button"]');
-  let idx = 0;
-  for (const el of nodes) {
-    const style = window.getComputedStyle(el);
-    const rect = el.getBoundingClientRect();
-    if (style.display === 'none' || style.visibility === 'hidden') continue;
-    if (rect.width === 0 && rect.height === 0) continue;
-    if (el.disabled || el.type === 'submit') continue;
-    const text = (el.innerText || el.value || el.getAttribute('aria-label') || el.title || '')
-      .replace(/\\s+/g, ' ').trim().slice(0, __MAX_TEXT_LEN__);
-    const href = el.tagName === 'A' ? (el.href || '') : '';
-    if (/^(mailto|tel):/i.test(href)) continue;
-    const kind = /^https?:/i.test(href) ? 'link' : 'button';
-    if (kind === 'button' && !text) continue;
-    const key = kind + '|' + text + '|' + href;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    el.setAttribute('__IDX_ATTR__', String(idx));
-    out.push({index: idx, kind: kind, text: text, href: href});
-    idx += 1;
-  }
-  return out;
-}
-""".replace("__MAX_TEXT_LEN__", str(MAX_TEXT_LEN)).replace("__IDX_ATTR__", IDX_ATTR)
+CHALLENGE_WAIT_S = 20.0  # target state timeout (TZ_SELAIN 8.5)
+CHALLENGE_POLL_MS = 1000
 
 
 @dataclass(frozen=True)
@@ -66,6 +43,7 @@ class PageState:
     html: str
     text: str
     candidates: list[Candidate]
+    challenge: bool = False  # a bot check that did not clear within 20 s
 
 
 class WalkBrowser:
@@ -120,17 +98,45 @@ class WalkBrowser:
             pass
         self.page.wait_for_timeout(SETTLE_MS)
 
+    def _challenged(self) -> bool:
+        try:
+            return is_challenge(self.page.evaluate(CHALLENGE_JS))
+        except PlaywrightError:  # the check reloads the page right now
+            self._settle()
+            return True
+
+    def _ready(self) -> PageState:
+        """Observe; a bot check is waited out for up to 20 s (it clears by itself)."""
+        deadline = time.monotonic() + CHALLENGE_WAIT_S
+        challenged = self._challenged()
+        while challenged and time.monotonic() < deadline:
+            self.page.wait_for_timeout(CHALLENGE_POLL_MS)
+            challenged = self._challenged()
+        if not challenged:
+            self._settle()
+        state = self.observe()
+        return PageState(state.url, state.title, state.html, state.text, state.candidates,
+                         challenge=challenged)
+
     def goto(self, url: str) -> PageState:
         """Navigate, wait for DOM content + a short settle, observe."""
         self.page.goto(url, wait_until="domcontentloaded")
         self._settle()
-        return self.observe()
+        return self._ready()
 
     def click(self, candidate: Candidate) -> PageState:
         """Click the numbered element on the current page, wait, observe."""
         self.page.locator(candidate.selector).first.click(timeout=CLICK_TIMEOUT_MS)
         self._settle()
-        return self.observe()
+        return self._ready()
+
+    def select(self, candidate: Candidate, option: str) -> PageState:
+        """Choose the option labelled `option` in the numbered dropdown, wait, observe."""
+        self.page.locator(candidate.selector).first.select_option(
+            label=option, timeout=CLICK_TIMEOUT_MS
+        )
+        self._settle()
+        return self._ready()
 
     def scroll(self) -> PageState:
         """Scroll the window to the bottom, wait, observe."""
@@ -142,10 +148,10 @@ class WalkBrowser:
         """History back (after an action left the approved hosts), wait, observe."""
         self.page.go_back(wait_until="domcontentloaded")
         self._settle()
-        return self.observe()
+        return self._ready()
 
-    def bindings(self, persons: list[PersonProbe]) -> list[tuple[str, ...]]:
-        """Structural binding of each probed value to its person on the current DOM."""
+    def bindings(self, persons: list[PersonProbe]) -> list[PersonBinding]:
+        """Structural binding of each probed value to its person, and its group heading."""
         if not persons:
             return []
         return parse_result(self.page.evaluate(BINDING_JS, probe_payload(persons)), persons)
@@ -160,6 +166,9 @@ class WalkBrowser:
                 text=str(item["text"]),
                 href=str(item["href"]),
                 selector=f'[{IDX_ATTR}="{int(item["index"])}"]',
+                role=str(item.get("role", "")),
+                state=str(item.get("state", "")),
+                options=tuple(str(o) for o in item.get("options", [])),
             )
             for item in raw
         ]

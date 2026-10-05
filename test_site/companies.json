@@ -70,5 +70,42 @@
       "en"
     ],
     "project_id": "fixture-expo-2027"
+  },
+  {
+    "company_id": "ledvance",
+    "company_name": "LEDVANCE Oy",
+    "seed_urls": [
+      "http://ledvance.localhost:8765/"
+    ],
+    "approved_hosts": [
+      "ledvance.localhost"
+    ],
+    "priority_countries": [
+      "FI"
+    ],
+    "priority_languages": [
+      "fi",
+      "en"
+    ],
+    "project_id": "fixture-expo-2027"
+  },
+  {
+    "company_id": "malux",
+    "company_name": "Malux Finland Oy",
+    "seed_urls": [
+      "http://malux.localhost:8765/fi/"
+    ],
+    "approved_hosts": [
+      "malux.localhost",
+      "malux-se.localhost"
+    ],
+    "priority_countries": [
+      "FI"
+    ],
+    "priority_languages": [
+      "fi",
+      "en"
+    ],
+    "project_id": "fixture-expo-2027"
   }
 ]

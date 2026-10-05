@@ -3,16 +3,18 @@
 Checks run in order: every evidence_id uploaded for this job (else
 evidence_missing, not recorded), each quote against its evidence text (else
 evidence_hash_mismatch), channel fields only from approved hosts (else
-host_not_approved). Accepted observations land on one canonical contact per
-(job_id, entity_id); a repeated observation_id adds nothing.
+host_not_approved), supersedes_observation_id of the same contact and field
+(else invalid_input). Accepted observations land on the company-level
+canonical contact (`identity.py`) by their change_kind (`history.py`).
 """
 
 from __future__ import annotations
 
+from contract_server import history, identity
 from contract_server.channels import channel_status, is_channel, strongest
 from contract_server.event_context import Batch, Outcome, rejected
 from contract_server.htmltext import quote_found
-from contract_server.util import Json, new_id, normalize_host, sha256_hex, url_host
+from contract_server.util import Json, normalize_host, sha256_hex, stamp, url_host
 
 CONTACT_TYPES = frozenset({"contact.observed", "contact.enriched"})
 OBSERVATION_FIELDS = (
@@ -69,38 +71,32 @@ def host_approved(batch: Batch, observation: Json) -> bool:
     return url_host(record["metadata"]["final_url"]) in approved
 
 
-def _contact(batch: Batch, payload: Json) -> Json:
-    key = f"{batch.job['job_id']}\n{payload['entity_id']}"
-    contact_id = batch.state["contact_index"].get(key)
-    if contact_id is None:
-        contact_id = new_id()
-        batch.state["contact_index"][key] = contact_id
-        batch.state["contacts"][contact_id] = {
-            "canonical_contact_id": contact_id,
+def stored_observation(batch: Batch, event: Json, observation: Json, status: str | None) -> Json:
+    stored: Json = {name: observation.get(name) for name in OBSERVATION_FIELDS}
+    stored.update(
+        {
+            "channel_status": status,
+            "event_id": event["event_id"],
+            "run_id": event["run_id"],
             "job_id": batch.job["job_id"],
-            "entity_id": payload["entity_id"],
-            "entity_type": payload["entity_type"],
-            "relationship": payload.get("relationship", "unknown"),
-            "observations": {},
+            "observed_at": stamp(event["occurred_at"]),
+            "last_confirmed_at": None,
+            "superseded_by": None,
+            "history": [],
         }
-    contact: Json = batch.state["contacts"][contact_id]
-    return contact
+    )
+    return stored
 
 
 def record_contact(batch: Batch, event: Json) -> tuple[str, str | None]:
     payload = event["payload"]
-    contact = _contact(batch, payload)
+    contact = identity.attach(batch.state, batch.job, payload)
     statuses: list[str | None] = []
     for observation in payload["observations"]:
         status = channel_status(contact["entity_type"], observation)
         statuses.append(status)
-        if observation["observation_id"] in contact["observations"]:
-            continue
-        stored: Json = {name: observation.get(name) for name in OBSERVATION_FIELDS}
-        stored.update(
-            {"channel_status": status, "event_id": event["event_id"], "run_id": event["run_id"]}
-        )
-        contact["observations"][observation["observation_id"]] = stored
+        history.add(contact, observation, stored_observation(batch, event, observation, status))
+    history.mark_seen(contact, stamp(event["occurred_at"]))
     return contact["canonical_contact_id"], strongest(statuses)
 
 
@@ -117,6 +113,10 @@ def apply(batch: Batch, event: Json) -> Outcome:
         if is_channel(observation["field"]) and not host_approved(batch, observation):
             detail = f"{observation['observation_id']}: evidence host is not approved"
             return rejected("host_not_approved", detail)
+    existing = identity.find(batch.state, batch.job, payload)
+    problem = history.supersede_error(batch.state, existing, payload["observations"])
+    if problem is not None:
+        return rejected("invalid_input", problem)
     contact_id, status = record_contact(batch, event)
     return Outcome(
         canonical_contact_id=contact_id, channel_status=status, state_applied=batch.applies

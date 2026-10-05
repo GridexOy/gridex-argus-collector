@@ -3,12 +3,15 @@
 Collections (all dicts keep insertion = creation order):
 batches, batch_keys, jobs, runs, evidence, events, contacts, contact_index,
 commands, workers, controls (dicts) and model_calls, sources, records,
-rejected (lists). `revision` is the server revision counter of EventResult.
+rejected (lists). `revision` is the server revision counter of EventResult. Contacts are
+company-level (`identity.py`); `contact_index` maps entity and identity keys
+to canonical_contact_id.
 """
 
 from __future__ import annotations
 
 from contract_server.errors import not_found
+from contract_server.identity import upgrade
 from contract_server.util import TERMINAL_STATES, Json
 
 LEASE_STATES = frozenset({"leased", "running"})
@@ -36,9 +39,10 @@ def empty_state() -> Json:
 
 
 def complete(state: Json) -> Json:
-    """Fill collections missing from a loaded state file."""
+    """Fill collections missing from a loaded state file; upgrade older contacts."""
     for key, value in empty_state().items():
         state.setdefault(key, value)
+    upgrade(state)
     return state
 
 

@@ -28,6 +28,11 @@ class Focus:
     countries: tuple[str, ...]
     languages: tuple[str, ...]
     native_language: str = ""
+    local_seed: bool = False  # the seed is already the exhibition-country version
+
+    @property
+    def country(self) -> str:
+        return self.countries[0] if self.countries else ""
 
     def with_native(self, language: str) -> Focus:
         return replace(self, native_language=fold(language).split("-", 1)[0][:2])
@@ -117,5 +122,7 @@ def focus_brief(focus: Focus | None) -> str:
         f"office or the contacts responsible for {country}; (3) when the company has no "
         f"office in {country}: pages in {own} or in English that list export, Nordic, "
         "Scandinavian or international sales and marketing people. Other language "
-        "versions of the site come last."
+        "versions of the site come last. On a list of countries open only "
+        f"{country}; on a page with department tabs open every tab, sales and "
+        "marketing first."
     )

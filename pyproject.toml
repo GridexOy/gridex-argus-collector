@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "argus-collector"
-version = "0.4.3.1"
+version = "0.4.4.0"
 description = "ARGUS 2.0 local contact collector (Selain) for Windows"
 readme = "README.md"
 requires-python = ">=3.11"

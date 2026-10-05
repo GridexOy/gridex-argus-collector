@@ -43,9 +43,15 @@ def transport_state(stand: Stand, worker_id: str | None) -> str:
     return "syncing" if worker["outbox_pending"] > 0 else "synced"
 
 
+def job_observation_ids(contact: Json, job_id: str) -> set[str]:
+    """Observation ids of one job on a contact: stored rows and reconfirmation aliases."""
+    rows = {**contact["observations"], **contact["aliases"]}
+    return {oid for oid, row in rows.items() if row["job_id"] == job_id}
+
+
 def job_counts(stand: Stand, job: Json, gaps: list[Json]) -> Json:
     state, job_id = stand.state, job["job_id"]
-    contacts = [c for c in state["contacts"].values() if c["job_id"] == job_id]
+    contacts = [c for c in state["contacts"].values() if job_id in c["job_ids"]]
     kinds = [c["entity_type"] for c in contacts]
     snapshot = job.get("counts_snapshot") or {}
     worker = state["workers"].get(job["worker_id"] or "") or {}
@@ -53,7 +59,7 @@ def job_counts(stand: Stand, job: Json, gaps: list[Json]) -> Json:
         "persons": kinds.count("person"),
         "organization_channels": kinds.count("organization_channel"),
         "other_entities": len(kinds) - kinds.count("person") - kinds.count("organization_channel"),
-        "observations": len({oid for c in contacts for oid in c["observations"]}),
+        "observations": sum(len(job_observation_ids(c, job_id)) for c in contacts),
         "pages_processed": sum(
             1 for s in state["sources"] if s["job_id"] == job_id and s["type"] == "source.processed"
         ),

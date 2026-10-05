@@ -6,11 +6,15 @@ import re
 from dataclasses import dataclass
 from urllib.parse import urlsplit, urlunsplit
 
+from argus_collector.discovery import countries
 from argus_collector.discovery import repository as tables
-from argus_collector.discovery.focus import Focus, focus_score
+from argus_collector.discovery.focus import Focus, focus_score, link_language
 
 KIND_LINK = "link"
 KIND_BUTTON = "button"
+KIND_SELECT = "select"
+STRONG_LINK_SCORE = 10  # a link the model may not skip before finishing (guard-rail)
+COUNTRY_LIST_MIN = 3  # distinct countries that make a page a country list
 WORD_RE = re.compile(r"[a-zåäöøæ»>]+", re.IGNORECASE)
 DEFAULT_PORTS = {"http": "80", "https": "443"}
 
@@ -19,9 +23,12 @@ DEFAULT_PORTS = {"http": "80", "https": "443"}
 class Candidate:
     """One element the model may act on, numbered as shown to it.
 
-    `kind` is `link` (has an http(s) href; acted on by navigation) or
-    `button` (button, role=button, summary, link without href; acted on by
-    click). `selector` finds the element again on the current page.
+    `kind` is `link` (has an http(s) href; acted on by navigation),
+    `button` (button, role=button/tab, summary, accordion header, link
+    without href; acted on by click) or `select` (a dropdown; `options` are
+    its option labels). `role` is `tab` / `expand` / "" and `state` is `on`
+    for a selected tab or an expanded header. `selector` finds the element
+    again on the current page.
     """
 
     index: int
@@ -29,6 +36,9 @@ class Candidate:
     text: str
     href: str
     selector: str
+    role: str = ""
+    state: str = ""
+    options: tuple[str, ...] = ()
 
 
 def _host(url: str) -> str:
@@ -79,7 +89,8 @@ def is_allowed_url(url: str, hosts: frozenset[str]) -> bool:
     return not parts.path.lower().endswith(tables.DOCUMENT_SUFFIXES)
 
 
-def score_link(text: str, href: str, focus: Focus | None = None) -> int:
+def base_score(text: str, href: str) -> int:
+    """Contact / noise words of a link without the exhibition-country focus."""
     words = {w.lower() for w in WORD_RE.findall(text)}
     path_words = {w.lower() for w in WORD_RE.findall(urlsplit(href).path.replace("-", " "))}
     score = 0
@@ -93,7 +104,48 @@ def score_link(text: str, href: str, focus: Focus | None = None) -> int:
             score += weight
     if any(w in text.lower() for w in tables.NEXT_WORDS):
         score += 5
-    return score + focus_score(text, href, focus)
+    return score
+
+
+def score_link(text: str, href: str, focus: Focus | None = None) -> int:
+    score = base_score(text, href) + focus_score(text, href, focus)
+    if focus is not None and focus.country and countries.url_country(href) == focus.country:
+        score += tables.FOCUS_COUNTRY_BONUS  # `/fi-fi/`, `fi.` host, `.fi` version
+    return score
+
+
+def is_version_switch(text: str, href: str) -> bool:
+    """A link to another language / country version: `Svenska`, `SE`, `/sv-se/`."""
+    if link_language(text, "") or countries.label_country(text):
+        return True
+    path = urlsplit(href).path.strip("/")
+    return bool(path) and "/" not in path and countries.url_country(href) is not None
+
+
+def strong_link(text: str, href: str, focus: Focus | None) -> bool:
+    """The model may not finish while such a link is unvisited (job mode guard).
+
+    A contact link, a link to the exhibition-country version, and, when the
+    seed already is that version, the switch to another country version (it
+    is walked after, owner 05.10.2026)."""
+    if max(base_score(text, href), score_link(text, href, focus)) >= STRONG_LINK_SCORE:
+        return True
+    if focus is None or not focus.local_seed:
+        return False
+    other = countries.link_country(text, href)
+    return other is not None and other != focus.country and is_version_switch(text, href)
+
+
+def country_members(candidates: list[Candidate]) -> dict[str, list[Candidate]]:
+    """Controls and links labelled with a country; a country list when >= 3 countries."""
+    found: dict[str, list[Candidate]] = {}
+    for cand in candidates:
+        labels = cand.options if cand.kind == KIND_SELECT else (cand.text,)
+        for label in labels:
+            code = countries.label_country(label)
+            if code is not None:
+                found.setdefault(code, []).append(cand)
+    return found if len(found) >= COUNTRY_LIST_MIN else {}
 
 
 def rank_candidates(
@@ -106,7 +158,7 @@ def rank_candidates(
     links: list[tuple[int, int, Candidate]] = []
     buttons: list[Candidate] = []
     for cand in candidates:
-        if cand.kind == KIND_BUTTON:
+        if cand.kind != KIND_LINK:
             buttons.append(cand)
             continue
         key = normalize_url(cand.href)

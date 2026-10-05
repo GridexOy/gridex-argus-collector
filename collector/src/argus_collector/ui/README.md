@@ -22,6 +22,7 @@ Blocks and states:
 - Jono: `Ladataan…` / `Jonon lataus epäonnistui` / `Ei tehtäviä` / the table; Lähetys: `Odottaa lähetystä: N · Lähetysvirhe: N · p95 (1 min)` and `Lähetetty` / `Lähetetään` / `Ei verkkoa` (also with an empty outbox when the heartbeat gets no answer) / `Lähetys epäonnistui` (red); both re-read the local SQLite every second.
 - Resurssit: lines from `diagnostics` (OS, Chrome, model + its endpoint/detail line, disk, memory, NVIDIA); errors in red, `Tarkistetaan…` while collecting; re-collected after every walk (Ollama loads the model on first use, so `Malli` turns to GPU after the first walk).
 - "Avaa työselain": the launcher on the test site (disabled while walking or collecting: one Chrome profile).
+- Huomio (0.4.4.0, `attention_lines.py`, `view_attention.py`): shown only while a job is `needs_attention` (a bot check did not clear in 20 s): `Tarvitsee huomiota: <company> — <reason>: <url>`, "Avaa työselain" on that URL (`app_browser.py`; disabled while a walk runs) and "Jatka käsin tehdyn toimen jälkeen" (the job walks on). The collector starts no walk while the work browser is open.
 - STOP file in the repo root or in the user data dir: red banner with the paths; a running walk stops at its next step.
 
 Tests (`tests/`) build props without a display and render the real window

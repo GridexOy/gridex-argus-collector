@@ -73,6 +73,16 @@ class Collector(CollectorHooks):
         self.deliverer.link(True)
         super().apply_heartbeat(resp, sent_acks)
 
+    def attention_done(self, job_id: str) -> None:
+        """Jatka kasin tehdyn toimen jalkeen: the job walks again from where it stopped."""
+        with self.connect() as conn:
+            row = repo.job(conn, job_id)
+            if row is not None and row["state"] == service.NEEDS_ATTENTION:
+                repo.update_job(conn, job_id, state=service.QUEUED, detail="")
+                runtime.journal("browser", f"job {job_id}: attention solved by the owner")
+        self.wake()
+        self.on_change()
+
     def heartbeat_failed(self, status: int) -> None:
         """A heartbeat failed; status 0 (no answer at all) shows Lahetys `offline`."""
         self.deliverer.link(status != 0)
@@ -90,7 +100,8 @@ class Collector(CollectorHooks):
         try:
             while not self._stopped():
                 target = self.target()
-                row = self._next_runnable(conn) if target is not None else None
+                free = self.settings.browser_free()
+                row = self._next_runnable(conn) if target is not None and free else None
                 if row is not None:
                     self._run(conn, row)
                     continue
@@ -171,6 +182,10 @@ class Collector(CollectorHooks):
         with self.connect() as conn:
             claim = (self.claim_state, self.claim_error)
             return views.queue_view(conn, self.running_job, claim, self.collecting)
+
+    def attention_view(self) -> list[views.AttentionItem]:
+        with self.connect() as conn:
+            return views.attention_view(conn)
 
     def delivery_view(self) -> views.DeliveryView:
         with self.connect() as conn:

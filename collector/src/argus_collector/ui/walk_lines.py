@@ -19,6 +19,7 @@ STEP_KEYS = {
     "navigate": "collecting.step.navigate",
     "click": "collecting.step.click",
     "scroll": "collecting.step.scroll",
+    "attention": "collecting.step.attention",
 }
 MODEL_DETAIL_KEYS = {
     "cards": "collecting.step.modelCards",
@@ -108,7 +109,8 @@ def _step_line(msgs: Messages, event: WalkEvent) -> tuple[str, str]:
         key = MODEL_DETAIL_KEYS.get(event.detail, "collecting.step.modelAction")
         return msgs.t(key), LEVEL_INFO
     key = STEP_KEYS.get(event.step, "collecting.step.extracting")
-    return msgs.t(key, url=event.detail or event.url, text=event.detail), LEVEL_INFO
+    level = LEVEL_WARN if event.step == "attention" else LEVEL_INFO
+    return msgs.t(key, url=event.detail or event.url, text=event.detail), level
 
 
 def walk_event_line(msgs: Messages, event: WalkEvent) -> tuple[str, str] | None:

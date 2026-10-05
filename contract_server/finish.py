@@ -4,11 +4,14 @@ Requires `last_content_seq == seq - 1` with every earlier seq recorded (else
 sequence_gap, not recorded). Only the current run of a non-cancelled job,
 delivered under its full lease, changes job state; a late finished (drain-only,
 old run, cancelled job, or a run that already finished) is still accepted with
-state_applied=false and never finishes a newer run.
+state_applied=false and never finishes a newer run. The freshness_summary is
+stored on the run as sent; `freshness_mismatch` (stand-only) notes when it
+differs from the contact.freshness checks the run delivered (never rejected).
 """
 
 from __future__ import annotations
 
+from contract_server import freshness
 from contract_server.event_context import Batch, Outcome, rejected
 from contract_server.leases import DRAIN, FULL, release_lease
 from contract_server.util import Json
@@ -62,6 +65,9 @@ def apply_to_job(job: Json, payload: Json) -> bool:
 def store_result(batch: Batch, payload: Json, now: float) -> None:
     run = batch.run
     run["result"] = {name: payload[name] for name in RESULT_FIELDS}
+    run["freshness_summary"] = payload["freshness_summary"]
+    run["freshness_counted"] = freshness.counted(batch.state, run["run_id"])
+    run["freshness_mismatch"] = run["freshness_counted"] != payload["freshness_summary"]
     run["finished"] = True
     run["finished_at"] = now
     release_lease(run, now, token_was_lease=batch.rights == FULL)

@@ -69,6 +69,23 @@ def queue_view(
     return QueueView(rows, claim[0], claim[1], collecting)
 
 
+@dataclass(frozen=True)
+class AttentionItem:
+    """A job waiting for the owner (Huomio): the URL of the bot check to pass."""
+
+    job_id: str
+    company: str
+    url: str
+    reason: str  # a Gap.reason (captcha)
+
+
+def attention_view(conn: sqlite3.Connection) -> list[AttentionItem]:
+    return [
+        AttentionItem(row["job_id"], row["company_name"], row["detail"], "captcha")
+        for row in repo.jobs(conn, (service.NEEDS_ATTENTION,))
+    ]
+
+
 def delivery_view(conn: sqlite3.Connection, transport_state: str) -> DeliveryView:
     stats = delivery.stats(conn)
     return DeliveryView(stats.pending, stats.errors, stats.p95_s, transport_state)

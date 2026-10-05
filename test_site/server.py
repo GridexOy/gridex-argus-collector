@@ -1,21 +1,29 @@
 """Local fixture site server (TZ_SELAIN section 12.2), stdlib only.
 
-Usage: python -m test_site.server [--port 8765] [--host 127.0.0.1]
+Usage: python -m test_site.server [--port 8765] [--host 127.0.0.1] [--variant NAME]
 `http://127.0.0.1:<port>/` serves `test_site/site/` (company `fixture_oy`).
 Every other fixture company is a virtual host `<label>.localhost:<port>`
 served from `test_site/sites/<label>/` (Chrome resolves `*.localhost` to the
 loopback address itself, so no hosts file is needed). `REDIRECTS` sends a
 label to another host on the same port (a seed that leaves its approved
-host). Also importable: `start(port)` returns a running ThreadingHTTPServer.
+host). Port placeholder, variants and the bot check live in `pages`.
+Directories are never listed (a real site has no index pages of folders).
+Also importable: `start(port=..., variant=...)` returns a running server.
 """
 
 from __future__ import annotations
 
 import argparse
 import functools
+import io
 import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from os import PathLike
 from pathlib import Path
+from typing import Any, BinaryIO
+from urllib.parse import urlsplit
+
+from test_site import pages
 
 SITE_DIR = Path(__file__).resolve().parent / "site"
 SITES_DIR = Path(__file__).resolve().parent / "sites"
@@ -53,11 +61,19 @@ def site_dir_for(host: str) -> Path | None:
 class SiteHandler(SimpleHTTPRequestHandler):
     """Static handler routed by the Host header, without console noise."""
 
+    def __init__(self, *args: Any, variant: str | None = None, **kwargs: Any) -> None:
+        self.variant = variant
+        self.port_text = ""
+        self.challenge: bytes | None = None
+        super().__init__(*args, **kwargs)
+
     def log_message(self, format: str, *args: object) -> None:  # noqa: A002
         return
 
     def _route(self) -> bool:
         host, port = split_host(self.headers.get("Host", ""))
+        self.port_text = port or str(self.connection.getsockname()[1])
+        self.challenge = None
         label = vhost_label(host)
         if label in REDIRECTS:
             target = f"{REDIRECTS[label]}{VHOST_SUFFIX}" + (f":{port}" if port else "")
@@ -70,8 +86,52 @@ class SiteHandler(SimpleHTTPRequestHandler):
         if folder is None:
             self.send_error(404, "unknown fixture host")
             return False
+        cookie = self.headers.get("Cookie", "")
+        if pages.needs_challenge(label, urlsplit(self.path).path, cookie, self.variant):
+            self.challenge = pages.challenge_page(host, self.variant)
         self.directory = str(folder)
+        self._apply_overlay(label)
         return True
+
+    def _apply_overlay(self, label: str | None) -> None:
+        overlay = pages.overlay_root(self.variant, label)
+        if overlay is None:
+            return
+        base, self.directory = self.directory, str(overlay)
+        if not pages.overlay_serves(Path(self.translate_path(self.path))):
+            self.directory = base
+
+    def _html_file(self) -> Path | None:
+        """The `.html` file this request names, None for anything else."""
+        raw = self.translate_path(self.path)
+        path = Path(raw)
+        if path.is_dir():
+            if not raw.endswith("/"):
+                return None  # the base class answers with the redirect to "dir/"
+            path = path / "index.html"
+        elif raw.endswith("/"):
+            return None
+        return path if path.suffix == ".html" and path.is_file() else None
+
+    def _send_html(self, body: bytes) -> io.BytesIO:
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        return io.BytesIO(body)
+
+    def send_head(self) -> io.BytesIO | BinaryIO | None:
+        if self.challenge is not None:
+            return self._send_html(self.challenge)
+        page = self._html_file()
+        if page is None:
+            return super().send_head()
+        return self._send_html(pages.substitute_port(page.read_bytes(), self.port_text))
+
+    def list_directory(self, path: str | PathLike[str]) -> io.BytesIO | None:
+        self.send_error(404, "File not found")
+        return None
 
     def do_GET(self) -> None:  # noqa: N802 - http.server API
         if self._route():
@@ -82,14 +142,20 @@ class SiteHandler(SimpleHTTPRequestHandler):
             super().do_HEAD()
 
 
-def make_server(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> ThreadingHTTPServer:
-    handler = functools.partial(SiteHandler, directory=str(SITE_DIR))
+def make_server(
+    host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, variant: str | None = None
+) -> ThreadingHTTPServer:
+    """Bound server; ValueError for a variant `pages.known_variants()` lacks."""
+    chosen = pages.check_variant(variant)
+    handler = functools.partial(SiteHandler, directory=str(SITE_DIR), variant=chosen)
     return ThreadingHTTPServer((host, port), handler)
 
 
-def start(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> ThreadingHTTPServer:
+def start(
+    host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, variant: str | None = None
+) -> ThreadingHTTPServer:
     """Start serving in a daemon thread; caller shuts it down with `.shutdown()`."""
-    server = make_server(host, port)
+    server = make_server(host, port, variant)
     thread = threading.Thread(target=server.serve_forever, name="test-site", daemon=True)
     thread.start()
     return server
@@ -109,10 +175,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Serve the ARGUS collector fixture site")
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    parser.add_argument("--variant", choices=pages.known_variants(), default=None)
     args = parser.parse_args(argv)
-    server = make_server(args.host, args.port)
+    server = make_server(args.host, args.port, args.variant)
     print(f"test site: {base_url(server)} (directory {SITE_DIR})", flush=True)
     print(f"virtual hosts: http://<label>.localhost:{args.port}/ from {SITES_DIR}", flush=True)
+    print(f"variant: {args.variant or 'none'}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

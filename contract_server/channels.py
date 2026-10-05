@@ -9,7 +9,7 @@ CHANNEL_PREFIXES = ("phone_", "email_")
 NOT_A_CHANNEL = frozenset({"email_pattern"})
 STRUCTURED_BINDINGS = frozenset({"card", "table_row", "json_object", "caption"})
 GENERAL_ENTITIES = frozenset({"organization_channel", "office", "department"})
-STRENGTH = ("published_direct", "published_general", "inferred", "stale")
+STRENGTH = ("published_direct", "published_general", "catalog_published", "inferred", "stale")
 
 
 def is_channel(field: str) -> bool:
@@ -37,6 +37,9 @@ def channel_status(entity_type: str, observation: Json) -> str | None:
 
 
 def strongest(statuses: list[str | None]) -> str | None:
-    """published_direct > published_general > inferred > stale; None when no channel."""
+    """published_direct > published_general > catalog_published > inferred > stale.
+
+    None when no channel; catalog_published never comes from a worker observation.
+    """
     ranked = [STRENGTH.index(status) for status in statuses if status in STRENGTH]
     return STRENGTH[min(ranked)] if ranked else None

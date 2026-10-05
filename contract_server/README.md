@@ -12,6 +12,7 @@ python -m contract_server.stand batch --companies FILE.json [--only c1,c2]
     [--rerun-reason TEXT] [--client-request-id X] [--base-url URL] [--system-token T]
 python -m contract_server.stand control JOB_ID pause|resume|cancel|continue
 python -m contract_server.stand job|batch-status|worker|contacts ID
+python -m contract_server.stand company-contacts COMPANY_ID
 ```
 
 `server.start(host, port, tokens=..., system_tokens=..., state_path=..., now=...,
@@ -34,17 +35,58 @@ revocations live in memory only.
   job.finished with auto-continue, reconcile resume/drain_only, control with
   optimistic `state_revision`, job/batch/worker status.
 - A finished run's lease token keeps drain rights (replays stay duplicates).
+- needs_attention: heartbeats keep renewing the run's lease; an accepted
+  `job.progress`, `source.*` or `contact.*` of the current run returns the job
+  to `running`; control `resume` is allowed (-> running with a live lease,
+  else queued) and goes to the worker as a Command, as for paused.
+
+## History and coverage (pair 4; the stand's own rules beyond the contract)
+- **Canonical contact per company** (`identity.py`): a person by (company_id,
+  full name casefolded, whitespace collapsed) from its `full_name`
+  observation; office / organization_channel / department / unassigned_channel
+  by (company_id, entity_type, first channel value: email casefolded, phone
+  `+` and digits); otherwise (company_id, job_id, entity_id). Within a job an
+  entity_id keeps its first contact. Each contact lists the `job_ids` that
+  touched it; a person without a `full_name` stays per job.
+- **change_kind** (`history.py`): `reconfirmed` with the value of a current
+  observation of the same contact and field adds no row; that observation
+  gets `last_confirmed_at` and a `history` entry `{date, observation_id,
+  kind: reconfirmed, value, run_id}`, the new id becomes its alias.
+  `supersedes_observation_id` must be an observation of the same contact and
+  field (unknown / other contact / other field -> rejected `invalid_input`);
+  with `changed` the old one gets `superseded_by` and a `changed` entry.
+- **contact.freshness** (`freshness.py`): every check needs a contact of the
+  job's company and, when set, an `observation_id` of that contact sent in the
+  same run (else `invalid_input`). Applied only with full rights on the current
+  run: `reconfirmed` -> contact `last_seen_at`; `changed` -> also a contact
+  `history` entry; `not_seen_in_checked_scope` -> `not_seen = {checked_at,
+  scope_description, run_id}` (the contact stays; a later sighting clears it);
+  `not_checked` -> recorded only. `job.finished.freshness_summary` is stored on
+  the run with `freshness_counted` and `freshness_mismatch` (never rejected).
+- **known_contacts** in claim (`known.py`): one KnownContact per contact of the
+  company touched by another job (unassigned_channel skipped).
+  `last_seen_at` = latest observation, reconfirmation or freshness check;
+  `channel_status` = strongest of the current channel observations
+  (published_direct > published_general > catalog_published > inferred >
+  stale), `inferred` without a channel. `fields` format (the collector parses it):
+  `{"<field>": [{"value": <normalized_value>, "raw_value": <raw_value>,
+  "observation_id": "<id>", "observed_at": "<RFC 3339>"}, ...]}` -- one item
+  per distinct normalized value, its latest observation, superseded left out.
 - `--state PATH` saves the whole state as JSON after every POST (atomic) and
   loads it at start; evidence bytes and texts go to `PATH.evidence/`.
 
 ## Stand-only endpoints (not in the contract, SystemBearer)
-`GET /_stand/jobs/{job_id}/contacts` (contacts with observations and channel
-status, recorded rejections, model calls, sources) and
+`GET /_stand/jobs/{job_id}/contacts` (contacts the job touched with
+observations and channel status, recorded rejections, model calls, sources,
+`freshness` checks of the job, `freshness_runs` summaries),
+`GET /_stand/companies/{company_id}/contacts` (every canonical contact of the
+company: observations with `last_confirmed_at` / `superseded_by` / `history`,
+`last_seen_at`, `not_seen`, `job_ids`; 404 for a company without jobs) and
 `GET /_stand/evidence/{evidence_id}` (metadata + text used for quote checks).
 
 ## Layout
 `server.py` (start/CLI), `httpio.py`, `routes.py` (auth, dispatch), `context.py`,
 `state.py`, `persistence.py`, `schema.py` + `openapi.py`, one module per
-endpoint (`batches`, `claim`, `heartbeat`, `evidence`, `events` with
-`event_apply`/`contacts`/`channels`/`finish`, `reconcile`, `control`,
-`status`, `stand_views`), `stand.py` (owner CLI), `tests/`.
+endpoint (`batches`, `claim` + `known`, `heartbeat`, `evidence`, `events` with
+`event_apply`/`contacts`/`identity`/`history`/`channels`/`freshness`/`finish`,
+`reconcile`, `control`, `status`, `stand_views`), `stand.py` (owner CLI), `tests/`.

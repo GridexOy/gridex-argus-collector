@@ -31,6 +31,7 @@ class Settings:
     max_jobs: int = service.MAX_JOBS
     claim_interval_s: float = 10.0
     idle_wait_s: float = 2.0
+    browser_free: Callable[[], bool] = lambda: True  # the owner's work browser is closed
 
 
 class CollectorHooks:
@@ -123,7 +124,8 @@ class CollectorHooks:
             return
         if reason == service.STOP_PAUSE:
             repo.update_job(conn, job_id, state=service.PAUSED)
-        elif reason == leases.RESUME and row["state"] == service.PAUSED:
+        elif reason == leases.RESUME and row["state"] in (service.PAUSED,
+                                                          service.NEEDS_ATTENTION):
             repo.update_job(conn, job_id, state=service.QUEUED)
             self.wake()
         elif reason == service.STOP_LEASE and row["state"] in service.RUNNABLE:

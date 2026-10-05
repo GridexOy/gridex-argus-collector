@@ -16,7 +16,7 @@ from contract_server import openapi
 from contract_server.contacts import CONTACT_TYPES, has_field_audit
 from contract_server.context import Request, Stand, validated
 from contract_server.errors import ApiError, conflict, invalid
-from contract_server.event_apply import APPLIERS
+from contract_server.event_apply import apply_event
 from contract_server.event_context import Batch, Outcome, rejected
 from contract_server.leases import execution_rights
 from contract_server.schema import Schema, same
@@ -99,7 +99,7 @@ def evaluate(batch: Batch, event: Json) -> Outcome:
     errors = openapi.check(event, "Event")
     if errors:
         return rejected("invalid_input", "; ".join(errors[:3]))
-    return APPLIERS[event["type"]](batch, event)
+    return apply_event(batch, event)
 
 
 def store(batch: Batch, event: Json, digest: str, outcome: Outcome) -> Json:

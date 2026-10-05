@@ -123,3 +123,17 @@ def html_language(html: str) -> str:
     """The `lang` attribute of the `<html>` element, "" when absent."""
     match = HTML_LANG_RE.search(html[:20000])
     return match.group(1) if match else ""
+
+# A number labelled as a fax is not a phone channel (owner 05.10.2026: no fax).
+FAX_WORDS = ("fax", "faksi", "telefax", "telefaksi", "telefaks")
+PHONE_LABEL_WORDS = ("puh", "puhelin", "tel", "phone", "vaihde", "switchboard", "gsm",
+                     "mobile", "matkapuhelin", "telefon", "vaxel", "växel", "mob")
+# Lines of an office block that name the company, not its address.
+LEGAL_FORMS = ("oy", "oyj", "ab", "gmbh", "ag", "ltd", "limited", "inc", "as", "a/s", "aps",
+               "sa", "s.a.", "srl", "spa", "s.p.a.", "bv", "b.v.", "nv", "sp. z o.o.", "kft")
+# `00100 Helsinki`, `80939 Munchen`, `SE-111 22 Stockholm`, `SW1A 1AA London`.
+POSTAL_LINE_RE = re.compile(
+    r"^(?:[A-Z]{1,2}-?)?\d{3}\s?\d{2}\s+\D{2,}|^\d{4,5}\s+\D{2,}|^[A-Z]{1,2}\d[\dA-Z]?\s\d[A-Z]{2}\b"
+)
+STREET_LINE_RE = re.compile(r"^\D{3,}\s\d+[a-zA-Z]?(?:[\s,-].{0,20})?$")
+URL_LINE_RE = re.compile(r"^(?:https?://|www\.)\S+$|^\S+\.[a-z]{2,}/\S*$", re.IGNORECASE)

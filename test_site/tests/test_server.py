@@ -33,11 +33,13 @@ def site() -> Iterator[ThreadingHTTPServer]:
 def fetch(srv: ThreadingHTTPServer, page: str) -> str:
     with DIRECT_OPENER.open(server.base_url(srv) + page, timeout=5) as resp:
         assert resp.status == 200
-        return resp.read().decode("utf-8")
+        body: bytes = resp.read()
+        return body.decode("utf-8")
 
 
 def gold() -> dict[str, Any]:
-    return json.loads(GOLD.read_text(encoding="utf-8"))
+    data: dict[str, Any] = json.loads(GOLD.read_text(encoding="utf-8"))
+    return data
 
 
 def test_home_and_contact_pages_served(site: ThreadingHTTPServer) -> None:

@@ -81,6 +81,8 @@ def locator(found: walk.FieldFinding, text_sha256: str) -> api.Locator:
         return api.LocatorJsonPointer(value="/" + found.locator.removeprefix("jsonld:"))
     if found.locator == "cfemail":
         return api.LocatorDom(value=f'[data-cfemail="{found.raw}"]', text_sha256=text_sha256)
+    if found.locator == "html:lang":
+        return api.LocatorDom(value="html[lang]", text_sha256=text_sha256)
     scheme = "tel" if found.field == "phone" else "mailto"
     return api.LocatorDom(value=f'a[href^="{scheme}:"]', text_sha256=text_sha256)
 

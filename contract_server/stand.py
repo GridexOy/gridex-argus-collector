@@ -4,6 +4,7 @@ python -m contract_server.stand <subcommand> [--base-url URL] [--system-token T]
   batch --companies FILE.json [--only id1,id2] [--rerun-reason TEXT]
         [--client-request-id X]
   job JOB_ID | batch-status BATCH_ID | worker WORKER_ID | contacts JOB_ID
+  company-contacts COMPANY_ID
   control JOB_ID pause|resume|cancel|continue
 FILE.json is a list of {company_id, company_name, seed_urls,
 approved_hosts: [host...], priority_countries, priority_languages, project_id?}.
@@ -112,6 +113,7 @@ def run_command(args: argparse.Namespace) -> tuple[int, Any]:
         "batch-status": f"{API}/batches/{{}}",
         "worker": f"{API}/workers/{{}}/status",
         "contacts": "/_stand/jobs/{}/contacts",
+        "company-contacts": "/_stand/companies/{}/contacts",
     }
     return call(args, "GET", paths[name].format(quote(args.target, safe="")))
 
@@ -145,6 +147,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("batch-status", "BATCH_ID"),
         ("worker", "WORKER_ID"),
         ("contacts", "JOB_ID"),
+        ("company-contacts", "COMPANY_ID"),
     ):
         commands.add_parser(name, parents=[common]).add_argument("target", metavar=metavar)
     ctl = commands.add_parser("control", parents=[common], help="POST /jobs/{id}/control")

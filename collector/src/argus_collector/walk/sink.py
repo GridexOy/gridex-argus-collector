@@ -57,6 +57,7 @@ class WalkCheckpoint:
     known_obs: dict[str, str] = field(default_factory=dict)
     claimed: dict[str, str] = field(default_factory=dict)
     gaps: list[WalkGap] = field(default_factory=list)
+    acted: list[str] = field(default_factory=list)  # structural actions done (url|label)
     pages: int = 0
     actions: int = 0
     active_seconds: float = 0.0
@@ -79,6 +80,7 @@ class WalkCheckpoint:
             known_obs={str(k): str(v) for k, v in data.get("known_obs", {}).items()},
             claimed={str(k): str(v) for k, v in data.get("claimed", {}).items()},
             gaps=[WalkGap(**g) for g in data.get("gaps", [])],
+            acted=[str(v) for v in data.get("acted", [])],
             pages=int(data.get("pages", 0)),
             actions=int(data.get("actions", 0)),
             active_seconds=float(data.get("active_seconds", 0.0)),

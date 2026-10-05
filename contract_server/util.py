@@ -26,6 +26,26 @@ def iso_or_none(ts: float | None) -> str | None:
     return None if ts is None else iso(ts)
 
 
+def parse_iso(text: str) -> float:
+    """RFC 3339 string -> epoch seconds (a naive value is taken as UTC)."""
+    moment = datetime.fromisoformat(text.upper())
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    return moment.timestamp()
+
+
+def stamp(text: str) -> str:
+    """One RFC 3339 form for stored times, so stored strings compare in time order."""
+    return iso(parse_iso(text))
+
+
+def latest(first: str | None, second: str | None) -> str | None:
+    """The later of two `stamp` strings (None counts as never)."""
+    if first is None or second is None:
+        return first or second
+    return max(first, second)
+
+
 def sha256_hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 

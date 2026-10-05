@@ -1,0 +1,230 @@
+{
+  "fixture": "ledvance",
+  "host": "ledvance.localhost",
+  "case": "International company, exhibition country Finland. The global contact page (en-int/company/contact/) has an accordion of 11 countries: only Finland's section is opened; its local office is taken (name, address, switchboard, general email; not the fax) together with the link to the local version /fi-fi/, which is followed for the people. /fi-fi/ sits behind a JS bot check (interstitial 'Just a moment...', passes after 3 s by setting cookie fixture_waf=passed). No other country's section, office or local site is walked; their offices are listed under excluded only so a test can check that none of their values is sent.",
+  "company": {
+    "name": "LEDVANCE Oy",
+    "offices": [
+      {
+        "name": "LEDVANCE Oy",
+        "address_lines": [
+          "Testikatu 1",
+          "00100 Helsinki"
+        ],
+        "phone": "+358974223300",
+        "phone_text": "09-7422 3300",
+        "email": "asiakaspalvelu@ledvance.com",
+        "country": "FI",
+        "page": "en-int/company/contact/",
+        "section": "Finland",
+        "local_site": {
+          "href": "/fi-fi/",
+          "text": "www.ledvance.com/fi-fi"
+        },
+        "also_on": "fi-fi/yhteystiedot/"
+      }
+    ]
+  },
+  "excluded": [
+    {
+      "kind": "fax",
+      "country": "FI",
+      "value": "+358974223301",
+      "value_text": "09-7422 3301",
+      "page": "en-int/company/contact/",
+      "reason": "a fax number is not a contact channel"
+    },
+    {
+      "kind": "other_countries",
+      "page": "en-int/company/contact/",
+      "reason": "only the exhibition country's section is opened; other countries' offices and local sites are neither taken nor walked",
+      "offices": [
+        {
+          "section": "Austria",
+          "country": "AT",
+          "name": "LEDVANCE GmbH",
+          "phone": "+43123456700",
+          "phone_text": "01 23456 700",
+          "fax": "+43123456701",
+          "fax_text": "01 23456 701",
+          "email": "office.at@ledvance.example",
+          "local_site": "/de-at/"
+        },
+        {
+          "section": "Belgium",
+          "country": "BE",
+          "name": "LEDVANCE NV",
+          "phone": "+3221234560",
+          "phone_text": "02 123 45 60",
+          "fax": "+3221234561",
+          "fax_text": "02 123 45 61",
+          "email": "info.be@ledvance.example",
+          "local_site": "/nl-be/"
+        },
+        {
+          "section": "Denmark",
+          "country": "DK",
+          "name": "LEDVANCE A/S",
+          "phone": "+4533123450",
+          "phone_text": "33 12 34 50",
+          "fax": "+4533123451",
+          "fax_text": "33 12 34 51",
+          "email": "info.dk@ledvance.example",
+          "local_site": "/da-dk/"
+        },
+        {
+          "section": "France",
+          "country": "FR",
+          "name": "LEDVANCE SAS",
+          "phone": "+33123456780",
+          "phone_text": "01 23 45 67 80",
+          "fax": "+33123456781",
+          "fax_text": "01 23 45 67 81",
+          "email": "contact.fr@ledvance.example",
+          "local_site": "/fr-fr/"
+        },
+        {
+          "section": "Germany",
+          "country": "DE",
+          "name": "LEDVANCE GmbH",
+          "phone": "+498912345670",
+          "phone_text": "089 1234 5670",
+          "fax": "+498912345671",
+          "fax_text": "089 1234 5671",
+          "email": "kontakt.de@ledvance.example",
+          "local_site": "/de-de/"
+        },
+        {
+          "section": "Italy",
+          "country": "IT",
+          "name": "LEDVANCE S.r.l.",
+          "phone": "+390212345670",
+          "phone_text": "02 1234 5670",
+          "fax": "+390212345671",
+          "fax_text": "02 1234 5671",
+          "email": "info.it@ledvance.example",
+          "local_site": "/it-it/"
+        },
+        {
+          "section": "Norway",
+          "country": "NO",
+          "name": "LEDVANCE AS",
+          "phone": "+4722123450",
+          "phone_text": "22 12 34 50",
+          "fax": "+4722123451",
+          "fax_text": "22 12 34 51",
+          "email": "kundeservice.no@ledvance.example",
+          "local_site": "/nb-no/"
+        },
+        {
+          "section": "Poland",
+          "country": "PL",
+          "name": "LEDVANCE Sp. z o.o.",
+          "phone": "+48221234560",
+          "phone_text": "22 123 45 60",
+          "fax": "+48221234561",
+          "fax_text": "22 123 45 61",
+          "email": "biuro.pl@ledvance.example",
+          "local_site": "/pl-pl/"
+        },
+        {
+          "section": "Sweden",
+          "country": "SE",
+          "name": "LEDVANCE AB",
+          "phone": "+46855512340",
+          "phone_text": "08-555 123 40",
+          "fax": "+46855512341",
+          "fax_text": "08-555 123 41",
+          "email": "kundservice.se@ledvance.example",
+          "local_site": "/sv-se/"
+        },
+        {
+          "section": "United Kingdom",
+          "country": "GB",
+          "name": "LEDVANCE Ltd",
+          "phone": "+442079460000",
+          "phone_text": "020 7946 0000",
+          "fax": "+442079460001",
+          "fax_text": "020 7946 0001",
+          "email": "info.uk@ledvance.example",
+          "local_site": "/en-gb/"
+        }
+      ]
+    }
+  ],
+  "bot_check": {
+    "paths": [
+      "fi-fi/"
+    ],
+    "cookie": "fixture_waf=passed",
+    "title": "Just a moment...",
+    "stuck_variant": "challenge-stuck"
+  },
+  "priority_pages": [
+    "en-int/company/contact/",
+    "fi-fi/",
+    "fi-fi/yhteystiedot/"
+  ],
+  "persons": [
+    {
+      "name": "Kari Lehtonen",
+      "title": "Myyntijohtaja",
+      "email": "kari.lehtonen@ledvance.example",
+      "phone": "+358407123456",
+      "phone_text": "040 712 3456",
+      "source_page": "fi-fi/yhteystiedot/",
+      "country": "FI",
+      "priority": true
+    },
+    {
+      "name": "Tiina Heikkinen",
+      "title": "Avainasiakaspäällikkö",
+      "email": "tiina.heikkinen@ledvance.example",
+      "phone": "+358503412267",
+      "phone_text": "050 341 2267",
+      "source_page": "fi-fi/yhteystiedot/",
+      "country": "FI",
+      "priority": true
+    },
+    {
+      "name": "Juha Rantanen",
+      "title": "Markkinointipäällikkö",
+      "email": "juha.rantanen@ledvance.example",
+      "phone": "+358445281190",
+      "phone_text": "044 528 1190",
+      "source_page": "fi-fi/yhteystiedot/",
+      "country": "FI",
+      "priority": true
+    },
+    {
+      "name": "Minna Koivisto",
+      "title": "Tuotepäällikkö",
+      "email": "minna.koivisto@ledvance.example",
+      "phone": "+358408765512",
+      "phone_text": "040 876 5512",
+      "source_page": "fi-fi/yhteystiedot/",
+      "country": "FI",
+      "priority": true
+    },
+    {
+      "name": "Petri Laaksonen",
+      "title": "Asiakaspalvelupäällikkö",
+      "email": "petri.laaksonen@ledvance.example",
+      "phone": "+358502234478",
+      "phone_text": "050 223 4478",
+      "source_page": "fi-fi/yhteystiedot/",
+      "country": "FI",
+      "priority": true
+    },
+    {
+      "name": "Sanna Hämäläinen",
+      "title": "Logistiikkapäällikkö",
+      "email": "sanna.hamalainen@ledvance.example",
+      "phone": "+358451193380",
+      "phone_text": "045 119 3380",
+      "source_page": "fi-fi/yhteystiedot/",
+      "country": "FI",
+      "priority": true
+    }
+  ]
+}

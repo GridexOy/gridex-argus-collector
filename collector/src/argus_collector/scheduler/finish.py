@@ -149,6 +149,11 @@ def finished(
     )
 
 
+def attention(conn: sqlite3.Connection, facts: RunFacts) -> api.AttentionPayload:
+    """job.needs_attention: the gap the owner has to solve (the last one) and the counts."""
+    return api.AttentionPayload(gap=gaps(facts)[-1], counts=counts(conn, facts))
+
+
 def progress(conn: sqlite3.Connection, facts: RunFacts, transport: str) -> api.ProgressPayload:
     found = counts(conn, facts)
     return api.ProgressPayload(

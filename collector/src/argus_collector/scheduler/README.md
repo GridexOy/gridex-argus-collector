@@ -18,7 +18,10 @@ ARGUS jobs on this PC (ARGUS20_TZ_TANDEM.md pairs A2, A3; TZ_SELAIN 8.1,
 Local job states: `queued` -> `running` -> `completed` / `partial` / `failed` /
 `cancelled`; `stopped` (Pysayta, STOP, panel closed: resumes on Kaynnista),
 `paused` (ARGUS pause), `waiting_lease` (lease expired or mismatched:
-reconcile before walking). A walk is interrupted between steps by
+reconcile before walking), `needs_attention` (0.4.4.0: a bot check did not
+clear; `job.needs_attention` with the gap, the lease stays renewed, no walk
+while the owner's work browser is open; Huomio "Jatka kasin tehdyn toimen
+jalkeen" or ARGUS resume -> `queued`, the run goes on from that URL). A walk is interrupted between steps by
 Pysayta/STOP, pause, cancel or a lease that expired locally; cancel ends the
 run with `job.finished` `cancelled` / `manual_cancel`, the others keep it
 resumable. After a restart `running` jobs become `stopped`; seq, entity and

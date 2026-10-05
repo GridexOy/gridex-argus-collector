@@ -41,6 +41,7 @@ class WalkState:
     failed_targets: set[str] = field(default_factory=set)
     failures_in_row: int = 0
     contacts: int = 0
+    page_has_contacts: bool = False  # the last extracted page state had people or channels
     source_id: str | None = None
     end_reason: str = service.END_FINISHED
     _mark: float = field(default_factory=time.monotonic)

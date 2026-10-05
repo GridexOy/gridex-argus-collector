@@ -69,7 +69,7 @@ CONTACT_WORDS: dict[str, int] = {
     "offices": 4,
     "locations": 4,
     "about": 3,
-    "kontakt": 9,
+    "kontakt": 10,
     "kontakte": 9,
     "vertrieb": 6,
     "ansprechpartner": 8,

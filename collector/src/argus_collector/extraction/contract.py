@@ -10,8 +10,11 @@ Anything else is dropped. Nothing here depends on `models` (TZ section 11).
 
 from __future__ import annotations
 
-from argus_collector.extraction import repository, roles, service
+from collections.abc import Callable
+
+from argus_collector.extraction import repository, roles, sections, service
 from argus_collector.extraction.roles import ChannelRole
+from argus_collector.extraction.sections import OfficeLines, Section
 from argus_collector.extraction.service import (
     Channel,
     Contact,
@@ -24,26 +27,58 @@ __all__ = [
     "Channel",
     "ChannelRole",
     "Contact",
+    "OfficeLines",
     "PersonCard",
+    "Section",
     "VerifiedField",
     "card_from_json",
     "classify_unattached",
+    "country_sections",
     "extract_channels",
     "has_contact_signals",
     "html_language",
+    "office_lines",
+    "region_resolver",
+    "section_at",
     "verify_card",
 ]
 
 
-def extract_channels(html: str, text: str, region: str = DEFAULT_REGION) -> list[Channel]:
+def extract_channels(
+    html: str,
+    text: str,
+    region: str = DEFAULT_REGION,
+    region_at: Callable[[int], str] | None = None,
+) -> list[Channel]:
     """Phones and emails found deterministically; `text` is the canonical page text.
 
     Each channel carries the normalised `value`, the `raw` form, a `locator`
     (`href:tel`, `href:mailto`, `jsonld:<pointer>`, `cfemail`, `text`) and a
     `TextSpan` when the raw form is visible in `text`. De-duplicated by value.
-    National phone numbers are read in `region` (`normalization.region_for_page`).
+    National phone numbers are read in `region` (`normalization.region_for_page`),
+    or per text offset by `region_at` (country sections). A number labelled as a
+    fax is not a channel.
     """
-    return service.extract_channels(html, text, region)
+    return service.extract_channels(html, text, region, region_at)
+
+
+def country_sections(text: str) -> list[Section]:
+    """Country sections of a page that names >= 3 countries on lines of their own."""
+    return sections.country_sections(text)
+
+
+def section_at(found: list[Section], offset: int) -> Section | None:
+    return sections.section_at(found, offset)
+
+
+def region_resolver(found: list[Section], default: str) -> Callable[[int], str]:
+    """Phone region per text offset: the section's country, else `default`."""
+    return sections.region_resolver(found, default)
+
+
+def office_lines(text: str, section: Section) -> OfficeLines:
+    """Company name line and address lines of an office section (spans in `text`)."""
+    return sections.office_lines(text, section)
 
 
 def has_contact_signals(text: str, channels: list[Channel]) -> bool:

@@ -8,7 +8,9 @@ card). When that ancestor is a table row -> `table_row`; when it is a small cont
 holds no other person's name or value -> `card`; otherwise (only the page
 body joins them, or another person is inside) -> `proximity_only`; a part
 that cannot be found in the DOM -> `none`. Text is compared lower-case with
-all whitespace removed, so `<b>Anna</b> Virtanen` still matches.
+all whitespace removed, so `<b>Anna</b> Virtanen` still matches. Each person
+also gets its group: the nearest h2-h6 / legend / summary before its card in
+the same tab panel or section (`Myynti`), else the label of its tab.
 """
 
 from __future__ import annotations
@@ -66,10 +68,31 @@ BINDING_JS = """
   };
   const own = p => [squash(p.name), ...p.values.map(v => squash(v.text))].filter(s => s);
   const owners = probe.persons.map(own);
+  const personNames = new Set(probe.persons.map(p => squash(p.name)));
+  const groupOf = card => {
+    if (!card) return {group: '', panel: false};
+    const box = card.closest('[role="tabpanel"], section, article, fieldset, details')
+      || document.body;
+    const panel = !!card.closest('[role="tabpanel"]');
+    let best = null;
+    for (const h of box.querySelectorAll('h2, h3, h4, h5, h6, [role="heading"], legend, summary')) {
+      if (h.contains(card) || card.contains(h)) continue;
+      if (!(h.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
+      const t = (h.innerText || '').replace(/\\s+/g, ' ').trim();
+      if (t && t.length <= 60 && !personNames.has(squash(t))) best = t;
+    }
+    if (best) return {group: best, panel};
+    const tabpanel = card.closest('[role="tabpanel"]');
+    const tab = tabpanel && tabpanel.getAttribute('aria-labelledby')
+      ? document.getElementById(tabpanel.getAttribute('aria-labelledby')) : null;
+    const label = tab ? (tab.innerText || '').replace(/\\s+/g, ' ').trim() : '';
+    return {group: label, panel: !!tab};
+  };
   return probe.persons.map((p, i) => {
     const names = minimal(squash(p.name));
     const others = owners.filter((_, j) => j !== i).flat();
-    return p.values.map(v => {
+    const cards = [];
+    const values = p.values.map(v => {
       let found = minimal(squash(v.text));
       if (!found.length) { const a = byHref(v); found = a ? [a] : []; }
       if (!names.length || !found.length) return 'none';
@@ -80,8 +103,10 @@ BINDING_JS = """
       if (t.length > __MAX__) return 'proximity_only';
       const mine = new Set(own(p));
       if (others.some(o => !mine.has(o) && t.includes(o))) return 'proximity_only';
+      cards.push(top);
       return top.closest('tr') ? 'table_row' : 'card';
     });
+    return {values, ...groupOf(cards[0] || names[0] || null)};
   });
 }
 """.replace("__MAX__", str(MAX_CARD_TEXT))
@@ -112,13 +137,24 @@ def probe_payload(persons: list[PersonProbe]) -> dict[str, Any]:
     }
 
 
-def parse_result(raw: object, persons: list[PersonProbe]) -> list[tuple[str, ...]]:
-    """JS result -> one binding per probed value; anything malformed -> `none`."""
+@dataclass(frozen=True)
+class PersonBinding:
+    values: tuple[str, ...]  # one binding per probed value
+    group: str = ""  # group heading or tab label of the person's card ("" none)
+    in_panel: bool = False  # the group is inside a tab panel (a department for sure)
+
+
+def parse_result(raw: object, persons: list[PersonProbe]) -> list[PersonBinding]:
+    """JS result -> one binding per probed value and the group; malformed -> `none`."""
     allowed = {BINDING_CARD, BINDING_ROW, BINDING_PROXIMITY, BINDING_NONE}
     rows = raw if isinstance(raw, list) else []
-    out: list[tuple[str, ...]] = []
+    out: list[PersonBinding] = []
     for index, person in enumerate(persons):
-        row = rows[index] if index < len(rows) and isinstance(rows[index], list) else []
+        item = rows[index] if index < len(rows) and isinstance(rows[index], dict) else {}
+        row = item.get("values") if isinstance(item.get("values"), list) else []
+        assert isinstance(row, list)
         values = [str(row[i]) if i < len(row) else BINDING_NONE for i in range(len(person.values))]
-        out.append(tuple(v if v in allowed else BINDING_NONE for v in values))
+        group = str(item.get("group", "") or "")[:120]
+        bound = tuple(v if v in allowed else BINDING_NONE for v in values)
+        out.append(PersonBinding(bound, group, item.get("panel") is True))
     return out

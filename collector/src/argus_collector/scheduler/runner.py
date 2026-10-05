@@ -85,11 +85,14 @@ def walk_settings(
     scope = job.scope
     hosts = frozenset(host_key(h.host) for h in scope.approved_hosts)
     countries = list(scope.priority_countries)
+    focus = discovery.make_focus(countries, list(scope.priority_languages))
+    if focus is not None:
+        focus = replace(focus, local_seed=discovery.is_local_seed(job.seed_urls[0], focus.country))
     return walk.WalkSettings(
         start_url=job.seed_urls[0], model=env.model, headless=env.headless,
         profile_dir=env.profile_dir, evidence_dir=env.evidence_dir, db_path=env.db_path,
         stop_files=env.stop_files, approved_hosts=hosts,
-        focus=discovery.make_focus(countries, list(scope.priority_languages)),
+        focus=focus,
         limits=service.run_limits(api.to_json(job.policy), consumed(claimed)),
         resume=resume, id_namespace=job.job_id,
         region_fallback=countries[0].upper() if countries else DEFAULT_REGION,
@@ -143,6 +146,23 @@ def finish_run(
     return result
 
 
+def needs_attention(
+    conn: sqlite3.Connection, row: sqlite3.Row, env: WalkEnv, checkpoint: walk.WalkCheckpoint
+) -> str:
+    """job.needs_attention once; the run stays open until the owner presses Jatka."""
+    facts = JobSink(context(row, claimed_job(row), env), lambda: "synced").facts(
+        checkpoint, walk.END_ATTENTION
+    )
+    with storage.transaction(conn):
+        payload = finish.attention(conn, facts)
+        make = events.envelope(api.JobNeeds_AttentionEvent, row["job_id"], row["run_id"], payload)
+        delivery.enqueue_event(conn, row["job_id"], row["run_id"], make, [])
+        repo.update_job_tx(conn, row["job_id"], state=service.NEEDS_ATTENTION,
+                           stage=service.STAGE_QUEUED, detail=payload.gap.source_url)
+    runtime.journal("browser", f"job {row['job_id']}: needs attention ({payload.gap.reason.value})")
+    return service.NEEDS_ATTENTION
+
+
 def run_job(
     conn: sqlite3.Connection,
     row: sqlite3.Row,
@@ -163,5 +183,7 @@ def run_job(
                  service.STOP_LEASE: service.WAITING_LEASE}[reason]
         repo.update_job(conn, row["job_id"], state=state, stage=service.STAGE_QUEUED)
         return state
+    if reason is None and summary.end_reason == walk.END_ATTENTION:
+        return needs_attention(conn, row, env, summary.checkpoint)
     cancelled = reason == service.STOP_CANCEL
     return finish_run(conn, row, env, summary.checkpoint, (summary.end_reason, cancelled))

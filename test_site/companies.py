@@ -38,6 +38,13 @@ def companies(port: int = DEFAULT_PORT) -> list[dict[str, Any]]:
         _company("nordtec", "Nordtec AB", vhost("nordtec"), ["nordtec.localhost"]),
         _company("vogel", "Vogel Antriebstechnik GmbH", vhost("vogel"), ["vogel.localhost"]),
         _company("katsa", "Katsa Oy", vhost("katsa-oy"), ["katsa-oy.localhost"]),
+        _company("ledvance", "LEDVANCE Oy", vhost("ledvance"), ["ledvance.localhost"]),
+        _company(
+            "malux",
+            "Malux Finland Oy",
+            vhost("malux") + "fi/",
+            ["malux.localhost", "malux-se.localhost"],
+        ),
     ]
 
 

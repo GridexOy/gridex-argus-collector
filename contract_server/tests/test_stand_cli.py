@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from contract_server import openapi, server, stand
+from contract_server.tests import payloads
 from contract_server.tests.client import SYSTEM_TOKEN, WORKER_ID, Client
 from contract_server.tests.flow import Flow
 
@@ -101,6 +102,27 @@ def test_worker_and_contacts_views(
     code, view = run(capsys, srv, "contacts", job.job_id)
     assert (code, view["contacts"], view["rejected"]) == (0, [], [])
     code, error = run(capsys, srv, "job", "missing")
+    assert (code, error["code"]) == (1, "invalid_input")
+
+
+def test_company_contacts_view(
+    capsys: pytest.CaptureFixture[str], srv: server.ContractServer
+) -> None:
+    flow = Flow(Client(srv))
+    job = flow.start("c1")
+    evidence_id = flow.page(job)
+    name = payloads.observation("full_name", "Anna Virtanen", evidence_id)
+    flow.send(job, flow.contact(job, evidence_id, [name]))
+    code, view = run(capsys, srv, "company-contacts", "c1")
+    assert (code, view["company_id"], view["job_ids"]) == (0, "c1", [job.job_id])
+    contact = view["contacts"][0]
+    assert (contact["entity_type"], contact["job_ids"], contact["not_seen"]) == (
+        "person",
+        [job.job_id],
+        None,
+    )
+    assert contact["observations"][0]["history"] == []
+    code, error = run(capsys, srv, "company-contacts", "nobody")
     assert (code, error["code"]) == (1, "invalid_input")
 
 
