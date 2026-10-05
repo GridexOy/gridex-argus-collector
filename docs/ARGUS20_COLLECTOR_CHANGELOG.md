@@ -1,5 +1,24 @@
 # ARGUS20_COLLECTOR_CHANGELOG
 
+## 0.4.8.1 — 2026-10-05
+
+**Правка 1 шага 7 (`stage-5/step-7-delivery-reasons`), приоритет владельца 05.10: «Lähetysvirhe 2» без причины.** Контракт не менялся. Сервер ARGUS (`/api/health`, journal `argus20-api`, Caddy, `POST /api/collector/batches`, «Lähetä Selaimeen») — вне доступа сборщика (CLAUDE.md); со стороны сборщика каждый отказ теперь виден с id, кодом и словами, а `request_id` из ответа ARGUS связывает строку журнала сборщика с записью в журнале API.
+
+**Что видно.**
+- Lähetys: `Lähetysvirhe: 2 (lainaus ei vastaa lähdettä)` — число отказов и причина последнего словами (раньше — только `Lähetysvirhe: 2`); пока ARGUS отвечает 5xx — `Palvelinvirhe: 502` красным до первого прошедшего прохода (раньше при 5xx было видно только `Lähetetään`). Ответ без тела ошибки (страница прокси) — `HTTP-virhe 422 ilman syytä` / `Palvelinvirhe: <код>`.
+- Журнал `delivery`: на каждый отклонённый элемент — `job <id> (<компания>): contact.observed event <event_id> seq <n> rejected <код> (<слова>)` или `evidence <id>`; на ошибку запроса — `job <id>: HTTP <статус> <код> (<слова>) request_id=<id>`; `evidence_missing` / `sequence_gap` (отправляются снова) — тоже строкой. Текст `detail` из ответа ARGUS в журнал не пишется: в нём может быть цитата с контактом.
+- Yhteys: ответ 5xx на heartbeat — `Palvelinvirhe: 502` (раньше `Ei verkkoa: HTTP 502: <html>…</html>` — «нет сети» и сырой HTML страницы прокси); другой отказ — `ARGUS vastasi 403: <detail>` или `ARGUS vastasi 404: HTTP-virhe 404 ilman syytä`; `Ei verkkoa` — только когда ответа нет вовсе. Подсказка Keruu: `Keruu vaatii yhteyden ARGUSiin (Yhdistä)` (была ссылка на прежнюю кнопку «Testaa yhteys»).
+- Журнал `http`: смена ответа heartbeat — `heartbeat: HTTP 200 answered` / `heartbeat: HTTP 401 <код> (<слова>) request_id=…` / `heartbeat: HTTP 0 offline (no answer from ARGUS)`; строка пишется только при смене, не каждые 30 с. Строки `claim: HTTP …` и `reconcile job …: HTTP …` — тоже с кодом, словами и `request_id`.
+- `scripts\delivery_check.ps1 [-Minutes 30]` (или `python -m argus_collector.pilot rejected`): таблица всех отказов из локального outbox — время, компания, job, тип, event_id / evidence_id, seq, код, слова → `reports\rejected-<дата>.md`, и строки журнала за последние N минут об отказах, heartbeat, claim, reconcile.
+
+**Исправлено.** Пакет событий, отклонённый целиком (4xx без ответа по событиям), помечал первое событие `rejected`, но не засчитывал отказ компании: `Lähetysvirhe` рос, а строка Jono причины не показывала. Теперь засчитывается и показывается.
+
+**Модули.** Новые файлы: `pilot/rejected.py`, `scripts/delivery_check.ps1`. Изменены: `delivery` (service, loop, results, hooks, repository, contract, README), `scheduler` (hooks, views, collector), `ui` (queue_lines, connection_lines, app_connection), `scheduler/leases.py`, `pilot` (contract, `__main__`, README), `collector/messages/fi.json` (`delivery.errorReason`, `delivery.serverError`, `delivery.rejected.http`, `connection.state.refused`; `collecting.notConnected` — «Yhdistä»). Тесты: `delivery/tests/test_reasons.py`, `scheduler/tests/test_rejected_reason.py`, `pilot/tests/test_rejected.py`, `ui/tests/test_connection_lines.py`, дополнения `ui/tests/test_queue_lines.py`, `ui/tests/test_ui_connection.py`, `ui/tests/test_ui.py`.
+
+**Решения (поправь, если не так).**
+1. Срочная правка доставки — 0.4.8.1; правка Ellego (извлечение до навигации, детектор цикла, параллельные вызовы) — следующей версией 0.4.8.2, тоже в cv0.4.8.
+2. Название компании пишется в строку отказа журнала: это не значение контакта; значения контактов, цитаты и токены в журнал не попадают.
+
 ## 0.4.8.0 — 2026-10-05
 
 **Шаг `stage-5/step-7-routing`: разбор живого обхода Beckhoff (MAIN-PC, 05.10), тайминг по фазам и маршрутизация моделей (решения владельца 05.10.2026).** Контракт не менялся.

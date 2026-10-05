@@ -95,7 +95,13 @@ class DeliveryProps:
 
 def rejection_text(msgs: Messages, code: str) -> str:
     key = REJECT_KEYS.get(code)
-    return msgs.t(key) if key else msgs.t("delivery.rejected.other", code=code)
+    if key:
+        return msgs.t(key)
+    status = code[5:] if code.startswith("http_") else ""
+    if status.isdigit():
+        key = "delivery.serverError" if int(status) >= 500 else "delivery.rejected.http"
+        return msgs.t(key, status=status)
+    return msgs.t("delivery.rejected.other", code=code)
 
 
 def tila(msgs: Messages, row: QueueRow) -> str:
@@ -134,17 +140,19 @@ def queue_props(msgs: Messages, view: QueueView | None) -> QueueProps:
 
 def delivery_props(msgs: Messages, view: DeliveryView | None) -> DeliveryProps:
     title = msgs.t("delivery.title")
-    if view is None:
-        state = "offline"
-        pending, errors, p95 = 0, 0, None
-    else:
-        state, pending, errors, p95 = view.state, view.pending, view.errors, view.p95_s
+    view = view or DeliveryView(0, 0, None, "offline")
+    p95 = view.p95_s
     p95_text = msgs.t("delivery.p95", s=p95) if p95 is not None else msgs.t("delivery.p95none")
-    counts = " · ".join(
-        (msgs.t("delivery.pending", n=pending), msgs.t("delivery.error", n=errors), p95_text)
-    )
-    state_key = TRANSPORT_KEYS.get(state, TRANSPORT_KEYS["syncing"])
+    errors = msgs.t("delivery.error", n=view.errors)
+    if view.errors and view.last_code:
+        errors = msgs.t("delivery.errorReason", n=view.errors,
+                        reason=rejection_text(msgs, view.last_code))
+    parts = [msgs.t("delivery.pending", n=view.pending), errors, p95_text]
+    if view.server_error:
+        parts.append(msgs.t("delivery.serverError", status=view.server_error))
+    state_key = TRANSPORT_KEYS.get(view.state, TRANSPORT_KEYS["syncing"])
+    level = LEVEL_ERROR if view.errors or view.server_error else LEVEL_OK
     return DeliveryProps(
-        title, counts, LEVEL_ERROR if errors else LEVEL_OK, msgs.t(state_key),
-        TRANSPORT_LEVELS.get(state, LEVEL_INFO),
+        title, " · ".join(parts), level, msgs.t(state_key),
+        TRANSPORT_LEVELS.get(view.state, LEVEL_INFO),
     )

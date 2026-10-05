@@ -139,7 +139,8 @@ def reconcile(
                                  proxy_mode=mode)
     except api.ApiError as exc:
         code = exc.error.code if exc.error else ""
-        runtime.journal("http", f"reconcile job {row['job_id']}: HTTP {exc.status} {code}")
+        runtime.journal("http", f"reconcile job {row['job_id']}: HTTP {exc.status}"
+                        f" {delivery.error_text(exc)}")
         if exc.status == 0 or exc.status >= 500 or exc.status in (401, 403, 429):
             return "offline", code
         repo.update_job(conn, row["job_id"], state=service.FAILED, detail=f"lease lost: {code}")

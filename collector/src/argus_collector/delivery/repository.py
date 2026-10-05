@@ -162,3 +162,13 @@ def local_evidence_id(conn: sqlite3.Connection, evidence_id: str) -> str | None:
         "SELECT local_evidence_id FROM evidence_uploads WHERE evidence_id = ?", (evidence_id,)
     ).fetchone()
     return str(row[0]) if row else None
+
+
+def rejected_rows(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """Rejected events and snapshots, the latest first (job, kind, id, seq, code, at)."""
+    return conn.execute(
+        "SELECT job_id, type AS kind, event_id AS item_id, seq, code, sent_at AS at"
+        " FROM outbox WHERE status = 'rejected' UNION ALL"
+        " SELECT job_id, 'evidence', evidence_id, NULL, code, acked_at"
+        " FROM evidence_uploads WHERE status = 'rejected' ORDER BY at DESC"
+    ).fetchall()

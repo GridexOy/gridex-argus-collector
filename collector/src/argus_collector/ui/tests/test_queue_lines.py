@@ -61,3 +61,17 @@ def test_delivery_props_counts_and_transport(msgs: repository.Messages) -> None:
     offline = queue_lines.delivery_props(msgs, None)
     assert offline.state_text == msgs.t("delivery.state.offline")
     assert offline.state_level == queue_lines.LEVEL_WARN
+
+
+def test_delivery_props_name_the_last_reason_and_a_server_error(
+    msgs: repository.Messages,
+) -> None:
+    view = DeliveryView(0, 2, None, "synced", "evidence_hash_mismatch")
+    props = queue_lines.delivery_props(msgs, view)
+    reason = msgs.t("delivery.rejected.evidence_hash_mismatch")
+    assert msgs.t("delivery.errorReason", n=2, reason=reason) in props.counts_text
+    down = queue_lines.delivery_props(msgs, DeliveryView(4, 0, None, "syncing", "", 502))
+    assert msgs.t("delivery.serverError", status=502) in down.counts_text
+    assert down.counts_level == queue_lines.LEVEL_ERROR
+    assert queue_lines.rejection_text(msgs, "http_503") == "Palvelinvirhe: 503"
+    assert queue_lines.rejection_text(msgs, "http_422") == "HTTP-virhe 422 ilman syytä"

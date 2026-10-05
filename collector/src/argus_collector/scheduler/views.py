@@ -42,6 +42,8 @@ class DeliveryView:
     errors: int
     p95_s: float | None
     state: str  # TransportState
+    last_code: str = ""  # code of the latest rejection
+    server_error: int = 0  # HTTP status of the last 5xx answer while it lasts
 
 
 def _stage(row: sqlite3.Row, pending: int, running: bool) -> str:
@@ -86,9 +88,11 @@ def attention_view(conn: sqlite3.Connection) -> list[AttentionItem]:
     ]
 
 
-def delivery_view(conn: sqlite3.Connection, transport_state: str) -> DeliveryView:
+def delivery_view(conn: sqlite3.Connection, transport_state: str,
+                  server_error: int = 0) -> DeliveryView:
     stats = delivery.stats(conn)
-    return DeliveryView(stats.pending, stats.errors, stats.p95_s, transport_state)
+    return DeliveryView(stats.pending, stats.errors, stats.p95_s, transport_state,
+                        stats.last_code, server_error)
 
 
 @dataclass(frozen=True)

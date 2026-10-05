@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from argus_collector.api_client import contract as api
+from argus_collector.delivery import contract as delivery
 from argus_collector.ui.repository import Messages
 from argus_collector.worker_auth import contract as worker_auth
 
@@ -37,6 +39,7 @@ class ConnectionState:
     token: str  # masked
     status: str = STATE_NONE
     error_detail: str = ""
+    error_status: int = 0  # HTTP status of the failed heartbeat (0: no answer at all)
     last_heartbeat: datetime | None = None
     testing: bool = False
     key_error: worker_auth.PairingKeyError | None = None  # the last pasted key was refused
@@ -60,6 +63,12 @@ def _state_line(msgs: Messages, state: ConnectionState) -> tuple[str, str]:
         return msgs.t("connection.state.ok"), LEVEL_OK
     if state.status == STATE_REJECTED:
         return msgs.t("connection.state.rejected"), LEVEL_ERROR
+    if state.status == STATE_ERROR and state.error_status >= 500:
+        return msgs.t("delivery.serverError", status=state.error_status), LEVEL_ERROR
+    if state.status == STATE_ERROR and state.error_status:
+        detail = state.error_detail or msgs.t("delivery.rejected.http", status=state.error_status)
+        return msgs.t("connection.state.refused", status=state.error_status,
+                      detail=detail), LEVEL_ERROR
     if state.status == STATE_ERROR:
         return msgs.t("connection.state.error", detail=state.error_detail), LEVEL_ERROR
     if state.status == STATE_CHECKING:
@@ -101,3 +110,12 @@ def connection_props(msgs: Messages, state: ConnectionState) -> ConnectionProps:
         heartbeat_text=_heartbeat_text(msgs, state),
         connect_enabled=not state.testing,
     )
+
+
+def heartbeat_line(status: int, body: api.Error | None) -> str:
+    """`heartbeat: HTTP 502 http_502 (server error 502)`, ARGUS's request_id when sent."""
+    if status == 200:
+        return "heartbeat: HTTP 200 answered"
+    code = body.code if body else f"http_{status}" if status else "offline"
+    rid = f" request_id={body.request_id}" if body and body.request_id else ""
+    return f"heartbeat: HTTP {status} {code} ({delivery.reason(code)}){rid}"

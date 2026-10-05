@@ -29,6 +29,7 @@ from argus_collector.ui.connection_lines import (
     STATE_REJECTED,
     ConnectionProps,
     ConnectionState,
+    heartbeat_line,
 )
 from argus_collector.ui.connection_lines import connection_props as build_connection_props
 from argus_collector.ui.repository import Messages
@@ -62,6 +63,7 @@ class ConnectionController:
         )
         self._stop = threading.Event()
         self._loop_thread: threading.Thread | None = None
+        self._heard = -1  # HTTP status of the last heartbeat in the journal (200 = answered)
 
     def props(self, msgs: Messages) -> ConnectionProps:
         return build_connection_props(msgs, self.state)
@@ -124,10 +126,18 @@ class ConnectionController:
         try:
             self._call(address, worker_id, token)
         except api.ApiError as exc:
+            self._journal(exc.status, exc.error)
             self.host.heartbeat_failed(exc.status)
             self.host.post(functools.partial(self._apply_error, address, worker_id, exc))
             return
+        self._journal(200, None)
         self.host.post(functools.partial(self._apply_ok, address, worker_id))
+
+    def _journal(self, status: int, body: api.Error | None) -> None:
+        """A changed heartbeat answer goes in the journal (not one line every 30 s)."""
+        if status != self._heard:
+            self._heard = status
+            runtime.journal("http", heartbeat_line(status, body))
 
     def _call(self, address: str, worker_id: str, token: str) -> api.HeartbeatResponse:
         """One heartbeat with the collector's leases, outbox, slots and command acks;
@@ -166,11 +176,10 @@ class ConnectionController:
         if not self._is_current(address, worker_id):
             return
         status = STATE_REJECTED if exc.status == 401 else STATE_ERROR
-        detail = exc.error.detail if exc.error is not None else str(exc)
-        self.state = ConnectionState(
-            address=address, worker_id=worker_id, token=self.state.token,
-            status=status, error_detail=detail, last_heartbeat=self.state.last_heartbeat,
-        )
+        body = exc.error
+        detail = (body.detail or body.code) if body else str(exc) if not exc.status else ""
+        self.state = ConnectionState(address, worker_id, self.state.token, status, detail,
+                                     exc.status, self.state.last_heartbeat)
         self.host.refresh()
 
     def _start_loop(self) -> None:

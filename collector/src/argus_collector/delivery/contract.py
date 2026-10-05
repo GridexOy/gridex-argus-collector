@@ -33,11 +33,15 @@ __all__ = [
     "DeliveryStats",
     "MakeEvent",
     "ReconcileInfo",
+    "Rejection",
     "enqueue_event",
     "enqueue_evidence",
+    "error_text",
     "job_totals",
     "next_seq",
     "reconcile_info",
+    "reason",
+    "rejections",
     "run_events",
     "run_ids",
     "stats",
@@ -52,6 +56,7 @@ class DeliveryStats:
     pending: int  # events + snapshots not yet answered by ARGUS
     errors: int  # events + snapshots ARGUS rejected
     p95_s: float | None  # delivery time of events acknowledged in the last minute
+    last_code: str = ""  # code of the latest rejection (words: `reason`, fi.json)
 
 
 @dataclass(frozen=True)
@@ -97,7 +102,30 @@ def stats(conn: sqlite3.Connection) -> DeliveryStats:
     since = (datetime.now(UTC) - timedelta(seconds=P95_WINDOW_S)).isoformat(
         timespec="milliseconds"
     )
-    return DeliveryStats(pending, errors, service.p95_s(repo.acked_since(conn, since)))
+    last = repo.rejected_rows(conn)[:1]
+    return DeliveryStats(pending, errors, service.p95_s(repo.acked_since(conn, since)),
+                         str(last[0]["code"]) if last else "")
+
+
+@dataclass(frozen=True)
+class Rejection:
+    job_id: str
+    kind: str  # event type or `evidence`
+    item_id: str  # event_id or evidence_id
+    seq: int | None
+    code: str
+    at: str
+
+
+def rejections(conn: sqlite3.Connection) -> list[Rejection]:
+    """Every rejected event and snapshot, the latest first."""
+    return [Rejection(str(r["job_id"]), str(r["kind"]), str(r["item_id"]), r["seq"],
+                      str(r["code"]), str(r["at"] or "")) for r in repo.rejected_rows(conn)]
+
+
+def reason(code: str) -> str:
+    """English words for a rejection code (journal, `pilot rejected`)."""
+    return service.reason(code)
 
 
 def job_totals(conn: sqlite3.Connection, job_id: str) -> tuple[int, int]:
@@ -152,3 +180,12 @@ def local_evidence_id(conn: sqlite3.Connection, evidence_id: str) -> str | None:
 
 def run_ids(conn: sqlite3.Connection, job_id: str) -> list[str]:
     return repo.job_run_ids(conn, job_id)
+
+
+def error_text(exc: api.ApiError) -> str:
+    """`<code> (<words>) request_id=<id>` of a failed request, for the journal; ARGUS's
+    detail is left out (it may quote a contact value)."""
+    body = exc.error
+    code = body.code if body else service.status_code(exc.status) if exc.status else "offline"
+    rid = f" request_id={body.request_id}" if body and body.request_id else ""
+    return f"{code} ({service.reason(code)}){rid}"

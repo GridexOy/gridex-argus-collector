@@ -5,6 +5,7 @@ local SQLite; `render_markdown(report)` gives the tables for
 `docs/ARGUS20_COLLECTOR_STAGE6_REPORT.md` (ARGUS20_TZ_TANDEM.md §9).
 `timing_markdown(lines, names, source)` splits a collecting day's journal
 into page phases, who decided, model calls and delivery (0.4.8.0).
+`rejected_markdown(conn)` lists what ARGUS rejected with its words (0.4.8.1).
 """
 
 from __future__ import annotations
@@ -12,7 +13,8 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Iterable
 
-from argus_collector.pilot import render, repository, timing, timing_render
+from argus_collector.delivery import contract as delivery
+from argus_collector.pilot import rejected, render, repository, timing, timing_render
 from argus_collector.pilot.service import CompanyRow, PhoneCheck, PilotReport
 from argus_collector.pilot.timing import JobTiming
 from argus_collector.scheduler import contract as scheduler
@@ -24,6 +26,7 @@ __all__ = [
     "PilotReport",
     "company_names",
     "parse_timing",
+    "rejected_markdown",
     "render_markdown",
     "report",
     "timing_markdown",
@@ -52,3 +55,7 @@ def company_names(conn: sqlite3.Connection) -> dict[str, str]:
 
 def timing_markdown(lines: Iterable[str], names: dict[str, str], source: str) -> str:
     return timing_render.markdown(timing.parse(lines), names, source)
+
+
+def rejected_markdown(conn: sqlite3.Connection) -> str:
+    return rejected.markdown(delivery.rejections(conn), scheduler.job_companies(conn))

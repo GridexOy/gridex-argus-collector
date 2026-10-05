@@ -140,7 +140,7 @@ class Collector(CollectorHooks):
                                   proxy_mode=self.mode(target))
         except api.ApiError as exc:
             self.claim_state, self.claim_error = "failed", str(exc)
-            runtime.journal("http", f"claim: HTTP {exc.status}")
+            runtime.journal("http", f"claim: HTTP {exc.status} {delivery.error_text(exc)}")
             self.on_change()
             return 0
         for claimed in resp.jobs:
@@ -189,4 +189,5 @@ class Collector(CollectorHooks):
 
     def delivery_view(self) -> views.DeliveryView:
         with self.connect() as conn:
-            return views.delivery_view(conn, self.deliverer.state)
+            return views.delivery_view(conn, self.deliverer.state,
+                                       self.deliverer.server_error)

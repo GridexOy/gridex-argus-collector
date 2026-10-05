@@ -12,6 +12,7 @@ import sqlite3
 
 from argus_collector.api_client import contract as api
 from argus_collector.delivery import repository as repo
+from argus_collector.delivery import service
 from argus_collector.delivery.hooks import DeliveryHooks
 from argus_collector.runtime import contract as runtime
 
@@ -29,13 +30,15 @@ def apply(
     updates: list[tuple[str, str, str, str | None, str | None]] = []
     for result in resp.results:
         code, status = result.code or "", result.status.value
+        row, item = rows[result.event_id], f"event {result.event_id} seq {result.seq}"
         if status == "rejected" and code in KEEP_PENDING:
+            runtime.journal("delivery", f"job {job_id}: {row['type']} {item} rejected {code}"
+                            f" ({service.reason(code)})")
             if code == "evidence_missing":
-                ids = json.loads(rows[result.event_id]["evidence_ids_json"])
-                repo.reset_upload(conn, ids)
+                repo.reset_upload(conn, json.loads(row["evidence_ids_json"]))
             continue
         if status == "rejected":
-            hooks.rejected(conn, job_id, str(rows[result.event_id]["type"]), code)
+            hooks.rejected(conn, job_id, str(row["type"]), code, item)
         channel = result.channel_status.value if result.channel_status else None
         updates.append((result.event_id, status, code, result.canonical_contact_id, channel))
     repo.mark_events(conn, updates)

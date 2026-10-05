@@ -69,7 +69,7 @@ def test_start_enabled_only_with_model_chrome_and_connection(msgs: repository.Me
     online = service.Activity(connected=True)
     offline = service.build_props(msgs, version_ok(), ready_report(), None, None, conn)
     assert not offline.collect.start_enabled and offline.collect.local_test_enabled
-    assert offline.collect.hint == "Keruu vaatii yhteyden ARGUSiin (Testaa yhteys)"
+    assert offline.collect.hint == "Keruu vaatii yhteyden ARGUSiin (Yhdistä)"
     ready = service.build_props(msgs, version_ok(), ready_report(), None, None, conn, online)
     assert ready.collect.start_enabled and ready.collect.hint == ""
     assert ready.collect.local_test_label == "Testaa paikallisesti"

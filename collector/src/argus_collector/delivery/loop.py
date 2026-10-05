@@ -40,6 +40,7 @@ class Deliverer:
         self.on_change = on_change or (lambda: None)
         self.error, self.failures, self.connected, self.pending = "", 0, False, 0
         self.link_down = False  # the last heartbeat got no answer at all
+        self.server_error = 0  # the HTTP status of the last 5xx answer until a pass succeeds
         self._stop, self._wake, self._flush = threading.Event(), threading.Event(), False
         self._thread: threading.Thread | None = None
 
@@ -95,7 +96,7 @@ class Deliverer:
             try:
                 self._uploads(conn, target)
                 self._events(conn, target)
-                self.error, self.failures, self.connected = "", 0, True
+                self.error, self.failures, self.connected, self.server_error = "", 0, True, 0
             except Failed as failed:
                 delay = self._failed(failed)
         self.pending = repo.totals(conn)[0]
@@ -112,12 +113,16 @@ class Deliverer:
         return service.backoff_s(self.failures, failed.retry_after)
 
     def _api_error(self, exc: api.ApiError, job_id: str, run_id: str, token: str) -> str:
-        """Class of an error; raises Failed for the classes that stop this pass."""
-        code = exc.error.code if exc.error is not None else ""
-        retryable = exc.error.retryable if exc.error is not None else False
-        kind = service.classify(exc.status, code, retryable)
-        runtime.journal("delivery", f"job {job_id}: HTTP {exc.status} {code or kind}")
+        """Code of an error that rejects the request; raises Failed for the classes that
+        stop this pass. The journal gets the words and ARGUS's request_id."""
+        body = exc.error
+        code = body.code if body else service.status_code(exc.status) if exc.status else ""
+        kind = service.classify(exc.status, code, body.retryable if body else False)
+        rid = f" request_id={body.request_id}" if body and body.request_id else ""
+        runtime.journal("delivery", f"job {job_id}: HTTP {exc.status} {code or kind}"
+                        f" ({service.reason(code or kind)}){rid}")
         self.link_down = self.link_down and exc.status == 0
+        self.server_error = exc.status if exc.status >= 500 else self.server_error
         if kind == service.ERROR_LEASE:
             self.hooks.lease_problem(job_id, run_id, code, token)
         if kind in (service.ERROR_PERMANENT, service.ERROR_CONFLICT):
@@ -154,7 +159,7 @@ class Deliverer:
         self, conn: sqlite3.Connection, job_id: str, evidence_id: str, code: str
     ) -> None:
         repo.mark_upload(conn, evidence_id, "rejected", code)
-        self.hooks.rejected(conn, job_id, "evidence", code)
+        self.hooks.rejected(conn, job_id, "evidence", code, f"evidence {evidence_id}")
 
     def _events(self, conn: sqlite3.Connection, target: ApiTarget) -> None:
         flush, self._flush = self._flush, False
@@ -178,7 +183,10 @@ class Deliverer:
                 )
             except api.ApiError as exc:
                 code = self._api_error(exc, job_id, run_id, token)
+                first = rows[chunk[0].event_id]
                 repo.mark_events(conn, [(chunk[0].event_id, "rejected", code, None, None)])
+                self.hooks.rejected(conn, job_id, str(first["type"]), code,
+                                    f"event {first['event_id']} seq {first['seq']}")
                 continue
             self.link_down = False
             results.apply(conn, self.hooks, job_id, rows, resp, _ms(started))

@@ -83,7 +83,14 @@ class CollectorHooks:
             if row is not None and row["run_id"] == run_id and row["lease_token"] == token:
                 self.reconcile_row(conn, target, row)
 
-    def rejected(self, conn: sqlite3.Connection, job_id: str, kind: str, code: str) -> None:
+    def rejected(
+        self, conn: sqlite3.Connection, job_id: str, kind: str, code: str, item: str
+    ) -> None:
+        """Counted on the company's row; one journal line: company, item, code, words."""
+        row = repo.job(conn, job_id)
+        company = row["company_name"] if row is not None else "?"
+        runtime.journal("delivery", f"job {job_id} ({company}): {kind} {item} rejected {code}"
+                        f" ({delivery.reason(code)})")
         with conn:
             repo.bump_job_tx(conn, job_id, rejected=1)
             repo.update_job_tx(conn, job_id, last_reject_code=code)

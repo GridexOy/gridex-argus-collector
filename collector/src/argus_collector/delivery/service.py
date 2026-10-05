@@ -27,6 +27,22 @@ ERROR_CONFLICT = "conflict"  # 409 idempotency_conflict
 ERROR_PERMANENT = "permanent"  # 4xx the same request will never pass
 ERROR_RETRY = "retry"  # 5xx or retryable=true
 LEASE_CODES = ("lease_expired", "lease_mismatch", "job_cancelled")
+REASONS = {  # what an ARGUS code means, for the journal (the panel's words are in fi.json)
+    "host_not_approved": "the host is not approved for this job",
+    "evidence_missing": "the snapshot was not uploaded, sent again",
+    "evidence_hash_mismatch": "the quote is not in the snapshot",
+    "field_audit_missing": "the field audit is missing",
+    "invalid_input": "ARGUS refused the content",
+    "schema_unsupported": "the contract version is not supported",
+    "payload_too_large": "the snapshot is too large",
+    "idempotency_conflict": "the same id with other content",
+    "lease_expired": "the lease expired",
+    "lease_mismatch": "the lease does not match",
+    "job_cancelled": "the job was cancelled in ARGUS",
+    "budget_exceeded": "the budget was exceeded",
+    "participation_not_confirmed": "participation is not confirmed",
+    "sequence_gap": "a gap in seq, sent again",
+}
 
 
 @dataclass(frozen=True)
@@ -109,3 +125,20 @@ def transport_state(error: str, pending: int, connected: bool) -> str:
     if error in (ERROR_AUTH, ERROR_PERMANENT, ERROR_CONFLICT):
         return STATE_ERROR
     return STATE_SYNCING if pending else STATE_SYNCED
+
+
+def status_code(status: int) -> str:
+    """The code of a request ARGUS answered without an error body (a proxy page, 502)."""
+    return f"http_{status}"
+
+
+def reason(code: str) -> str:
+    """Words for a rejection code, an `http_<status>` code or a class of request error."""
+    if code.startswith("http_") and code[5:].isdigit():
+        status = int(code[5:])
+        return f"server error {status}" if status >= 500 else f"HTTP {status} without a reason"
+    if code == ERROR_OFFLINE:
+        return "no answer from ARGUS"
+    if code == ERROR_AUTH:
+        return "the token was rejected"
+    return REASONS.get(code, code)

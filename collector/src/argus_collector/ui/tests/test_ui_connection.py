@@ -148,6 +148,9 @@ def test_a_rejected_token_shows_tunnus_hylatty(
         pump_until(app, root, lambda: app.connection.state.status == "rejected")
         assert app.view.connection.state_label.cget("text") == "Tunnus hylätty"
         assert not app.connection.connected
+        log = "".join(p.read_text("utf-8") for p in (tmp_path / "logs").glob("*.log"))
+        assert " http: heartbeat: HTTP 401 " in log and "request_id=" in log
+        assert "not-a-real-token" not in log, "no token in the journal"
     finally:
         root.destroy()
 
@@ -175,5 +178,9 @@ def test_argus_down_keeps_the_last_heartbeat_and_shows_ei_verkkoa(
         assert app.view.delivery.state_label.cget("text") == "Ei verkkoa", "nothing pending"
         assert app.view.connection.state_label.cget("text").startswith("Ei verkkoa")
         assert app.view.connection.heartbeat_label.cget("text") == seen
+        log = "".join(p.read_text("utf-8") for p in (tmp_path / "logs").glob("*.log"))
+        assert log.count("heartbeat: HTTP 200 answered") == 1, "a change, not every 30 s"
+        assert "heartbeat: HTTP 0 offline (no answer from ARGUS)" in log
     finally:
         root.destroy()
+

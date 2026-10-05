@@ -16,6 +16,7 @@
   "connection.state.ok": "Yhdistetty",
   "connection.state.rejected": "Tunnus hylätty",
   "connection.state.error": "Ei verkkoa: {detail}",
+  "connection.state.refused": "ARGUS vastasi {status}: {detail}",
   "connection.heartbeat.never": "Ei vielä heartbeatia",
   "connection.heartbeat.at": "Viimeksi: {time}",
   "collecting.title": "Keruu",
@@ -91,7 +92,7 @@
   "version.notInstalled": "ei asennustietoa",
   "version.error": "Versiovirhe: {error}",
   "collecting.localTest": "Testaa paikallisesti",
-  "collecting.notConnected": "Keruu vaatii yhteyden ARGUSiin (Testaa yhteys)",
+  "collecting.notConnected": "Keruu vaatii yhteyden ARGUSiin (Yhdistä)",
   "queue.title": "Jono",
   "queue.loading": "Ladataan…",
   "queue.loadError": "Jonon lataus epäonnistui",
@@ -124,6 +125,8 @@
   "delivery.title": "Lähetys",
   "delivery.pending": "Odottaa lähetystä: {n}",
   "delivery.error": "Lähetysvirhe: {n}",
+  "delivery.errorReason": "Lähetysvirhe: {n} ({reason})",
+  "delivery.serverError": "Palvelinvirhe: {status}",
   "delivery.p95": "p95 (1 min): {s} s",
   "delivery.p95none": "p95 (1 min): –",
   "delivery.state.synced": "Lähetetty",
@@ -143,5 +146,6 @@
   "delivery.rejected.job_cancelled": "tehtävä peruttu",
   "delivery.rejected.budget_exceeded": "budjetti ylittyi",
   "delivery.rejected.participation_not_confirmed": "osallistumista ei ole vahvistettu",
+  "delivery.rejected.http": "HTTP-virhe {status} ilman syytä",
   "delivery.rejected.other": "{code}"
 }

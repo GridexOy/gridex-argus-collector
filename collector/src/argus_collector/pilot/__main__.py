@@ -1,5 +1,6 @@
 """`python -m argus_collector.pilot [--batch ID] [--out FILE]`: the pilot tables;
-`python -m argus_collector.pilot timing --log FILE [--out FILE]`: where the time went."""
+`python -m argus_collector.pilot timing --log FILE [--out FILE]`: where the time went;
+`python -m argus_collector.pilot rejected [--out FILE]`: what ARGUS rejected and why."""
 
 from __future__ import annotations
 
@@ -56,10 +57,26 @@ def _timing(argv: list[str]) -> int:
     return 0
 
 
+def _rejected(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="argus_collector.pilot rejected")
+    parser.add_argument("--out", type=Path, default=None, help="write the markdown here")
+    parser.add_argument("--db", type=Path, default=None, help="collector.db (default: user data)")
+    args = parser.parse_args(argv)
+    conn = storage.connect(args.db)
+    try:
+        text = contract.rejected_markdown(conn)
+    finally:
+        conn.close()
+    _write(text, args.out, "rejected list")
+    return 0
+
+
 def main() -> int:
     argv = sys.argv[1:]
     if argv[:1] == ["timing"]:
         return _timing(argv[1:])
+    if argv[:1] == ["rejected"]:
+        return _rejected(argv[1:])
     return _pilot(argv)
 
 

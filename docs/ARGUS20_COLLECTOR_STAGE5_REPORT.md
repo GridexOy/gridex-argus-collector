@@ -337,3 +337,56 @@ Claude Code (Исполнитель-2), основная сессия, шаг 6 
 | 4 | Beckhoff в ARGUS | `check_extra.py beckhoff` по стенду | Офис FI: `+358201233800`, `finland@beckhoff.example`, `extra` FI / название / адрес / факс; офис DE из вкладки Germany с `extra:country DE`; люди с отделами и FI; прямых country…fax — 0; источники без `/de-de/` | 10:38 |
 | 5 | model.called | События `model.called` Beckhoff на стенде | `qwen2.5:14b-instruct` · `card_parsing` 1, `qwen2.5:7b` · `action_planning` 2 | 10:38 |
 | 6 | Отчёт тайминга | `python -m argus_collector.pilot timing --log … --db …` | Таблицы T4.4 с названиями компаний; доставка 17–109 мс на компанию | 10:39 |
+
+# Правка 1 шага 7: причина отказа доставки на экране — версия 0.4.8.1
+
+**Дата:** 05.10.2026 · **Основание:** «Сборщик MAIN-PC не может доставить события…» и «Приоритет (владелец 05.10): два отказа без причины…» · **Ветка:** `stage-5/step-7-delivery-reasons`, ff в `main` · **Контракт:** не менялся.
+
+## T5.1. Что проверено и что вне доступа сборщика
+
+Пункты про сервер ARGUS — `/api/health`, journal `argus20-api` по `/api/collector/*`, правило Caddy для worker-методов (`render_caddy` после 0.4.24), `POST /api/collector/workers/heartbeat` с действующим токеном, ответ `POST /api/collector/batches` на «Lähetä Selaimeen» и тексты ошибок экрана ARGUS — у сборщика доступа нет (CLAUDE.md: «К `/opt/argus20`, серверу, базе и проду ARGUS у тебя доступа нет»; токен сборщика хранится только на MAIN-PC в DPAPI). Это работа сессии `gridex-argus20`. Со стороны сборщика сделано так, чтобы каждый отказ был виден на MAIN-PC с id и словами, а `request_id` из тела ошибки ARGUS связывал строку журнала сборщика с записью journal `argus20-api`.
+
+## T5.2. Что значит «Lähetysvirhe 2» в панели сборщика
+
+Это число элементов outbox (события + снимки), которым ARGUS **ответил отказом с кодом**: отказ по событию в ответе 200 на пакет или отказ всего запроса 4xx (кроме 401/403/409 lease/429). Ответ 5xx, 429, обрыв связи — не отказ: элемент остаётся `Odottaa lähetystä` и отправляется снова. Значит, «Lähetysvirhe 2» на MAIN-PC — ARGUS принял запросы и отклонил два элемента по коду, а не «сервер недоступен». Какие именно — покажет `scripts\delivery_check.ps1` на MAIN-PC: компания, event_id / evidence_id, seq, код, слова, плюс строки журнала с `request_id`.
+
+Найдено в сборщике и исправлено:
+1. Журнал писал только счётчик (`2 events sent, 1 accepted/duplicate, 1 rejected`): ни event_id, ни кода, ни компании — причину на MAIN-PC нельзя было найти без SQLite.
+2. Запрос событий, отклонённый целиком (4xx), помечал первое событие `rejected`, но не засчитывал отказ компании: `Lähetysvirhe` рос, а у строки Jono причины не было.
+3. Ответ 5xx на heartbeat показывался как `Ei verkkoa: HTTP 502: <html>…` («нет сети» и сырой HTML страницы прокси); 5xx на отправке был виден только как `Lähetetään`.
+4. Подсказка Keruu ссылалась на кнопку «Testaa yhteys», которой с 0.4.7.0 нет.
+
+## T5.3. Самопроверка
+
+`pytest`: **576 passed**, 0 failed, 0 skipped (было 566 в 0.4.8.0; +10 новых). Гейты: 11 ok (version, no_cyrillic, size, docs, i18n, legacy — предупреждения как в 0.4.8.0, ruff, mypy, import_linter, pip_audit, gen_api_client).
+
+## T5.4. Живая проверка (контейнер, 05.10.2026, время UTC)
+
+Стенд: контракт-сервер `:8910`; перед ним испытательный прокси `:8911` (scratchpad, не в репозитории): по файлу режима пропускает запросы, переписывает 2-й результат пакета событий в `rejected <код>` или отвечает 502 с HTML-страницей. Панель спарена с прокси ключом `argus://pair?url=http://127.0.0.1:8911…`.
+
+| # | Строка | Что сделал | Что увидел | Время |
+|---|---|---|---|---|
+| 1 | Версия | Открыл панель | `cv0.4.8.1 (ei asennustietoa)` | 15:26 |
+| 2 | Паринг | Ключ → «Yhdistä» | `Yhdistetty`, `Viimeksi: 15:26:20`; журнал `http: heartbeat: HTTP 200 answered` | 15:26:19 |
+| 3 | Отказ по событию | Режим `reject:evidence_hash_mismatch:2`, пакет Nordtec + Vogel + Malux, «Käynnistä» | Lähetys: `Lähetysvirhe: 2 (lainaus ei vastaa lähdettä)` красным; Jono: `Nordtec AB … Valmis · Hylätty 2: lainaus ei vastaa lähdettä`; журнал: `delivery: job b70d95aa… (Nordtec AB): contact.observed event 3b7729e6… seq 2 rejected evidence_hash_mismatch (the quote is not in the snapshot)` и такая же для seq 14 | 15:26:31 → 15:27:11 |
+| 4 | Таблица отказов | `python -m argus_collector.pilot rejected --db …` | `# Rejected by ARGUS: 2`, две строки: время, Nordtec AB, job, `contact.observed`, event_id, seq 14 / 2, код, слова | 15:27 |
+| 5 | 502 на heartbeat | Режим `502`, перезапуск панели | Yhteys: `Palvelinvirhe: 502` красным (до этой правки на том же стенде, 15:28: `Ei verkkoa: HTTP 502: <html><body><h1>502 Bad Gateway</h1></body></html>`); журнал `heartbeat: HTTP 502 http_502 (server error 502)` один раз, не каждые 30 с | 15:29:43 |
+| 6 | 502 на отправке | Режим `pass`, пакет LEDVANCE, «Käynnistä», через 3 с режим `502` | Lähetys: `Odottaa lähetystä: 24 · Lähetysvirhe: 2 (lainaus ei vastaa lähdettä) · p95 (1 min): 2.2 s · Palvelinvirhe: 502` красным; журнал `delivery: job db83f20f…: HTTP 502 http_502 (server error 502)` с backoff 1–8 с | 15:30:39 → 15:30:53 |
+| 7 | Восстановление | Режим `pass` | Через 3 с `transport syncing -> synced`, `Odottaa lähetystä: 0`, `Palvelinvirhe` исчез, Yhteys `Yhdistetty`, LEDVANCE `Valmis` 6 людей | 15:31:00 → 15:31:14 |
+| 8 | claim при 502 | «Käynnistä», режим `502` на 22 с | `http: claim: HTTP 502 http_502 (server error 502)` каждые 10 с (было `claim: HTTP 502`) | 15:33:41 → 15:34:06 |
+
+`scripts\delivery_check.ps1` в контейнере не запускался (нет PowerShell); его Python-часть — строка 4.
+
+## T5.5. «Ei verkkoa» при Odottaa lähetystä 146 → 144 (вопрос владельца 05.10)
+
+Журнал `/api/collector` — на сервере ARGUS, у сборщика доступа нет. По коду сборщика: поток доставки от heartbeat не зависит — при «Ei verkkoa» (heartbeat без ответа) он продолжает слать снимки и события каждые 0.5 с, с backoff только после собственной ошибки. Ничего не удаляется: число `Odottaa lähetystä` убывает только когда ARGUS ответил на элемент — принят / дубликат (уходит из счётчика) или отклонён с кодом (переходит в `Lähetysvirhe`). Значит, 146 → 144 при неизменном `Lähetysvirhe` — два элемента дошли до ARGUS и приняты, пока heartbeat не отвечал. У heartbeat, событий и снимков один адрес, один режим прокси и одинаковый таймаут 10 с, поэтому сеть MAIN-PC → ARGUS работает, а не отвечает за 10 с именно `POST /workers/heartbeat` — это проверяет сессия `gridex-argus20` (journal `argus20-api`, правило Caddy для worker-методов). Пока heartbeat не отвечает, аренды не продлеваются: по `lease_expires_at` сборщик перестанет начинать новые действия и сделает reconcile — это видно в журнале как `reconcile job …`. На MAIN-PC подтверждают строки журнала `delivery: job …: N events sent …` / `evidence … uploaded` в те же минуты, что `http: heartbeat: HTTP 0 offline` (команда — в сдаче).
+
+## T5.6. Принятые решения (поправь, если не так)
+
+1. Срочная правка доставки — 0.4.8.1; правка Ellego (извлечение до навигации, детектор цикла, параллельные вызовы моделей) идёт следующей версией 0.4.8.2, тоже в cv0.4.8.
+2. Текст `detail` из ответа ARGUS в журнал не пишется (может содержать цитату с контактом); пишутся код, слова и `request_id`. На экране Yhteys `detail` показывается, как и раньше.
+3. Название компании пишется в строку отказа журнала: это не значение контакта.
+
+## T5.7. Расход
+
+Подписка, ≈ 0.35 млн токенов основной сессии на правку 0.4.8.1 (счётчик сессии). Субагент фикстуры Ellego (относится к 0.4.8.2) — 169 тыс. токенов. Рантайм-модель — подмена, платных вызовов нет.

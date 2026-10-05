@@ -19,7 +19,8 @@ class NoJobs:
     def lease_problem(self, job_id: str, run_id: str, code: str, token: str) -> None:
         return None
 
-    def rejected(self, conn: sqlite3.Connection, job_id: str, kind: str, code: str) -> None:
+    def rejected(self, conn: sqlite3.Connection, job_id: str, kind: str, code: str,
+                 item: str) -> None:
         return None
 
     def applied(self, conn: sqlite3.Connection, job_id: str, resp: api.EventsResponse) -> None:
