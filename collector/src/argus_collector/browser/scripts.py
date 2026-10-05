@@ -87,3 +87,28 @@ HIDDEN_LINKS_JS = """
   .filter(a => !a.getClientRects().length || getComputedStyle(a).visibility === 'hidden')
   .map(a => (a.getAttribute('href') || '').trim())
 """
+
+# A visible cookie-consent banner and its buttons (OneTrust, Cookiebot, generic
+# dialogs and bars that talk about cookies); `service.consent_choice` picks one.
+CONSENT_JS = """
+() => {
+  const visible = el => {
+    const r = el.getBoundingClientRect(), s = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
+  };
+  const boxes = Array.from(document.querySelectorAll(
+    '#onetrust-banner-sdk, #onetrust-consent-sdk, #CybotCookiebotDialog, #cookiebanner, ' +
+    '#cookie-banner, #cookie-consent, .cookie-banner, .cookie-consent, .cc-window, ' +
+    '[role="dialog"], [aria-modal="true"], [id*="cookie" i], [class*="cookie" i], ' +
+    '[id*="consent" i], [class*="consent" i]'));
+  const words = /cookie|eväste|kakor|evästeet|consent|suostumus|datenschutz|privacy/i;
+  const clickable = 'button, a[role="button"], [role="button"], input[type="button"]';
+  const box = boxes.find(b => visible(b) && words.test(b.innerText || '')
+    && (b.innerText || '').length < 4000 && b.querySelector(clickable));
+  if (!box) return null;
+  const buttons = Array.from(box.querySelectorAll(clickable)).filter(visible).slice(0, 12);
+  buttons.forEach((b, i) => b.setAttribute('data-argus-consent', String(i)));
+  const label = b => (b.innerText || b.value || b.getAttribute('aria-label') || '');
+  return buttons.map((b, i) => ({index: i, text: label(b).replace(/\\s+/g, ' ').trim()}));
+}
+"""

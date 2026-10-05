@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -89,3 +90,36 @@ def is_challenge(signals: object) -> bool:
         + bool(markers)
     )
     return hits >= 2 and length < CHALLENGE_MAX_TEXT
+
+
+# Cookie banners (TZ_SELAIN 8.5): automatic, the necessary cookies preferred.
+CONSENT_NECESSARY = (
+    "vain välttämättömät", "välttämättömät", "only necessary", "necessary only",
+    "necessary cookies only", "accept necessary", "use necessary", "essential only",
+    "only essential", "nur notwendige", "nur erforderliche", "endast nödvändiga", "nödvändiga",
+    "kun nødvendige", "bare nødvendige",
+)
+CONSENT_REJECT = (
+    "hylkää", "kieltäydy", "reject", "decline", "deny", "refuse", "ablehnen", "avvisa", "neka",
+    "afvis", "avslå",
+)
+CONSENT_ACCEPT = (
+    "hyväksy kaikki", "hyväksy", "accept all", "allow all", "accept", "agree", "alle akzeptieren",
+    "akzeptieren", "godkänn alla", "acceptera", "godta", "ok",
+)
+CONSENT_ORDER = (("necessary", CONSENT_NECESSARY), ("reject", CONSENT_REJECT),
+                 ("accept", CONSENT_ACCEPT))
+
+
+def consent_choice(buttons: object) -> tuple[int, str, str] | None:
+    """(button index, kind necessary | reject | accept, its text) or None (no banner)."""
+    if not isinstance(buttons, list):
+        return None
+    labels = [(int(b.get("index", -1)), str(b.get("text", "")))
+              for b in buttons if isinstance(b, dict)]
+    for kind, words in CONSENT_ORDER:
+        for index, text in labels:
+            folded = text.casefold()
+            if folded and any(re.search(rf"(?<!\w){re.escape(w)}(?!\w)", folded) for w in words):
+                return index, kind, text
+    return None

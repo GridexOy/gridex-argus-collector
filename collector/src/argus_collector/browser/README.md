@@ -9,6 +9,7 @@ Playwright driver of the work browser. Entry point: `contract.py`.
 | `launcher_command(url, serve_test_site_port)` | argv for the detached launcher `python -m argus_collector.browser` ("Avaa tyoselain") |
 | `WalkBrowser(headless, profile_dir)` | context manager of a walk (`session.py`): one persistent-profile context, one tab; `goto(url)`, `click(candidate)`, `scroll()`, `back()`, `observe()` return `PageState(url, title, html, text, candidates)` |
 | `WalkBrowser.bindings(probes)` | 0.4.3.0 (`binding.py`): DOM binding of each verified person field: `card` / `table_row` (name and value meet in a small container with no other person) / `proximity_only` / `none` (TZ_SELAIN 8.11, 9.4); 0.4.4.0: plus the person's group (nearest heading before the card in its tab panel / section, else its tab label) |
+| `PageState.consent` | 0.4.6.0 (`page_tools.py`): a cookie banner is answered once per host before the page is read: necessary cookies, else reject, accept only when nothing else (TZ_SELAIN 8.5); the choice is journaled |
 | `WalkBrowser.select(candidate, option)`, `PageState.challenge` | 0.4.4.0 (`scripts.py`): tabs, accordion headers (`aria-expanded`, `summary`) and dropdowns are candidates; a bot check (two of: title, text, challenge element; short page) is waited out for up to 20 s, still there -> `challenge=True` |
 
 `PageState.candidates` are the visible, enabled links (`a[href]` with an

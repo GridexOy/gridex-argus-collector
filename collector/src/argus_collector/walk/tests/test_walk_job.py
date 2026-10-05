@@ -145,6 +145,7 @@ def test_company_without_office_reads_export_people_in_own_language(
             phone = next(f for f in ent.fields if f.field == "phone")
             assert phone.value == person["phone"], "national numbers read as German (lang de)"
     assert summary.checkpoint.native_language == "de"
+    assert summary.checkpoint.consents == {"vogel.localhost": "necessary: Nur notwendige"}
 
 
 def test_seed_redirect_off_the_approved_host_is_a_gap(

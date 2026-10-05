@@ -15,7 +15,14 @@ from argus_collector.scheduler.collector import Collector
 from argus_collector.scheduler.hooks import Settings
 from argus_collector.scheduler.leases import HeartbeatFields
 from argus_collector.scheduler.runner import WalkEnv
-from argus_collector.scheduler.views import AttentionItem, DeliveryView, QueueRow, QueueView
+from argus_collector.scheduler.views import (
+    AttentionItem,
+    DeliveryView,
+    JobFacts,
+    QueueRow,
+    QueueView,
+    job_facts,
+)
 
 __all__ = [
     "ACTIVE_STATES",
@@ -27,10 +34,12 @@ __all__ = [
     "Collector",
     "DeliveryView",
     "HeartbeatFields",
+    "JobFacts",
     "QueueRow",
     "QueueView",
     "Settings",
     "WalkEnv",
+    "job_facts",
 ]
 
 MAX_JOBS = service.MAX_JOBS

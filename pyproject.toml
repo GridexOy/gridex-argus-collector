@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "argus-collector"
-version = "0.4.5.0"
+version = "0.4.6.0"
 description = "ARGUS 2.0 local contact collector (Selain) for Windows"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -53,10 +53,10 @@ ignore_missing_imports = true
 root_package = "argus_collector"
 
 [[tool.importlinter.contracts]]
-name = "layers: ui > scheduler > walk > browser|extraction|diagnostics|delivery > discovery|models|evidence|api_client > normalization|storage|worker_auth > runtime"
+name = "layers: ui|pilot > scheduler > walk > browser|extraction|diagnostics|delivery > discovery|models|evidence|api_client > normalization|storage|worker_auth > runtime"
 type = "layers"
 layers = [
-  "argus_collector.ui",
+  "argus_collector.ui | argus_collector.pilot",
   "argus_collector.scheduler",
   "argus_collector.walk",
   "argus_collector.browser | argus_collector.extraction | argus_collector.diagnostics | argus_collector.delivery",
@@ -70,6 +70,7 @@ name = "modules talk to each other only through contract.py"
 type = "forbidden"
 source_modules = [
   "argus_collector.ui",
+  "argus_collector.pilot",
   "argus_collector.scheduler",
   "argus_collector.delivery",
   "argus_collector.walk",
@@ -94,9 +95,13 @@ forbidden_modules = [
   "argus_collector.browser.repository",
   "argus_collector.browser.session",
   "argus_collector.browser.binding",
+  "argus_collector.browser.scripts",
+  "argus_collector.browser.page_tools",
   "argus_collector.discovery.service",
   "argus_collector.discovery.repository",
   "argus_collector.discovery.focus",
+  "argus_collector.discovery.countries",
+  "argus_collector.discovery.country_names",
   "argus_collector.models.service",
   "argus_collector.models.repository",
   "argus_collector.evidence.service",
@@ -104,6 +109,7 @@ forbidden_modules = [
   "argus_collector.extraction.service",
   "argus_collector.extraction.repository",
   "argus_collector.extraction.roles",
+  "argus_collector.extraction.sections",
   "argus_collector.normalization.service",
   "argus_collector.normalization.repository",
   "argus_collector.storage.service",
@@ -117,6 +123,12 @@ forbidden_modules = [
   "argus_collector.walk.prompts",
   "argus_collector.walk.sink",
   "argus_collector.walk.state",
+  "argus_collector.walk.structure",
+  "argus_collector.walk.entities",
+  "argus_collector.walk.offices",
+  "argus_collector.walk.context",
+  "argus_collector.walk.coverage",
+  "argus_collector.walk.actions",
   "argus_collector.scheduler.collector",
   "argus_collector.scheduler.events",
   "argus_collector.scheduler.finish",
@@ -127,6 +139,11 @@ forbidden_modules = [
   "argus_collector.scheduler.service",
   "argus_collector.scheduler.sink",
   "argus_collector.scheduler.views",
+  "argus_collector.scheduler.history",
+  "argus_collector.scheduler.freshness",
+  "argus_collector.pilot.service",
+  "argus_collector.pilot.repository",
+  "argus_collector.pilot.render",
   "argus_collector.delivery.hooks",
   "argus_collector.delivery.loop",
   "argus_collector.delivery.repository",
@@ -173,4 +190,5 @@ ignore_imports = [
   "argus_collector.api_client.* -> argus_collector.api_client.*",
   "argus_collector.runtime.* -> argus_collector.runtime.*",
   "argus_collector.worker_auth.* -> argus_collector.worker_auth.*",
+  "argus_collector.pilot.* -> argus_collector.pilot.*",
 ]

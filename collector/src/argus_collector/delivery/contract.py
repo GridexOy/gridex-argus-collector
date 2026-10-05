@@ -24,6 +24,9 @@ from argus_collector.delivery.hooks import ApiTarget, DeliveryHooks
 from argus_collector.delivery.loop import Deliverer
 
 __all__ = [
+    "SentEvent",
+    "local_evidence_id",
+    "run_results",
     "ApiTarget",
     "Deliverer",
     "DeliveryHooks",
@@ -121,6 +124,30 @@ def run_events(conn: sqlite3.Connection, run_id: str, event_type: str) -> list[d
             payload = json.loads(row["event_json"]).get("payload", {})
             out.append(payload if isinstance(payload, dict) else {})
     return out
+
+
+@dataclass(frozen=True)
+class SentEvent:
+    """One outbox event of a run with what ARGUS answered (for reports)."""
+
+    type: str
+    payload: dict[str, object]
+    status: str  # pending | accepted | duplicate | rejected
+    channel_status: str | None  # the strongest K3 status ARGUS gave a contact event
+
+
+def run_results(conn: sqlite3.Connection, run_id: str) -> list[SentEvent]:
+    out = []
+    for row in repo.run_rows(conn, run_id):
+        payload = json.loads(row["event_json"]).get("payload", {})
+        out.append(SentEvent(str(row["type"]), payload if isinstance(payload, dict) else {},
+                             str(row["status"]), row["channel_status"]))
+    return out
+
+
+def local_evidence_id(conn: sqlite3.Connection, evidence_id: str) -> str | None:
+    """The local snapshot id behind an evidence id sent to ARGUS."""
+    return repo.local_evidence_id(conn, evidence_id)
 
 
 def run_ids(conn: sqlite3.Connection, job_id: str) -> list[str]:

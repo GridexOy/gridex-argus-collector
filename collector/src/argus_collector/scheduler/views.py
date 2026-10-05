@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 
 from argus_collector.delivery import contract as delivery
 from argus_collector.scheduler import repository as repo
-from argus_collector.scheduler import service
+from argus_collector.scheduler import runner, service
 
 RECENT_HOURS = 24
 
@@ -89,3 +89,37 @@ def attention_view(conn: sqlite3.Connection) -> list[AttentionItem]:
 def delivery_view(conn: sqlite3.Connection, transport_state: str) -> DeliveryView:
     stats = delivery.stats(conn)
     return DeliveryView(stats.pending, stats.errors, stats.p95_s, transport_state)
+
+
+@dataclass(frozen=True)
+class JobFacts:
+    """A job as a report sees it (pilot): identity, result, hosts, its runs."""
+
+    job_id: str
+    batch_id: str
+    company: str
+    state: str
+    completion_reason: str
+    persons: int
+    channels: int
+    approved_hosts: tuple[str, ...]
+    run_ids: tuple[str, ...]
+
+
+def job_facts(conn: sqlite3.Connection, batch_id: str | None) -> list[JobFacts]:
+    """Jobs of one batch (the latest claimed batch when None), in claim order."""
+    rows = repo.jobs(conn)
+    if batch_id is None and rows:
+        batch_id = max(rows, key=lambda r: str(r["claimed_at"]))["batch_id"]
+    out = []
+    for row in rows:
+        if row["batch_id"] != batch_id:
+            continue
+        claimed = runner.claimed_job(row)
+        hosts = tuple(runner.host_key(h.host) for h in claimed.job.scope.approved_hosts)
+        out.append(JobFacts(
+            row["job_id"], row["batch_id"], row["company_name"], row["state"],
+            row["completion_reason"], int(row["persons"]), int(row["channels"]), hosts,
+            tuple(delivery.run_ids(conn, row["job_id"])),
+        ))
+    return out

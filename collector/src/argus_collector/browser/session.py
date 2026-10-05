@@ -14,8 +14,8 @@ from pathlib import Path
 from types import TracebackType
 
 from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
-from playwright.sync_api import Error as PlaywrightError
 
+from argus_collector.browser import page_tools as tools
 from argus_collector.browser.binding import (
     BINDING_JS,
     PersonBinding,
@@ -23,13 +23,8 @@ from argus_collector.browser.binding import (
     parse_result,
     probe_payload,
 )
-from argus_collector.browser.scripts import (
-    CANDIDATES_JS,
-    CHALLENGE_JS,
-    HIDDEN_LINKS_JS,
-    IDX_ATTR,
-)
-from argus_collector.browser.service import is_challenge, launch_kwargs
+from argus_collector.browser.scripts import HIDDEN_LINKS_JS
+from argus_collector.browser.service import launch_kwargs
 from argus_collector.discovery.contract import Candidate
 from argus_collector.runtime import contract as runtime
 
@@ -50,6 +45,7 @@ class PageState:
     candidates: list[Candidate]
     challenge: bool = False  # a bot check that did not clear within 20 s
     hidden_hrefs: tuple[str, ...] = ()  # mailto:/tel: links not rendered now
+    consent: str = ""  # the cookie banner answered on this page (`necessary: <text>`)
 
 
 class WalkBrowser:
@@ -61,6 +57,7 @@ class WalkBrowser:
         self._pw: Playwright | None = None
         self._context: BrowserContext | None = None
         self._page: Page | None = None
+        self._consented: set[str] = set()
 
     def __enter__(self) -> WalkBrowser:
         from argus_collector.browser import contract  # noqa: PLC0415 - avoid import cycle
@@ -105,24 +102,29 @@ class WalkBrowser:
         self.page.wait_for_timeout(SETTLE_MS)
 
     def _challenged(self) -> bool:
-        try:
-            return is_challenge(self.page.evaluate(CHALLENGE_JS))
-        except PlaywrightError:  # the check reloads the page right now
+        found = tools.challenged(self.page)
+        if found is None:  # the check reloads the page right now
             self._settle()
             return True
+        return found
 
     def _ready(self) -> PageState:
-        """Observe; a bot check is waited out for up to 20 s (it clears by itself)."""
+        """Observe; a bot check is waited out for up to 20 s (it clears by itself),
+        a cookie banner is answered (necessary cookies preferred)."""
         deadline = time.monotonic() + CHALLENGE_WAIT_S
         challenged = self._challenged()
         while challenged and time.monotonic() < deadline:
             self.page.wait_for_timeout(CHALLENGE_POLL_MS)
             challenged = self._challenged()
+        consent = ""
         if not challenged:
             self._settle()
+            consent = tools.answer_consent(self.page, self._consented)
+            if consent:
+                self._settle()
         state = self.observe()
         return PageState(state.url, state.title, state.html, state.text, state.candidates,
-                         challenge=challenged, hidden_hrefs=state.hidden_hrefs)
+                         challenge=challenged, hidden_hrefs=state.hidden_hrefs, consent=consent)
 
     def goto(self, url: str) -> PageState:
         """Navigate, wait for DOM content + a short settle, observe."""
@@ -164,20 +166,7 @@ class WalkBrowser:
 
     def observe(self) -> PageState:
         """Current page without acting: html, visible text, candidates."""
-        raw = self.page.evaluate(CANDIDATES_JS)
-        candidates = [
-            Candidate(
-                index=int(item["index"]),
-                kind=str(item["kind"]),
-                text=str(item["text"]),
-                href=str(item["href"]),
-                selector=f'[{IDX_ATTR}="{int(item["index"])}"]',
-                role=str(item.get("role", "")),
-                state=str(item.get("state", "")),
-                options=tuple(str(o) for o in item.get("options", [])),
-            )
-            for item in raw
-        ]
+        candidates = tools.candidates(self.page)
         text = self.page.evaluate("() => document.body ? document.body.innerText : ''")
         hidden = self.page.evaluate(HIDDEN_LINKS_JS)
         return PageState(

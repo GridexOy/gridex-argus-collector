@@ -78,6 +78,9 @@ def _walk(state: WalkState) -> None:
                 _attention(state, page)
                 return
             state.clear_gap(page.url, CHALLENGE_GAP)
+            if page.consent:
+                state.cp.consents[discovery.host_of(page.url)] = page.consent
+                state.step(service.STEP_CONSENT, page.consent.split(": ", 1)[-1], page.url)
             state.check_stop()
             state.tick()
             if state.budget_spent() or not page_step.enter(state, page):

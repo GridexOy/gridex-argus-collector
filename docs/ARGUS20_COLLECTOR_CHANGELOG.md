@@ -1,5 +1,20 @@
 # ARGUS20_COLLECTOR_CHANGELOG
 
+## 0.4.6.0 — 2026-10-05
+
+**Шаг `stage-5/step-5-a5-pilot`: пара 5 TZ_TANDEM «Пилот» (A5) — подготовка сборщика.** Сам пилот (8 компаний Sähkö-Electricity 2027 против прода ARGUS на MAIN-PC, `owner_known_url` для Schneider / Prysmian / Phoenix Contact) — действие владельца и сессии ARGUS (B2–B4 на проде); в контейнере не проводился.
+
+**Что видно.**
+- Cookie-баннеры отвечаются автоматически (TZ_SELAIN §8.5): «только необходимые» (`Vain välttämättömät`, `Only necessary`, `Nur notwendige`, …), иначе «отклонить» (`Hylkää`, `Reject all`, …), «принять» — только если другого нет; ответ — один раз на хост, до чтения страницы (текст баннера в снимок не попадает). Строка состояния `Evästeilmoitus: valittiin «Nur notwendige»`, журнал `browser: cookie banner on <host>: necessary (…)`, в `coverage.scope_description` — `cookie banners answered (<host>: necessary)`.
+- Отчёт пилота со стороны сборщика: `scripts\pilot_report.ps1 [-Batch <id>]` (или `python -m argus_collector.pilot`) пишет `%LOCALAPPDATA%\Gridex\ArgusCollector\reports\pilot-*.md`: по компании — результат и причина, активное и полное время, страницы, действия, вызовы модели (число, токены, секунды), люди, каналы, `published_direct` среди событий, оценённых ARGUS; порог ≥ 50 % компаний с человеком, чей канал не `inferred`/`stale`; 10 случайных телефонов — хост снимка в `approved_hosts`, цитата на своём месте в снимке.
+
+**Модули.** Новый: `pilot` (README, contract, service, repository, render, `__main__`, tests). Изменены: `browser` (`page_tools.py` — кандидаты, проверка «не бот», ответ на cookie-баннер; `scripts.py` — `CONSENT_JS`; `service.consent_choice`), `walk` (`checkpoint.consents`, шаг `consent`), `scheduler` (`job_facts`, scope с cookie-ответами), `delivery` (`run_results`, `local_evidence_id`), `ui` (строка шага), `messages/fi.json`; `test_site/sites/vogel/index.html` — баннер в духе Cookiebot (`Alle akzeptieren` / `Nur notwendige` / `Einstellungen`); `pyproject.toml` — слой `ui | pilot`, новые внутренние файлы шагов 3–5 закрыты import-linter'ом.
+
+**Решения (поправь, если не так).**
+1. При баннере только с «принять» сборщик принимает (TZ: «автоматически, предпочтение необходимым») и фиксирует это в журнале и в scope; баннер без понятных кнопок не трогается (если перекрывает клик — gap как раньше).
+2. Метрики ARGUS (Gold P · R, Nimetty henkilö, Soitettavia, сравнение с серверной лестницей) отчёт сборщика не считает — это экран Soittolista и отчёт ARGUS; сборщик даёт свои таблицы для `ARGUS20_COLLECTOR_STAGE6_REPORT.md`.
+3. `ARGUS20_COLLECTOR_STAGE6_REPORT.md` пишется после пилота (сейчас данных нет, демо-цифры не ставлю); порядок пилота — в `ARGUS20_COLLECTOR_STAGE5_REPORT.md`, раздел пары 5.
+
 ## 0.4.5.0 — 2026-10-05
 
 **Шаг `stage-5/step-4-a4-history`: пара 4 TZ_TANDEM «История и полнота» (A4) и сокращение паузы по решению владельца 05.10.2026.**

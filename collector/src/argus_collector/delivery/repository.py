@@ -155,3 +155,10 @@ def job_run_ids(conn: sqlite3.Connection, job_id: str) -> list[str]:
         (job_id,),
     )
     return [str(r[0]) for r in rows]
+
+
+def local_evidence_id(conn: sqlite3.Connection, evidence_id: str) -> str | None:
+    row = conn.execute(
+        "SELECT local_evidence_id FROM evidence_uploads WHERE evidence_id = ?", (evidence_id,)
+    ).fetchone()
+    return str(row[0]) if row else None

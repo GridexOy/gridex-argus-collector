@@ -60,6 +60,9 @@ def _scope(facts: RunFacts) -> str:
         parts.append(f"{len(cp.acted)} tabs, sections or country choices opened")
     if cp.declared_total:
         parts.append(f"the directory states {cp.declared_total} records")
+    if cp.consents:
+        answered = ", ".join(f"{h}: {c.split(':', 1)[0]}" for h, c in sorted(cp.consents.items()))
+        parts.append(f"cookie banners answered ({answered})")
     parts.append(f"{len(cp.frontier)} links left unvisited, {len(cp.gaps)} gaps")
     return "; ".join(parts)
 

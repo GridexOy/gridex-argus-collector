@@ -39,6 +39,7 @@
   "collecting.step.click": "Napsautetaan: {text}",
   "collecting.step.scroll": "Vieritetään sivua",
   "collecting.step.attention": "Selaintarkistus ei päästänyt läpi: {url} — katso Huomio",
+  "collecting.step.consent": "Evästeilmoitus: valittiin «{text}»",
   "collecting.found": "Löydetty: {n} yhteystietoa",
   "collecting.openSource": "Kaksoisnapsautus avaa lähteen selaimessa",
   "collecting.col.name": "Nimi",

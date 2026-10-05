@@ -30,5 +30,24 @@
     <p>Zentrale <a href="tel:+497111234000">0711 123 4000</a> &middot;
        <a href="mailto:info@vogel.example">info@vogel.example</a></p>
   </footer>
+  <div id="cookie-banner" class="cookie-banner" role="dialog" aria-label="Cookie-Einstellungen"
+       style="position:fixed;bottom:0;left:0;right:0;padding:16px;background:#222;color:#fff">
+    <p>Wir verwenden Cookies, um unsere Website zu verbessern. Datenschutz</p>
+    <button type="button" data-choice="all">Alle akzeptieren</button>
+    <button type="button" data-choice="necessary">Nur notwendige</button>
+    <button type="button" data-choice="settings">Einstellungen</button>
+  </div>
+  <script>
+    (function () {
+      var banner = document.getElementById("cookie-banner");
+      if (document.cookie.indexOf("fixture_consent=") >= 0) { banner.remove(); return; }
+      banner.addEventListener("click", function (e) {
+        var choice = e.target.getAttribute("data-choice");
+        if (!choice || choice === "settings") { return; }
+        document.cookie = "fixture_consent=" + choice + "; path=/";
+        banner.remove();
+      });
+    })();
+  </script>
 </body>
 </html>

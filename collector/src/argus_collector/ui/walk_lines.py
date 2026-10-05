@@ -20,6 +20,7 @@ STEP_KEYS = {
     "click": "collecting.step.click",
     "scroll": "collecting.step.scroll",
     "attention": "collecting.step.attention",
+    "consent": "collecting.step.consent",
 }
 MODEL_DETAIL_KEYS = {
     "cards": "collecting.step.modelCards",
