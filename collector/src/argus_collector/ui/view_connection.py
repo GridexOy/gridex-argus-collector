@@ -1,4 +1,5 @@
-"""tkinter widgets of the Yhteys block: Paritusavain, Yhdistä, the state lines."""
+"""tkinter widgets of the Yhteys block: Paritusavain, Yhdistä, Yhdistä uudelleen, the state
+lines."""
 
 from __future__ import annotations
 
@@ -21,9 +22,10 @@ class ConnectionBlock:
     never pre-filled and emptied after Yhdistä."""
 
     def __init__(
-        self, parent: ttk.Frame, props: ConnectionProps, on_connect: Callable[[str], None]
+        self, parent: ttk.Frame, props: ConnectionProps, on_connect: Callable[[str], None],
+        on_reconnect: Callable[[], None],
     ) -> None:
-        self.on_connect = on_connect
+        self.on_connect, self.on_reconnect = on_connect, on_reconnect
         self.key_var = tk.StringVar(parent)
         self._build_field(parent, props)
         self.key_error_label = ttk.Label(parent, text="", foreground=COLOURS["error"])
@@ -46,12 +48,19 @@ class ConnectionBlock:
             row, text=props.connect_label, command=self._on_connect_clicked
         )
         self.connect_button.pack(side="left", padx=(8, 0))
+        self.reconnect_button = ttk.Button(row, text=props.reconnect_label,
+                                           command=self._on_reconnect_clicked)
+        self.reconnect_button.pack(side="left", padx=(8, 0))
 
     def _on_connect_clicked(self) -> None:
         if not self.connect_button.instate(["!disabled"]):
             return
         self.on_connect(self.key_var.get())
         self.key_var.set("")
+
+    def _on_reconnect_clicked(self) -> None:
+        if self.reconnect_button.instate(["!disabled"]):
+            self.on_reconnect()
 
     def render(self, props: ConnectionProps) -> None:
         level = props.state_level
@@ -64,3 +73,4 @@ class ConnectionBlock:
         else:
             self.key_error_label.pack_forget()
         self.connect_button.state(["!disabled"] if props.connect_enabled else ["disabled"])
+        self.reconnect_button.state(["!disabled"] if props.reconnect_enabled else ["disabled"])

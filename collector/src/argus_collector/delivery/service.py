@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import random
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -119,8 +120,11 @@ def p95_s(pairs: Sequence[tuple[str, str]]) -> float | None:
     return round(values[index], 1)
 
 
-def transport_state(error: str, pending: int, connected: bool) -> str:
-    if not connected or error == ERROR_OFFLINE:
+def transport_state(error: str, pending: int, connected: bool, silent: bool = False) -> str:
+    """`offline` only when not paired or when neither the heartbeat nor delivery got an
+    answer (`Transport.silent`, owner 05.10.2026); a delivery request without an answer
+    alone is a retry."""
+    if not connected or silent:
         return STATE_OFFLINE
     if error in (ERROR_AUTH, ERROR_PERMANENT, ERROR_CONFLICT):
         return STATE_ERROR
@@ -142,3 +146,8 @@ def reason(code: str) -> str:
     if code == ERROR_AUTH:
         return "the token was rejected"
     return REASONS.get(code, code)
+
+
+def elapsed_ms(started: float) -> int:
+    """Milliseconds since `started` (`time.monotonic`)."""
+    return int((time.monotonic() - started) * 1000)

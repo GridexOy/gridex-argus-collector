@@ -1,5 +1,30 @@
 # ARGUS20_COLLECTOR_CHANGELOG
 
+## 0.4.8.2 — 2026-10-05
+
+**Правка 2 шага 7 (`stage-5/step-7-heartbeat`), связь панели (владелец 05.10): после таймаута heartbeat цикл не возобновлялся, «Viimeksi» стоял 30 мин при открытом пути; в журнале несколько одинаковых переходов транспорта и heartbeat в одну секунду.** Контракт не менялся.
+
+**Что видно.**
+- Yhteys: heartbeat каждые 30 с всегда — после таймаута, 5xx, 401 (`Tunnus hylätty`) и ошибки внутри панели; отсчёт от начала прошлой попытки. Таймаут чтения heartbeat — 30 с (было 10 с).
+- Нет ответа за 30 с — `Hidas yhteys: 30 s` жёлтым (раньше `Ei verkkoa: HTTP 0: … timed out`), Lähetys при этом не переходит в `Ei verkkoa`: события идут своими запросами. `Ei verkkoa` — только когда ответа нет вовсе (отказ соединения, нет DNS). Ошибка внутри панели при отправке heartbeat — `Paneelin virhe: <тип>: <текст>` красным, следующий heartbeat через 30 с.
+- Кнопка «Yhdistä uudelleen» рядом с «Yhdistä»: heartbeat сразу по сохранённому ключу, ключ вставлять не нужно; неактивна, пока паринга нет или идёт проверка.
+- «Yhdistä» с пустым полем ничего не делает и не пишет `Paritusavain ei kelpaa`; сообщение — только для непустого поля.
+- Одна панель на машину: второй запуск показывает окно `ARGUS Selain on jo auki tällä koneella (prosessi N). Käytä avointa ikkunaa…` и закрывается; в журнале `http: panel started: pid N`, `panel closed: pid N`, `panel not started: pid N has the panel open`.
+- Lähetys (владелец 05.10, «Yhdistetty + Ei verkkoa»): одно состояние транспорта из одного источника (`delivery/transport.py`). `Ei verkkoa` — только когда heartbeat не получил никакого ответа (Yhteys тоже `Ei verkkoa`) и доставка тоже: последний её запрос без ответа или после падения heartbeat ни один не получил ответа (пустая очередь ничего не шлёт). Запрос доставки без ответа при проходящем heartbeat — `Lähetetään` и повтор (раньше — `Ei verkkoa` до первого полностью успешного прохода, отсюда «Yhdistetty» рядом с красным «Ei verkkoa» при убывающей очереди); ответ доставки при оборванном heartbeat — не `Ei verkkoa`; медленный heartbeat (`Hidas yhteys`) Lähetys в `Ei verkkoa` не переводит; любой HTTP-ответ, в том числе 5xx, — ответ.
+- Журнал: переход транспорта (`delivery: transport offline -> synced`) пишется один раз, кем бы из двух потоков (heartbeat или доставка) он ни был замечен; heartbeat — одна строка при смене ответа, в том числе `heartbeat: no answer in 30 s (slow, not offline)`; часы, остановленные чем угодно, панель запускает снова (`heartbeat: the clock had stopped, started again`).
+
+**Причина (по коду; лог MAIN-PC за тот час не приходил).** До 0.4.8.2 heartbeat слал поток цикла плюс отдельный поток на каждое «Yhdistä» и старт панели. Цикл ловил только ошибки HTTP: любое другое исключение внутри попытки (SQLite `database is locked` после 30 с ожидания при чтении полей или применении ответа, ошибка при применении аренд и команд) завершало поток навсегда — на экране оставалось состояние прошлой попытки (`Ei verkkoa` от таймаута) и «Viimeksi», и никто цикл не перезапускал. Ответ 401 останавливал цикл по замыслу 0.4.7.0. Теперь все heartbeat шлёт один поток часов (`ui/heartbeat_loop.py`), исключение любой попытки ловится и показывается, мёртвые часы перезапускает панель раз в секунду, зависшая попытка видна как `Hidas yhteys: N s`.
+
+**Параллельные циклы.** В одном процессе 0.4.8.1 могли одновременно идти поток цикла и потоки «Yhdistä»/старта — три heartbeat в одну секунду. Четыре одинаковых перехода транспорта в одну секунду — это несколько процессов панели (в одном процессе один поток доставки): все потоки панели фоновые, закрытое окно завершает процесс, значит панели были открыты одновременно — например, панель открыта ярлыком после `install.ps1`, пока старая ещё работала. Теперь: один процесс панели (блокировка `state/panel-lock`), один поток heartbeat, одна строка на переход транспорта.
+
+**Модули.** Новые файлы: `ui/heartbeat_loop.py`, `ui/heartbeat_call.py`, `runtime/instance.py`, `delivery/transport.py`. Изменены: `ui` (app_connection, connection_lines, view_connection, view, app, contract, README), `runtime` (contract, README), `delivery` (loop, hooks, service, README), `scheduler/collector.py` (docstring), `collector/messages/fi.json` (`connection.reconnect`, `connection.state.slow`, `connection.state.panel`, `panel.alreadyOpen`). Тесты: `ui/tests/test_heartbeat_loop.py`, `test_connection_clock.py` (+ стенд `slow_argus.py`), `test_ui_reconnect.py`, `runtime/tests/test_instance.py`, `delivery/tests/test_transport.py`, дополнение `delivery/tests/test_link.py`, `scheduler/tests/test_collector_recovery.py` (ARGUS выключен — heartbeat тоже без ответа); `ui/tests/conftest.py` останавливает часы heartbeat каждого теста (фоновые потоки не пишут в журнал следующего).
+
+**Решения (поправь, если не так).**
+1. Heartbeat продолжается и после `Tunnus hylätty` (401) — «независимо от прошлой ошибки»: если токен снова разрешат в ARGUS, панель подключится сама; раньше нужен был новый ключ.
+2. Таймаут 30 с — у heartbeat; события, снимки, claim и reconcile остаются с 10 с и повтором с backoff.
+3. «Hidas yhteys» (таймаут heartbeat) не переводит Lähetys в `Ei verkkoa` и не блокирует отправку событий: `Ei verkkoa` в Lähetys бывает только вместе с `Ei verkkoa` в Yhteys. Кнопка «Käynnistä» требует, как и раньше, состояния `Yhdistetty`.
+4. Вторая панель не запускается совсем (а не «подключается к первой»): окно с номером процесса открытой панели.
+
 ## 0.4.8.1 — 2026-10-05
 
 **Правка 1 шага 7 (`stage-5/step-7-delivery-reasons`), приоритет владельца 05.10: «Lähetysvirhe 2» без причины.** Контракт не менялся. Сервер ARGUS (`/api/health`, journal `argus20-api`, Caddy, `POST /api/collector/batches`, «Lähetä Selaimeen») — вне доступа сборщика (CLAUDE.md); со стороны сборщика каждый отказ теперь виден с id, кодом и словами, а `request_id` из ответа ARGUS связывает строку журнала сборщика с записью в журнале API.

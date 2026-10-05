@@ -4,10 +4,32 @@ from __future__ import annotations
 
 import time
 import tkinter as tk
+from collections.abc import Iterator
 from typing import Any
+
+import pytest
+
+from argus_collector.ui.heartbeat_loop import HeartbeatLoop
 
 TK_CREATE_RETRIES = 3
 TK_CREATE_RETRY_DELAY_S = 0.3
+
+
+@pytest.fixture(autouse=True)
+def stop_heartbeat_clocks(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Every heartbeat clock a test starts stops with the test: the clocks are daemon
+    threads and would otherwise write into the next test's journal."""
+    started: list[HeartbeatLoop] = []
+    original = HeartbeatLoop.ensure
+
+    def ensure(loop: HeartbeatLoop) -> None:
+        started.append(loop)
+        original(loop)
+
+    monkeypatch.setattr(HeartbeatLoop, "ensure", ensure)
+    yield
+    for loop in started:
+        loop.stop()
 
 
 def sample_document() -> dict[str, Any]:

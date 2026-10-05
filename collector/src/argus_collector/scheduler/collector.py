@@ -84,7 +84,8 @@ class Collector(CollectorHooks):
         self.on_change()
 
     def heartbeat_failed(self, status: int) -> None:
-        """A heartbeat failed; status 0 (no answer at all) shows Lahetys `offline`."""
+        """A heartbeat failed; status 0 (no answer) makes Lahetys `offline` only when
+        delivery got no answer either (`delivery.Transport`)."""
         self.deliverer.link(status != 0)
 
     def _stopped(self) -> bool:

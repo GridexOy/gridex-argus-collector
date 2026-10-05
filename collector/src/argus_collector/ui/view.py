@@ -47,6 +47,7 @@ class Callbacks:
     connect: Callable[[str], None]  # Yhteys: Yhdista with the pasted pairing key
     open_attention: Callable[[], None]  # Huomio: work browser on the blocked page
     attention_done: Callable[[], None]  # Huomio: Jatka kasin tehdyn toimen jalkeen
+    reconnect: Callable[[], None]  # Yhteys: Yhdista uudelleen with the saved key
 
 
 def _style(root: tk.Tk) -> None:
@@ -81,7 +82,7 @@ class PanelView:
         root.minsize(MIN_WIDTH, min(MIN_HEIGHT, root.winfo_screenheight() - 80))
         self.scroll = ScrollBody(root, BG)
         self.body = self.scroll.inner
-        self._build_connection(props, on.connect)
+        self._build_connection(props, on.connect, on.reconnect)
         self._heading(props.collecting_title)
         self.collect = CollectBlock(self.body, props.collect, on)
         queue, delivery = _blocks(props)
@@ -105,9 +106,10 @@ class PanelView:
             anchor="w", padx=12, pady=(12, 2)
         )
 
-    def _build_connection(self, props: PanelProps, on_connect: Callable[[str], None]) -> None:
+    def _build_connection(self, props: PanelProps, on_connect: Callable[[str], None],
+                          on_reconnect: Callable[[], None]) -> None:
         self._heading(props.connection.title)
-        self.connection = ConnectionBlock(self.body, props.connection, on_connect)
+        self.connection = ConnectionBlock(self.body, props.connection, on_connect, on_reconnect)
 
     def _build_resources(self, props: PanelProps, on_open_browser: Callable[[], None]) -> None:
         self._heading(props.resources_title)
