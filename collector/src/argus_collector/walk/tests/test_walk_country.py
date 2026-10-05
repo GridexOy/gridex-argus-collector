@@ -1,7 +1,7 @@
 """Owner decisions 05.10.2026 on real fixture sites (job mode, fake model).
 
 Ledvance: on the international contact page only Finland is opened; its
-office (name, address, switchboard, email, country; no fax) is one entity,
+office (name, address, switchboard, email, country, fax) is one entity,
 the local version /fi-fi/ is followed through a bot check that clears by
 itself, and its people are taken; no other country is walked.
 Malux: the seed is the Finnish version, every department tab is opened
@@ -61,8 +61,10 @@ def test_ledvance_finland_office_and_local_people(site: ThreadingHTTPServer,  # 
     assert finland[0]["email"] == "asiakaspalvelu@ledvance.com"
     assert finland[0]["office_name"] == "LEDVANCE Oy"
     assert "00100 Helsinki" in finland[0]["address"]
+    assert finland[0]["fax"] == "+358974223301", "the fax goes as extra `fax` (ANSWERS_S5 3)"
+    phones = {f.value for e in sink.entities().values() for f in e.fields if f.field == "phone"}
+    assert "+358974223301" not in phones, "a fax is never a phone"
     values = {f.value for e in sink.entities().values() for f in e.fields}
-    assert "+358974223301" not in values, "the fax is not taken"
     others = gold("ledvance")["excluded"][1]["offices"]
     leaked = {v for o in others for v in (o["email"], o["phone"])} & values
     assert not leaked, "closed country sections are not read"

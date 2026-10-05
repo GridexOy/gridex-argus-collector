@@ -9,7 +9,9 @@ Usage: python -m contract_server.server [--host H] [--port P]
        [--token TOKEN:WORKER_ID]... [--system-token T]... [--state PATH]
        [--lease-seconds N]
 Importable: `start(host, port, tokens=..., system_tokens=..., state_path=...,
-now=..., lease_seconds=...)` returns a running ContractServer.
+now=..., lease_seconds=...)` returns a running ContractServer. At start the
+stand prints one pairing key per worker token (`argus://pair?url=&worker=&token=`),
+the string the owner pastes into the panel's Yhteys block, as ARGUS does.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ import argparse
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import quote
 
 from contract_server.context import DEFAULT_LEASE_SECONDS, Clock, Stand
 from contract_server.httpio import make_handler
@@ -87,6 +90,12 @@ def base_url(server: ThreadingHTTPServer) -> str:
     return f"http://{host!s}:{port}"
 
 
+def pairing_key(address: str, worker_id: str, token: str) -> str:
+    """The one-string pairing key of a worker (values percent-encoded)."""
+    values = (("url", address), ("worker", worker_id), ("token", token))
+    return "argus://pair?" + "&".join(f"{k}={quote(v, safe='')}" for k, v in values)
+
+
 def _parse_token_arg(item: str) -> tuple[str, str]:
     token, _, worker_id = item.partition(":")
     return token, worker_id or token
@@ -139,6 +148,9 @@ def main(argv: list[str] | None = None) -> int:
         f"{sorted(set(tokens.values()))}, state: {args.state or 'memory'})",
         flush=True,
     )
+    for token, worker_id in sorted(tokens.items(), key=lambda item: item[1]):
+        print(f"pairing key {worker_id}: {pairing_key(base_url(server), worker_id, token)}",
+              flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -15,7 +15,13 @@ from argus_collector.extraction import contract as extraction
 from argus_collector.walk import context as ctx
 from argus_collector.walk.entities import BINDING_CAPTION, CONFIRMED, PageBuilder, status_of
 from argus_collector.walk.offices import add_offices
-from argus_collector.walk.sink import AuditEntry, FieldFinding, PageFindings, PageSource
+from argus_collector.walk.sink import (
+    AuditEntry,
+    FieldFinding,
+    PageFindings,
+    PageSource,
+    extra_label_of,
+)
 from argus_collector.walk.state import WalkState
 
 PERSON = "person"
@@ -91,8 +97,8 @@ def _add_person(
             new.append(found)
         if name in ("phone", "email"):
             page.claim(name, vf.value, obs_id)
-        if name != "country":
-            page.audit.append(AuditEntry(f"person[{index}].{name}", (obs_id,), vf.quote))
+        page.audit.append(AuditEntry(f"person[{index}].{name}", (obs_id,), vf.quote,
+                                     extra_label_of(name)))
     page.add_entity(key, PERSON, new)
     return key
 
@@ -102,8 +108,10 @@ def _add_channel(
 ) -> None:
     claim = f"{channel.kind}|{channel.value}"
     source_field = f"channel:{channel.kind}:{channel.locator}"
+    audited = extra_label_of(channel.kind)
     if claim in page.state.cp.claimed:
-        page.audit.append(AuditEntry(source_field, (page.state.cp.claimed[claim],), channel.raw))
+        claimed = (page.state.cp.claimed[claim],)
+        page.audit.append(AuditEntry(source_field, claimed, channel.raw, audited))
         return
     role = extraction.classify_unattached(channel, page.source.text)
     key = f"{role.entity_type}:{claim}"
@@ -119,10 +127,12 @@ def _add_channel(
     new = [found] if found else []
     country = ctx.country_field(context, span.start if span else -1)
     if country is not None:  # the company header in ARGUS keeps other countries apart
-        other, _ = page.finding(key, "country", country, BINDING_CAPTION, CONFIRMED)
+        other, other_id = page.finding(key, "country", country, BINDING_CAPTION, CONFIRMED)
         new += [other] if other else []
+        page.audit.append(AuditEntry(f"{source_field}.country", (other_id,), country.quote,
+                                     extra_label_of("country")))
     page.add_entity(key, role.entity_type, new)
-    page.audit.append(AuditEntry(source_field, (obs_id,), channel.raw))
+    page.audit.append(AuditEntry(source_field, (obs_id,), channel.raw, audited))
 
 
 def build_findings(

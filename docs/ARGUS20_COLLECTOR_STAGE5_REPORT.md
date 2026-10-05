@@ -137,3 +137,136 @@ Claude Code (Исполнитель-2): основная сессия с «ок 
 1. Формат `KnownContact.fields` (B4) в контракте открыт: сборщик читает строку, список, объект `{value, observation_id}` и список объектов. Какой отдаёт ARGUS?
 2. Новые поля наблюдений: `country` (ISO, цитата — заголовок раздела или значение `<html lang>`, locator `dom html[lang]`), `department`, `office_name`, `address`. Так ли их ждёт ARGUS для шапки, «Muut maat» и чипа страны?
 3. Факс по решению 05.10 не отправляется вовсе, а FieldAudit требует учесть каждое контактное поле. Оставить так или отправлять как `extra` (`extra_label=Fax`)?
+
+**Ответы на T2.9** — `docs/ANSWERS_S5.md` (ARGUS, 05.10.2026), исполнены в 0.4.7.0 (раздел T3).
+
+# Шаг 6: паринг в один клик и поля `extra` — версия 0.4.7.0
+
+**Дата:** 05.10.2026 · **Основание:** решение владельца 05.10.2026 («Шаг паринга в один клик…», «Возьми файл docs/collector_contract/ANSWERS_S5.md… Это входит в шаг паринга») · **Ветка:** `stage-5/step-6-pairing`, ff в `main` · **Контракт:** не менялся.
+
+## T3.1. Сделано
+
+1. **Yhteys — одно поле.** «Paritusavain» + «Yhdistä» (или Enter) вместо адреса, worker_id, токена и «Testaa yhteys». Строка `argus://pair?url=…&worker=…&token=…` разбирается, сохраняется (адрес и worker_id — открыто, токен — DPAPI), сразу heartbeat. Строка `Paritettu: <адрес> · <worker_id> · tunnus ****abcd`. Поле замаскировано и очищается сразу после нажатия.
+2. **Сам при каждом запуске.** Сохранённый паринг подключается при старте панели; пока ARGUS недоступен — `Ei verkkoa`, повтор каждые 30 с; `Tunnus hylätty` — повторы стоп до нового ключа.
+3. **Неверный ключ** — красная строка с причиной, ничего не сохраняется и не отправляется.
+4. **Пустые значения по умолчанию.** Адреса ARGUS нет ни в `config.example.yaml`, ни в `runtime.Config`; адрес стенда в коде сборщика не зашит. Контракт-сервер печатает ключ паринга на каждый токен при старте.
+5. **`extra` по ANSWERS_S5.** `country`, `department`, `office_name`, `address`, `fax` — только `field="extra"` + `extra_label`, с цитатой; строка field audit — `extra`, `reason` = ключ. Факс — `extra` `fax` (не телефон). `KnownContact.fields` читается в форме ответа §1 (ключ = имя поля, значение — строка или список строк); контракт-сервер отдаёт эту форму и отклоняет прямые `country`/…/`fax` и `extra` без метки.
+
+## T3.2. Принятые решения (поправь, если не так)
+
+CHANGELOG 0.4.7.0 пп. 1–6. Главное: «разобрал → сохранил → подключился» (ключ сохраняется до ответа ARGUS); http — только для этой машины; `url` с `/api/collector` и без принимается; `+` в значениях — не пробел; факс вне раздела страны — общий канал компании.
+
+## T3.3. Отклонения
+
+1. Живая проверка — в контейнере (Xvfb, Chromium, контракт-сервер, тестовый сайт, подмена модели), не на MAIN-PC; дата сборки в панели появится после `install.ps1`.
+2. Коммита `04022ca` в `GridexOy/gridex-argus20` нет; `ANSWERS_S5.md` взят из `main` на `8c0279c` (blob `d8b6c3d`), положен как есть. Прочитан только этот файл (частичный клон, один blob) и сообщение коммита `8c0279c` (ARGUS 0.4.22.0 выдаёт ключ `argus://pair?…` в Asetukset → Selain) — кода ARGUS не открывал. Точную кодировку ключа ARGUS я не видел: парсер принимает и закодированные (`%3A%2F%2F`), и сырые значения.
+3. Форма known_contacts на контракт-сервере сменилась на форму ANSWERS_S5 §1 (было — список объектов с `observation_id`). Без `observation_id` от ARGUS `changed` уходит без `supersedes_observation_id` (контракт допускает null).
+4. Теги: git-прокси сессии не пропускает отправку тегов — теги созданы локально, команда для владельца в сдаче.
+
+## T3.4. Самопроверка
+
+`pytest`: **531 passed**, 0 failed (было 500 в T2). Гейты `scripts/run_gates.py`: **11 ok**, 0 failed. Новые тесты: `worker_auth/tests/test_pairing_key.py` (17), `ui/tests/test_ui_connection.py` (5, под Xvfb: вставка ключа, автоподключение, неверный ключ, отклонённый токен, ARGUS недоступен), `scheduler/tests/test_extra_fields.py` (5), `contract_server/tests/test_extra_rule.py` (7).
+
+## T3.5. Версии и теги
+
+| Версия | Шаг | Коммит в `main` | Тег |
+|---|---|---|---|
+| 0.4.4.0 | `stage-5/step-3-a2-country` | `eeaf4c9`, `a916967` (05.10 04:27, 04:50 UTC) | `cv0.4.4` → `a916967` |
+| 0.4.5.0 | `stage-5/step-4-a4-history` | `cc67a39` (05.10 05:12 UTC) | `cv0.4.5` → `cc67a39` |
+| 0.4.6.0 | `stage-5/step-5-a5-pilot` | `48c9e35`, `446e308` (05.10 05:36, 05:40 UTC) | `cv0.4.6` → `446e308` |
+| 0.4.7.0 | `stage-5/step-6-pairing` | коммит шага (в сдаче) | `cv0.4.7` → коммит шага |
+
+`v0.4.3` (на `b700d40`, по «ок S5») — как раньше.
+
+## T3.6. Живая проверка (контейнер, 05.10.2026, время UTC)
+
+| # | Строка | Что сделал | Что увидел | Время |
+|---|---|---|---|---|
+| 1 | Версия | Открыл панель | `cv0.4.7.0 (ei asennustietoa)`; Yhteys — одно поле «Paritusavain» и «Yhdistä», `Ei paritettu: liitä ARGUSista saatu paritusavain…`, `Ei yhteyttä` | 07:08:18 |
+| 2 | Ключ стенда | Запустил контракт-сервер | В выводе: `pairing key worker-main-pc: argus://pair?url=http%3A%2F%2F127.0.0.1%3A8900&worker=worker-main-pc&token=test-token-abc` | 07:08 |
+| 3 | Неверный ключ | Вставил `http://127.0.0.1:8900 worker-main-pc test-token-abc`, Enter | Красным `Paritusavain ei kelpaa: muoto on argus://pair?url=…&worker=…&token=…`, поле пустое; на стенде worker не появлялся, в каталоге панели ничего не сохранено | 07:09:12 |
+| 4 | http на другую машину | Ключ с `url=http://argus.example.fi`, «Yhdistä» | `Paritusavain ei kelpaa: osoitteen pitää alkaa https:// (http vain tällä koneella)` | 07:09:25 |
+| 5 | Неверный токен | Ключ стенда с `token=wrong-token-0000` | `Paritettu: http://127.0.0.1:8900 · worker-main-pc · tunnus ************0000`, красным `Tunnus hylätty` | 07:09:59 |
+| 6 | Паринг | Вставил ключ из п. 2, «Yhdistä» | `Yhdistetty`, `Viimeksi: 07:10:09`, `tunnus **********-abc`; стенд: worker `connected`, `last_seen_at 07:10:09`; `worker_connection.json` — адрес и worker_id, токена в открытом виде на диске нет | 07:10:12 |
+| 7 | Сам при запуске | Закрыл и открыл панель, ничего не вводил | `Yhdistetty`, `Viimeksi: 07:10:25` (панель запущена в 07:10:24) | 07:10:30 |
+| 8 | ARGUS выключен | Остановил стенд, открыл панель | `Ei verkkoa: HTTP 0: …/workers/heartbeat: <urlopen error [Errno 111] Connection refused>` | 07:10:49 |
+| 9 | ARGUS вернулся | Запустил стенд в 07:10:50 | Панель сама: `Yhdistetty`, `Viimeksi: 07:11:13` | 07:11:15 |
+| 10 | Сбор и `extra` | Пакет Ledvance + Malux, «Käynnistä» | Jono: LEDVANCE Oy 6 · Malux Finland Oy 25, оба `Valmis`, `Lähetetty`; 36 событий контактов приняты, 0 отклонений. Ledvance: офис — `phone +358974223300`, `email asiakaspalvelu@ledvance.com`, `extra:country FI` (цитата `Finland`), `extra:office_name`, `extra:address`, `extra:fax +358974223301` (цитата `09-7422 3301`); люди — `extra:country FI` (цитата `fi-FI`). Malux: Joakim Flakholm `extra:department Johto`, шведы `extra:country SE`. Прямых `country`/…/`fax` — 0. Field audit: `extra`/country 240, department 145, office_name 1, address 1, fax 2; `mapped` 1160 | 07:11:31 → 07:12:04 |
+
+Найдено живой проверкой и исправлено до сдачи: в смотровом виде стенда (`/_stand/.../contacts`) не было `extra_label` — добавлен.
+
+## T3.7. Совпадения legacy (гейт `check_legacy`, 57 предупреждений)
+
+Гейт хэширует каждую строку кода длиной ≥ 40 символов без пробелов и ищет хэш в `docs/legacy_line_hashes.txt`; одна строка — предупреждение, три подряд — красный гейт. На коммите шага: **57 совпадений, самая длинная серия — 2 строки подряд** (гейт зелёный). Все 57 — общие строки стандартной библиотеки, идиомы Python, сгенерированное из OpenAPI поле и HTML-шаблон тестового сайта; логики старой системы среди них нет. По типам: meta viewport тестового сайта — 22, импорт stdlib — 8, `mkdir(parents=True, exist_ok=True)` — 7, чтение JSON-файла — 3, сигнатура `HTMLParser.handle_starttag` — 3, перехват ошибок `subprocess` — 3, строковая идиома — 2, `sys.path.insert` скрипта — 2, проверка `isinstance(..., dict)` — 2, замер мс через `time.monotonic` — 2, `ast.parse` — 1, поле из OpenAPI — 1, `unicodedata.normalize` — 1.
+
+| # | Файл:строка | Тип строки | Строка |
+|---|---|---|---|
+| 1 | `collector/src/argus_collector/api_client/types_2.py:26` | поле типа, сгенерированное из OpenAPI | `participation_status: ParticipationStatus` |
+| 2 | `collector/src/argus_collector/delivery/contract.py:18` | импорт стандартной библиотеки | `from datetime import UTC, datetime, timedelta` |
+| 3 | `collector/src/argus_collector/diagnostics/repository.py:51` | перехват ошибок subprocess (stdlib) | `except (OSError, subprocess.TimeoutExpired) as exc:` |
+| 4 | `collector/src/argus_collector/discovery/service.py:7` | импорт стандартной библиотеки | `from urllib.parse import urlsplit, urlunsplit` |
+| 5 | `collector/src/argus_collector/discovery/service.py:50` | строковая идиома (срез / поиск) | `return host[4:] if host.startswith("www.") else host` |
+| 6 | `collector/src/argus_collector/evidence/repository.py:15` | создание каталога (pathlib, stdlib) | `path.parent.mkdir(parents=True, exist_ok=True)` |
+| 7 | `collector/src/argus_collector/extraction/repository.py:33` | сигнатура метода HTMLParser (stdlib) | `def handle_starttag(self, tag: str, attrs: list[tuple[str, str \| None]]) -> None:` |
+| 8 | `collector/src/argus_collector/models/contract.py:96` | замер длительности в мс (stdlib time) | `elapsed = int((time.monotonic() - started) * 1000)` |
+| 9 | `collector/src/argus_collector/models/repository.py:57` | замер длительности в мс (stdlib time) | `elapsed_ms = int((time.monotonic() - started) * 1000)` |
+| 10 | `collector/src/argus_collector/models/service.py:117` | строковая идиома (срез / поиск) | `start, end = text.find("{"), text.rfind("}")` |
+| 11 | `collector/src/argus_collector/models/service.py:124` | проверка типа значения (идиома Python) | `return parsed if isinstance(parsed, dict) else None` |
+| 12 | `collector/src/argus_collector/pilot/service.py:82` | проверка типа значения (идиома Python) | `usage = payload.get("usage") if isinstance(payload.get("usage"), dict) else {}` |
+| 13 | `collector/src/argus_collector/runtime/journal.py:13` | импорт стандартной библиотеки | `from datetime import UTC, datetime, timedelta` |
+| 14 | `collector/src/argus_collector/runtime/journal.py:15` | импорт стандартной библиотеки | `from urllib.parse import urlsplit, urlunsplit` |
+| 15 | `collector/src/argus_collector/runtime/journal.py:45` | создание каталога (pathlib, stdlib) | `path.parent.mkdir(parents=True, exist_ok=True)` |
+| 16 | `collector/src/argus_collector/scheduler/tests/test_collector_recovery.py:5` | импорт стандартной библиотеки | `from datetime import UTC, datetime, timedelta` |
+| 17 | `collector/src/argus_collector/scheduler/views.py:7` | импорт стандартной библиотеки | `from datetime import UTC, datetime, timedelta` |
+| 18 | `collector/src/argus_collector/walk/context.py:57` | Unicode-нормализация (stdlib) | `decomposed = unicodedata.normalize("NFKD", text.casefold())` |
+| 19 | `collector/src/argus_collector/walk/sink.py:14` | импорт стандартной библиотеки | `from dataclasses import asdict, dataclass, field` |
+| 20 | `collector/src/argus_collector/worker_auth/repository.py:84` | создание каталога (pathlib, stdlib) | `path.parent.mkdir(parents=True, exist_ok=True)` |
+| 21 | `collector/src/argus_collector/worker_auth/repository.py:107` | создание каталога (pathlib, stdlib) | `path.parent.mkdir(parents=True, exist_ok=True)` |
+| 22 | `collector/src/argus_collector/worker_auth/repository.py:116` | чтение JSON-файла (stdlib) | `data = json.loads(path.read_text(encoding="utf-8"))` |
+| 23 | `collector/tests/unit/test_gates.py:25` | создание каталога (pathlib, stdlib) | `path.parent.mkdir(parents=True, exist_ok=True)` |
+| 24 | `contract_server/htmltext.py:21` | сигнатура метода HTMLParser (stdlib) | `def handle_starttag(self, tag: str, attrs: list[tuple[str, str \| None]]) -> None:` |
+| 25 | `contract_server/persistence.py:49` | создание каталога (pathlib, stdlib) | `directory.mkdir(parents=True, exist_ok=True)` |
+| 26 | `contract_server/tests/conftest.py:6` | импорт стандартной библиотеки | `from datetime import UTC, datetime, timedelta` |
+| 27 | `test_site/site/contact.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 28 | `test_site/site/index.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 29 | `test_site/site/team-2.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 30 | `test_site/site/team.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 31 | `test_site/sites/ledvance/en-int/company/contact/index.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 32 | `test_site/sites/ledvance/en-int/company/contact-select/index.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 33 | `test_site/sites/ledvance/en-int/company/index.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 34 | `test_site/sites/ledvance/en-int/products/index.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 35 | `test_site/sites/ledvance/fi-fi/index.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 36 | `test_site/sites/ledvance/fi-fi/tuotteet/index.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 37 | `test_site/sites/ledvance/fi-fi/yhteystiedot/index.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 38 | `test_site/sites/ledvance/fi-fi/yritys/index.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 39 | `test_site/sites/ledvance/index.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 40 | `test_site/sites/malux/fi/index.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 41 | `test_site/sites/malux/fi/tuotteet/index.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 42 | `test_site/sites/malux/fi/yhteystiedot/index.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 43 | `test_site/sites/malux/index.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 44 | `test_site/sites/malux-se/index.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 45 | `test_site/sites/malux-se/sv/index.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 46 | `test_site/sites/malux-se/sv/kontakt/index.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 47 | `test_site/templates/challenge.html:7` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 48 | `test_site/tests/blocks.py:54` | сигнатура метода HTMLParser (stdlib) | `def handle_starttag(self, tag: str, attrs: list[tuple[str, str \| None]]) -> None:` |
+| 49 | `test_site/variants/departed/site/team.html:5` | HTML-шаблон: meta viewport (тестовый сайт) | `<meta name="viewport" content="width=device-width, initial-scale=1">` |
+| 50 | `scripts/codegen/spec.py:26` | чтение JSON-файла (stdlib) | `data = json.loads(path.read_text(encoding="utf-8"))` |
+| 51 | `scripts/gates/check_codegen.py:64` | перехват ошибок subprocess (stdlib) | `except (OSError, subprocess.TimeoutExpired) as exc:` |
+| 52 | `scripts/gates/check_i18n.py:29` | чтение JSON-файла (stdlib) | `data = json.loads(path.read_text(encoding="utf-8"))` |
+| 53 | `scripts/gates/check_i18n.py:36` | разбор Python-файла (ast, stdlib) | `tree = ast.parse(path.read_text(encoding="utf-8"))` |
+| 54 | `scripts/gates/check_tools.py:37` | перехват ошибок subprocess (stdlib) | `except (OSError, subprocess.TimeoutExpired) as exc:` |
+| 55 | `scripts/gen_api_client.py:18` | путь импорта скрипта (stdlib sys) | `sys.path.insert(0, str(Path(__file__).resolve().parent))` |
+| 56 | `scripts/gen_api_client.py:36` | создание каталога (pathlib, stdlib) | `path.parent.mkdir(parents=True, exist_ok=True)` |
+| 57 | `scripts/run_gates.py:13` | путь импорта скрипта (stdlib sys) | `sys.path.insert(0, str(Path(__file__).resolve().parent))` |
+
+## T3.8. Сдачи шагов 0.4.4–0.4.6 (по шаблону; подробно — T2.1–T2.6)
+
+**cv0.4.4.0** — шаг `stage-5/step-3-a2-country`, коммиты `eeaf4c9` + `a916967` (05.10 04:27 / 04:50 UTC), тег `cv0.4.4` → `a916967`. Что изменилось: в списке стран открывается только Finland и её офис (адрес, vaihde, общий email), по ссылке /fi-fi — за людьми; проверка «не бот» ждётся 20 с, иначе Huomio (`Tarvitsee huomiota`); все вкладки отделов, продажи первыми; при seed `.fi` / `/fi/` — сначала финская версия, потом шведская с SE; закрытые вкладки читаются после открытия; панель прокручивается. Модули: discovery, browser, extraction, walk, scheduler, ui. Живая проверка: T2.6 строки 1–5 (04:28–04:41).
+
+**cv0.4.5.0** — шаг `stage-5/step-4-a4-history`, коммит `cc67a39` (05.10 05:12 UTC), тег `cv0.4.5` → `cc67a39`. Что изменилось: повторный пакет подтверждает известные контакты (`reconfirmed`, строк не прибавляется), ушедший — `not_seen_in_checked_scope`, изменённое поле — `changed`; gap на каждую непройденную ветвь; `coverage.basis` / `expected_count`; «Pysäytä» из ARGUS — после текущей страницы (3.9 с). Модули: scheduler (history, freshness), walk (coverage, actions). Живая проверка: T2.6 строки 6–9 (05:13–05:16).
+
+**cv0.4.6.0** — шаг `stage-5/step-5-a5-pilot`, коммиты `48c9e35` + `446e308` (05.10 05:36 / 05:40 UTC), тег `cv0.4.6` → `446e308`. Что изменилось: cookie-баннер — «только необходимые» первыми; модуль `pilot` и `scripts\pilot_report.ps1` — таблицы сборщика для отчёта пилота. Модули: browser, pilot (новый), scheduler, delivery. Живая проверка: T2.6 строки 10–11 (05:36–05:38).
+
+## T3.9. Расход
+
+Claude Code (Исполнитель-2), основная сессия, шаг 6 — в сдаче (токены сессии; € — в биллинге владельца). Субагентов в шаге 6 не было. Рантайм-модель — подмена, платных вызовов нет.

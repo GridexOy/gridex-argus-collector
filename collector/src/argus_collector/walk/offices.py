@@ -1,10 +1,11 @@
 """Office entities of the country sections of a page (owner decision 05.10.2026).
 
 Under an opened country heading the office is one entity: its country (the
-heading), company name, address, switchboard and general email; the fax is
-not a channel (extraction leaves it out). Channels a person card already
-took stay with the person. Channels outside every section are handled as
-before (organization / office / unassigned channel by their line).
+heading), company name, address, switchboard, general email and fax; country,
+name, address and fax go to ARGUS as `extra` (walk.sink.EXTRA_FIELDS).
+Channels a person card already took stay with the person. Channels outside
+every section are handled as before (organization / office / unassigned
+channel by their line).
 """
 
 from __future__ import annotations
@@ -13,10 +14,11 @@ from argus_collector.extraction import contract as extraction
 from argus_collector.normalization import contract as norm
 from argus_collector.walk.context import PageContext
 from argus_collector.walk.entities import BINDING_CAPTION, CONFIRMED, PageBuilder
-from argus_collector.walk.sink import AuditEntry, FieldFinding
+from argus_collector.walk.sink import AuditEntry, FieldFinding, extra_label_of
 
 OFFICE = "office"
 BINDING_CARD = "card"
+CLAIMED_KINDS = ("phone", "email", "fax")
 
 
 def _text_field(value: str, quote: str, start: int, end: int) -> extraction.VerifiedField:
@@ -50,7 +52,7 @@ def _office(page: PageBuilder, index: int, section: extraction.Section,
     head = section.heading
     parts: list[tuple[str, extraction.VerifiedField, str, str]] = [
         ("country", _text_field(section.country, head.quote, head.start, head.end),
-         BINDING_CAPTION, ""),
+         BINDING_CAPTION, "country"),
     ]
     if lines.name is not None:
         named = lines.name
@@ -69,8 +71,9 @@ def _office(page: PageBuilder, index: int, section: extraction.Section,
         if found is not None:
             new.append(found)
         if audited:
-            page.audit.append(AuditEntry(f"office[{index}].{audited}", (obs_id,), vf.quote))
-        if name in ("phone", "email"):
+            page.audit.append(AuditEntry(f"office[{index}].{audited}", (obs_id,), vf.quote,
+                                         extra_label_of(name)))
+        if name in CLAIMED_KINDS:
             page.claim(name, vf.value, obs_id)
     page.add_entity(key, OFFICE, new)
 

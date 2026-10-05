@@ -16,6 +16,7 @@ from contract_server.util import Json
 OBSERVATION_VIEW = (
     "observation_id",
     "field",
+    "extra_label",
     "raw_value",
     "normalized_value",
     "extraction_status",

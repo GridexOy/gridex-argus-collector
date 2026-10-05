@@ -71,12 +71,15 @@ def raw_finds(html: str) -> RawFinds:
     return parser.finds
 
 
+JSONLD_KINDS = {"telephone": "phone", "email": "email", "faxNumber": "fax"}
+
+
 def _walk_jsonld(node: Any, pointer: str, out: list[tuple[str, str, str]]) -> None:
     if isinstance(node, dict):
         for key, value in node.items():
             child = f"{pointer}/{key}"
-            if key in ("telephone", "email", "faxNumber") and isinstance(value, str):
-                out.append(("phone" if key != "email" else "email", value, child))
+            if key in JSONLD_KINDS and isinstance(value, str):
+                out.append((JSONLD_KINDS[key], value, child))
             else:
                 _walk_jsonld(value, child, out)
     elif isinstance(node, list):

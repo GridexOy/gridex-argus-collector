@@ -17,6 +17,16 @@ from typing import Any, Protocol
 from argus_collector.evidence.contract import Snapshot
 from argus_collector.models.contract import CallRecord
 
+# docs/ANSWERS_S5.md sections 2-3 (owner 05.10.2026): the context and office
+# fields and the fax reach ARGUS only as `field="extra"` with `extra_label` =
+# this key and a quote; their field audit item is `extra` with this key as reason.
+EXTRA_FIELDS = frozenset({"country", "department", "office_name", "address", "fax"})
+
+
+def extra_label_of(field: str) -> str:
+    """The extra_label a finding's field goes with ("" for a mapped field)."""
+    return field if field in EXTRA_FIELDS else ""
+
 
 @dataclass(frozen=True)
 class WalkLimits:
@@ -106,7 +116,7 @@ class PageSource:
 @dataclass(frozen=True)
 class FieldFinding:
     observation_id: str
-    field: str  # full_name | job_title | phone | email
+    field: str  # full_name | job_title | phone | email, or one of EXTRA_FIELDS
     raw: str  # the quote as found
     value: str  # normalised value
     start: int  # code-point span in the canonical text; -1 when not in the text
@@ -130,6 +140,7 @@ class AuditEntry:
     source_field: str
     observation_ids: tuple[str, ...]
     raw: str
+    extra_label: str = ""  # set: an `extra` item with this reason, else `mapped`
 
 
 @dataclass(frozen=True)

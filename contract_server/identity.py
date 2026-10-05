@@ -24,6 +24,13 @@ def is_email(field: str) -> bool:
     return field == "email" or field.startswith("email_")
 
 
+def field_name(observation: Json) -> str:
+    """The field an observation is about: its `extra_label` for an extra field."""
+    field = str(observation["field"])
+    label = observation.get("extra_label")
+    return str(label) if field == "extra" and label else field
+
+
 def observed_value(observation: Json) -> Any:
     """normalized_value, or raw_value when the worker sent no normalized form."""
     value = observation.get("normalized_value")

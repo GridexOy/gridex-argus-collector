@@ -51,15 +51,15 @@ def extract_channels(
     region_at: Callable[[int], str] | None = None,
     skip_hrefs: frozenset[str] = frozenset(),
 ) -> list[Channel]:
-    """Phones and emails found deterministically; `text` is the canonical page text.
-
-    Each channel carries the normalised `value`, the `raw` form, a `locator`
-    (`href:tel`, `href:mailto`, `jsonld:<pointer>`, `cfemail`, `text`) and a
-    `TextSpan` when the raw form is visible in `text`. De-duplicated by value.
-    National phone numbers are read in `region` (`normalization.region_for_page`),
-    or per text offset by `region_at` (country sections). A number labelled as a
-    fax is not a channel; `skip_hrefs` are mailto:/tel: links the page does not
-    render now (a closed tab or section: taken when it is opened).
+    """Phones and emails found deterministically; `text` is the canonical page
+    text. Each channel carries the normalised `value`, the `raw` form, a
+    `locator` (`href:tel`, `href:mailto`, `jsonld:<pointer>`, `cfemail`,
+    `text`) and a `TextSpan` when the raw form is visible in `text`;
+    de-duplicated by value. National phone numbers are read in `region`
+    (`normalization.region_for_page`), or per text offset by `region_at`
+    (country sections). A number labelled as a fax (or JSON-LD `faxNumber`) is
+    a channel of kind `fax`; `skip_hrefs` are mailto:/tel: links the page does
+    not render now (a closed tab or section: taken when it is opened).
     """
     return service.extract_channels(html, text, region, region_at, skip_hrefs)
 

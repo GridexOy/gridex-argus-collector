@@ -1,4 +1,4 @@
-"""tkinter widgets of the Yhteys block: address, worker_id, token, Testaa yhteys."""
+"""tkinter widgets of the Yhteys block: Paritusavain, Yhdistä, the state lines."""
 
 from __future__ import annotations
 
@@ -10,52 +10,57 @@ from argus_collector.ui.connection_lines import ConnectionProps
 
 COLOURS = {"ok": "#1a7f37", "warn": "#9a6700", "error": "#b42318"}
 FG = "#1f2328"
+MUTED = "#57606a"
 PAD_X = 12
 PAD_Y = 4
-FIELD_WIDTH = 42
+FIELD_WIDTH = 60
 
 
 class ConnectionBlock:
-    """Renders `ConnectionProps`; the token entry is write-only (never pre-filled)."""
+    """Renders `ConnectionProps`; the key entry holds the token, so it is masked,
+    never pre-filled and emptied after Yhdistä."""
 
     def __init__(
-        self,
-        parent: ttk.Frame,
-        props: ConnectionProps,
-        on_test: Callable[[str, str, str], None],
+        self, parent: ttk.Frame, props: ConnectionProps, on_connect: Callable[[str], None]
     ) -> None:
-        self.on_test = on_test
-        self.address_var = tk.StringVar(parent, value=props.address_value)
-        self.worker_id_var = tk.StringVar(parent, value=props.worker_id_value)
-        self.token_var = tk.StringVar(parent)
-        self._build_fields(parent, props)
+        self.on_connect = on_connect
+        self.key_var = tk.StringVar(parent)
+        self._build_field(parent, props)
+        self.key_error_label = ttk.Label(parent, text="", foreground=COLOURS["error"])
+        self.paired_label = ttk.Label(parent, text=props.paired_text, foreground=MUTED)
+        self.paired_label.pack(anchor="w", padx=PAD_X)
         self.state_label = ttk.Label(parent, text=props.state_text)
         self.state_label.pack(anchor="w", padx=PAD_X, pady=(PAD_Y, 0))
-        self.heartbeat_label = ttk.Label(parent, text=props.heartbeat_text, foreground="#57606a")
+        self.heartbeat_label = ttk.Label(parent, text=props.heartbeat_text, foreground=MUTED)
         self.heartbeat_label.pack(anchor="w", padx=PAD_X)
         self.render(props)
 
-    def _build_fields(self, parent: ttk.Frame, props: ConnectionProps) -> None:
-        grid = ttk.Frame(parent)
-        grid.pack(anchor="w", fill="x", padx=PAD_X, pady=PAD_Y)
-        rows = (
-            (props.address_label, self.address_var, ""),
-            (props.worker_id_label, self.worker_id_var, ""),
-            (props.token_label, self.token_var, "*"),
+    def _build_field(self, parent: ttk.Frame, props: ConnectionProps) -> None:
+        row = ttk.Frame(parent)
+        row.pack(anchor="w", fill="x", padx=PAD_X, pady=PAD_Y)
+        ttk.Label(row, text=props.key_label).pack(side="left", padx=(0, 8))
+        self.key_entry = ttk.Entry(row, textvariable=self.key_var, width=FIELD_WIDTH, show="*")
+        self.key_entry.pack(side="left")
+        self.key_entry.bind("<Return>", lambda _event: self._on_connect_clicked())
+        self.connect_button = ttk.Button(
+            row, text=props.connect_label, command=self._on_connect_clicked
         )
-        for row_index, (label_text, var, show) in enumerate(rows):
-            ttk.Label(grid, text=label_text).grid(row=row_index, column=0, sticky="w", padx=(0, 8))
-            entry = ttk.Entry(grid, textvariable=var, width=FIELD_WIDTH, show=show)
-            entry.grid(row=row_index, column=1, sticky="w", pady=1)
-        self.test_button = ttk.Button(grid, text=props.test_label, command=self._on_test_clicked)
-        self.test_button.grid(row=len(rows), column=1, sticky="w", pady=(PAD_Y, 0))
+        self.connect_button.pack(side="left", padx=(8, 0))
 
-    def _on_test_clicked(self) -> None:
-        self.on_test(self.address_var.get(), self.worker_id_var.get(), self.token_var.get())
-        self.token_var.set("")
+    def _on_connect_clicked(self) -> None:
+        if not self.connect_button.instate(["!disabled"]):
+            return
+        self.on_connect(self.key_var.get())
+        self.key_var.set("")
 
     def render(self, props: ConnectionProps) -> None:
         level = props.state_level
         self.state_label.configure(text=props.state_text, foreground=COLOURS.get(level, FG))
         self.heartbeat_label.configure(text=props.heartbeat_text)
-        self.test_button.state(["!disabled"] if props.test_enabled else ["disabled"])
+        self.paired_label.configure(text=props.paired_text)
+        self.key_error_label.configure(text=props.key_error_text)
+        if props.key_error_text:  # shown only while the last pasted key is refused
+            self.key_error_label.pack(anchor="w", padx=PAD_X, before=self.paired_label)
+        else:
+            self.key_error_label.pack_forget()
+        self.connect_button.state(["!disabled"] if props.connect_enabled else ["disabled"])

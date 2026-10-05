@@ -2,8 +2,10 @@
 
 Checks run in order: every evidence_id uploaded for this job (else
 evidence_missing, not recorded), each quote against its evidence text (else
-evidence_hash_mismatch), channel fields only from approved hosts (else
-host_not_approved), supersedes_observation_id of the same contact and field
+evidence_hash_mismatch), country / department / office_name / address / fax
+only as `field="extra"` with that `extra_label` and every `extra` with a label
+(owner 05.10.2026, ANSWERS_S5; else invalid_input), channel fields only from
+approved hosts (else host_not_approved), supersedes_observation_id of the same contact and field
 (else invalid_input). Accepted observations land on the company-level
 canonical contact (`identity.py`) by their change_kind (`history.py`).
 """
@@ -17,6 +19,7 @@ from contract_server.htmltext import quote_found
 from contract_server.util import Json, normalize_host, sha256_hex, stamp, url_host
 
 CONTACT_TYPES = frozenset({"contact.observed", "contact.enriched"})
+EXTRA_ONLY = frozenset({"country", "department", "office_name", "address", "fax"})
 OBSERVATION_FIELDS = (
     "observation_id",
     "field",
@@ -65,6 +68,17 @@ def quote_matches(batch: Batch, observation: Json) -> bool:
     return quote_found(quote, text, raw)
 
 
+def extra_error(observation: Json) -> str | None:
+    """Why an observation breaks the extra rule, None when it keeps it."""
+    field, label = observation["field"], observation.get("extra_label")
+    name = observation["observation_id"]
+    if field in EXTRA_ONLY:
+        return f"{name}: {field} goes as field 'extra' with extra_label {field!r}"
+    if field == "extra" and not label:
+        return f"{name}: field 'extra' needs an extra_label"
+    return None
+
+
 def host_approved(batch: Batch, observation: Json) -> bool:
     approved = {normalize_host(item["host"]) for item in batch.job["scope"]["approved_hosts"]}
     record = batch.state["evidence"][observation["evidence_id"]]
@@ -105,6 +119,10 @@ def apply(batch: Batch, event: Json) -> Outcome:
     missing = _missing_evidence(batch, payload)
     if missing:
         return rejected("evidence_missing", f"not uploaded: {', '.join(missing)}", record=False)
+    for observation in payload["observations"]:
+        problem = extra_error(observation)
+        if problem is not None:
+            return rejected("invalid_input", problem)
     for observation in payload["observations"]:
         if not quote_matches(batch, observation):
             detail = f"quote of {observation['observation_id']} not found in its evidence"

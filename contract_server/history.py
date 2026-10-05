@@ -4,15 +4,15 @@
   the same contact and field adds no row: that observation gets
   `last_confirmed_at` and a `reconfirmed` history entry, and the new
   observation_id becomes an alias of it. Without such a value it is stored new.
-- `supersedes_observation_id` must name an observation (or alias) of the same
-  canonical contact and the same field, else the event is rejected
-  invalid_input; with `changed` the old observation gets `superseded_by` and a
-  `changed` history entry.
+- `supersedes_observation_id` must name an observation (or alias) of the
+  same canonical contact and the same field (an extra field: the same
+  `extra_label`), else the event is rejected invalid_input; with `changed` the
+  old observation gets `superseded_by` and a `changed` history entry.
 """
 
 from __future__ import annotations
 
-from contract_server.identity import observed_value, value_key
+from contract_server.identity import field_name, observed_value, value_key
 from contract_server.util import Json, latest
 
 
@@ -43,7 +43,7 @@ def _target_field(state: Json, contact_id: str | None, earlier: Json, target: st
     contact, stored = found
     if contact["canonical_contact_id"] != contact_id:
         raise ValueError(f"{target} belongs to another canonical contact")
-    return str(contact["observations"][stored]["field"])
+    return field_name(contact["observations"][stored])
 
 
 def supersede_error(state: Json, contact_id: str | None, observations: list[Json]) -> str | None:
@@ -61,18 +61,18 @@ def supersede_error(state: Json, contact_id: str | None, observations: list[Json
                 field = _target_field(state, contact_id, earlier, target)
             except ValueError as exc:
                 return f"{name}: {exc}"
-            if field != observation["field"]:
-                return f"{name}: {target} is field {field!r}, not {observation['field']!r}"
-        earlier[name] = observation["field"]
+            if field != field_name(observation):
+                return f"{name}: {target} is field {field!r}, not {field_name(observation)!r}"
+        earlier[name] = field_name(observation)
     return None
 
 
 def same_value(contact: Json, observation: Json) -> str | None:
     """Latest current observation of the contact with this field and value."""
-    field = observation["field"]
+    field = field_name(observation)
     wanted = value_key(field, observed_value(observation))
     for stored_id, stored in reversed(contact["observations"].items()):
-        if stored["field"] != field or stored.get("superseded_by"):
+        if field_name(stored) != field or stored.get("superseded_by"):
             continue
         if value_key(field, observed_value(stored)) == wanted:
             return str(stored_id)

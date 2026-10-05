@@ -7,9 +7,11 @@ one is `reconfirmed`, a different value of a known field is `changed` (it
 supersedes the known observation), anything else is `new`. At the end of a
 run every field of every known contact gets a freshness check: reconfirmed /
 changed / not_seen_in_checked_scope (the frontier was exhausted) /
-not_checked. The contract leaves the shape of `KnownContact.fields` open: a
-value may be a string, a list of strings, an object with `value` (and
-`observation_id`) or a list of such objects; all are read.
+not_checked. `KnownContact.fields` (docs/ANSWERS_S5.md section 1): key = the
+field name, an extra field by its `extra_label` (`country`, `department`,
+`office_name`, `address`); value = the normalized value, a string or a list
+of strings (first = primary). An object with `value` (and `observation_id`)
+or a list of such objects is read too.
 """
 
 from __future__ import annotations

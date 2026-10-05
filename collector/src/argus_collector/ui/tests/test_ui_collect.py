@@ -83,8 +83,8 @@ def test_kaynnista_collects_an_argus_job_into_jono_and_lahetys(
     root = make_tk_root()
     try:
         app = contract.create_app(root)
-        app.connection.test_connection(contract_server.base_url(argus), "worker-main-pc",
-                                       "test-token-abc")
+        app.connection.pair(contract_server.pairing_key(
+            contract_server.base_url(argus), "worker-main-pc", "test-token-abc"))
         pump_until(app, root, lambda: app.connection.connected)
         app.collect.start()
         rows = app.view.queue.rows

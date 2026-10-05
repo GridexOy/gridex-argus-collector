@@ -23,7 +23,11 @@ Worker tokens `{token: worker_id}`, default `test-token-abc` -> `worker-main-pc`
 system tokens default `{"system-token-xyz"}`. A worker token on a System
 endpoint (or the reverse), a missing or unknown token -> 401 `unauthorized`;
 `server.registry.revoke(worker_id)` -> 403 `worker_revoked`. Tokens and
-revocations live in memory only.
+revocations live in memory only. At start the server prints one pairing key
+per worker token, e.g. `pairing key worker-main-pc:
+argus://pair?url=http%3A%2F%2F127.0.0.1%3A8900&worker=worker-main-pc&token=test-token-abc`
+(`server.pairing_key(address, worker_id, token)`): the owner pastes it into
+the panel's Yhteys block ("Paritusavain" -> "Yhdistä").
 
 ## Behaviour
 - One door: every request body is validated against its OpenAPI schema by
@@ -68,10 +72,15 @@ revocations live in memory only.
   `last_seen_at` = latest observation, reconfirmation or freshness check;
   `channel_status` = strongest of the current channel observations
   (published_direct > published_general > catalog_published > inferred >
-  stale), `inferred` without a channel. `fields` format (the collector parses it):
-  `{"<field>": [{"value": <normalized_value>, "raw_value": <raw_value>,
-  "observation_id": "<id>", "observed_at": "<RFC 3339>"}, ...]}` -- one item
-  per distinct normalized value, its latest observation, superseded left out.
+  stale), `inferred` without a channel. `fields` as ARGUS answered
+  (docs/ANSWERS_S5.md section 1): `{"<field>": "<normalized value>"}`, a list
+  of strings (latest first) when there are several; an extra field keyed by
+  its `extra_label` (`country`, `department`, `office_name`, `address`);
+  addresses in lower case; superseded values left out.
+- **extra** (docs/ANSWERS_S5.md sections 2-3): `country`, `department`,
+  `office_name`, `address` and `fax` only as `field="extra"` with that
+  `extra_label` (a direct field or an `extra` without a label -> event
+  rejection `invalid_input`); the quote is checked like every other.
 - `--state PATH` saves the whole state as JSON after every POST (atomic) and
   loads it at start; evidence bytes and texts go to `PATH.evidence/`.
 

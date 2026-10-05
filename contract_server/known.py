@@ -2,17 +2,21 @@
 
 One KnownContact per canonical contact of the job's company that another job
 touched (person, department, office, organization_channel; the schema has no
-unassigned_channel). `fields` is the stand's documented format:
-`{field: [{value, raw_value, observation_id, observed_at}, ...]}` with one
-item per distinct normalized value (its latest observation), superseded
+unassigned_channel). `fields` has the form ARGUS answered (docs/ANSWERS_S5.md
+section 1): key = the observation's field name (an extra field by its
+`extra_label`: `country`, `department`, `office_name`, `address`), value = the
+stored normalized value -- a string, or a list of strings with the latest
+first when there are several; addresses in lower case; superseded
 observations left out. channel_status is the strongest of the current channel
 observations, `inferred` when there is none.
 """
 
 from __future__ import annotations
 
+from typing import Any
+
 from contract_server.channels import strongest
-from contract_server.identity import observed_value, value_key
+from contract_server.identity import field_name, observed_value, value_key
 from contract_server.util import Json
 
 KNOWN_TYPES = frozenset({"person", "department", "office", "organization_channel"})
@@ -22,25 +26,26 @@ def current(contact: Json) -> list[Json]:
     return [obs for obs in contact["observations"].values() if not obs.get("superseded_by")]
 
 
-def field_item(observation: Json) -> Json:
-    return {
-        "value": observation["normalized_value"],
-        "raw_value": observation["raw_value"],
-        "observation_id": observation["observation_id"],
-        "observed_at": observation["observed_at"],
-    }
+def stored_value(field: str, observation: Json) -> Any:
+    value = observed_value(observation)
+    return value.lower() if field == "address" and isinstance(value, str) else value
 
 
 def fields_of(observations: list[Json]) -> Json:
     by_field: dict[str, dict[str, Json]] = {}
     for observation in observations:
-        field = observation["field"]
+        field = field_name(observation)
         values = by_field.setdefault(field, {})
         key = value_key(field, observed_value(observation))
         previous = values.get(key)
         if previous is None or observation["observed_at"] >= previous["observed_at"]:
-            values[key] = field_item(observation)
-    return {field: list(values.values()) for field, values in by_field.items()}
+            values[key] = observation
+    out: Json = {}
+    for field, latest in by_field.items():
+        ordered = sorted(latest.values(), key=lambda obs: obs["observed_at"], reverse=True)
+        items = [stored_value(field, obs) for obs in ordered]
+        out[field] = items[0] if len(items) == 1 else items
+    return out
 
 
 def known_contact(contact: Json) -> Json:

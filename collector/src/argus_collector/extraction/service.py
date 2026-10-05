@@ -12,13 +12,14 @@ from argus_collector.normalization import contract as norm
 
 KIND_EMAIL = "email"
 KIND_PHONE = "phone"
+KIND_FAX = "fax"  # a phone number labelled as a fax: sent only as extra `fax` (05.10)
 CONTACT_WORDS = ("yhteystiedot", "contact", "puh", "tel", "email", "sähköposti", "@", "henkil")
 LOCATOR_TEXT = "text"
 
 
 @dataclass(frozen=True)
 class Channel:
-    kind: str  # email | phone
+    kind: str  # email | phone | fax
     value: str  # normalised (lower-case domain / E.164)
     raw: str  # as found in the page
     locator: str  # href:tel | href:mailto | jsonld:<pointer> | cfemail | text
@@ -71,12 +72,12 @@ def _channel(
     span = find_span(text, visible) if visible else None
     if span is None:
         span = find_span(text, raw)
-    if kind == KIND_PHONE and span is not None and is_fax(text, span.start):
-        return None
     where = region or _fixed(norm.DEFAULT_REGION)
     value = _normalize(kind, raw, where(span.start if span else -1))
     if value is None:
         return None
+    if kind == KIND_PHONE and span is not None and is_fax(text, span.start):
+        kind = KIND_FAX
     return Channel(kind, value, visible or raw, locator, span)
 
 

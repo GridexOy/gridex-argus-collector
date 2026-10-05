@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass
 
 from argus_collector.extraction import repository as tables
-from argus_collector.extraction.service import KIND_EMAIL, Channel
+from argus_collector.extraction.service import KIND_EMAIL, KIND_FAX, Channel
 
 ENTITY_ORGANIZATION = "organization_channel"
 ENTITY_OFFICE = "office"
@@ -49,6 +49,8 @@ def classify_unattached(channel: Channel, text: str) -> ChannelRole:
     line = _line_of(channel, text)
     if line and _has_word(line, tables.OFFICE_WORDS):
         return ChannelRole(ENTITY_OFFICE, BINDING_CAPTION)
+    if channel.kind == KIND_FAX:  # its "Fax" label is the caption; a fax is the company's
+        return ChannelRole(ENTITY_ORGANIZATION, BINDING_CAPTION)
     if channel.kind == KIND_EMAIL:
         local = channel.value.split("@", 1)[0]
         if LOCAL_SPLIT.split(local)[0] in tables.GENERIC_LOCAL_PARTS:

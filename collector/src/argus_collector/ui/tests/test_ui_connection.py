@@ -1,4 +1,4 @@
-"""End to end under Xvfb: Testaa yhteys drives a real heartbeat to contract_server."""
+"""End to end under Xvfb: a pasted pairing key connects to contract_server, and stays."""
 
 from __future__ import annotations
 
@@ -31,9 +31,18 @@ def running() -> Iterator[contract_server.ContractServer]:
         srv.server_close()
 
 
-def write_config(home: Path, base_url: str) -> None:
-    lines = [f'argus:\n  base_url: "{base_url}"', "network:\n  proxy: direct"]
-    (home / "config.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+def write_config(home: Path) -> None:
+    (home / "config.yaml").write_text("network:\n  proxy: direct\n", encoding="utf-8")
+
+
+def key_of(srv: contract_server.ContractServer, token: str = TOKEN) -> str:
+    return contract_server.pairing_key(contract_server.base_url(srv), WORKER_ID, token)
+
+
+def paste(app: PanelApp, key: str) -> None:
+    """What the owner does: paste the key into Paritusavain and press Yhdista."""
+    app.view.connection.key_var.set(key)
+    app.view.connection.connect_button.invoke()
 
 
 def pump_until(app: PanelApp, root: tk.Tk, predicate: object) -> None:
@@ -46,48 +55,99 @@ def pump_until(app: PanelApp, root: tk.Tk, predicate: object) -> None:
     root.update()
 
 
-def test_testaa_yhteys_connects_to_the_contract_server(
+def test_pairing_key_connects_and_is_saved(
     display: str,  # noqa: F811 - pytest fixture
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     running: contract_server.ContractServer,
 ) -> None:
     monkeypatch.setenv("ARGUS_COLLECTOR_HOME", str(tmp_path))
-    write_config(tmp_path, contract_server.base_url(running))
+    write_config(tmp_path)
     root = make_tk_root()
     try:
         app = contract.create_app(root)
-        assert app.view.connection.state_label.cget("text") == "Ei yhteyttä"
-        app.connection.test_connection(contract_server.base_url(running), WORKER_ID, TOKEN)
+        block = app.view.connection
+        assert block.state_label.cget("text") == "Ei yhteyttä"
+        assert block.paired_label.cget("text").startswith("Ei paritettu")
+        paste(app, key_of(running))
+        assert block.key_var.get() == "", "the key holds the token: emptied at once"
         pump_until(app, root, lambda: app.connection.state.status == "ok")
-        assert app.view.connection.state_label.cget("text") == "Yhdistetty"
-        assert app.connection.state.last_heartbeat is not None
-        assert running.registry.seen_at(WORKER_ID) is not None
-        assert worker_auth.load_connection() == worker_auth.SavedConnection(
-            contract_server.base_url(running), WORKER_ID
+        assert block.state_label.cget("text") == "Yhdistetty"
+        address = contract_server.base_url(running)
+        assert block.paired_label.cget("text") == (
+            f"Paritettu: {address} · {WORKER_ID} · tunnus **********-abc"
         )
+        assert running.registry.seen_at(WORKER_ID) is not None
+        assert worker_auth.load_connection() == worker_auth.SavedConnection(address, WORKER_ID)
         assert worker_auth.load_token() == TOKEN
     finally:
         root.destroy()
 
 
-def test_testaa_yhteys_shows_rejected_for_a_bad_token(
+def test_saved_pairing_connects_by_itself_at_the_next_start(
     display: str,  # noqa: F811 - pytest fixture
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     running: contract_server.ContractServer,
 ) -> None:
     monkeypatch.setenv("ARGUS_COLLECTOR_HOME", str(tmp_path))
-    write_config(tmp_path, contract_server.base_url(running))
+    write_config(tmp_path)
+    worker_auth.save_pairing(worker_auth.parse_pairing_key(key_of(running)))
     root = make_tk_root()
     try:
         app = contract.create_app(root)
-        app.connection.test_connection(
-            contract_server.base_url(running), WORKER_ID, "not-a-real-token"
-        )
+        app.connection.start_if_saved()  # what run_panel does after building the window
+        assert app.view.connection.state_label.cget("text") == "Tarkistetaan…"
+        pump_until(app, root, lambda: app.connection.state.status == "ok")
+        assert app.view.connection.state_label.cget("text") == "Yhdistetty"
+        assert running.registry.seen_at(WORKER_ID) is not None
+    finally:
+        root.destroy()
+
+
+def test_a_bad_key_is_refused_without_a_call_and_keeps_the_pairing(
+    display: str,  # noqa: F811 - pytest fixture
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    running: contract_server.ContractServer,
+) -> None:
+    monkeypatch.setenv("ARGUS_COLLECTOR_HOME", str(tmp_path))
+    write_config(tmp_path)
+    root = make_tk_root()
+    try:
+        app = contract.create_app(root)
+        paste(app, "https://argus.example.fi worker-main-pc test-token-abc")
+        app.pump()
+        root.update()
+        error = app.view.connection.key_error_label
+        assert error.cget("text").startswith("Paritusavain ei kelpaa: muoto on argus://pair")
+        assert error.winfo_ismapped()
+        assert running.registry.seen_at(WORKER_ID) is None
+        assert worker_auth.load_connection() is None and worker_auth.load_token() is None
+        paste(app, "argus://pair?url=http://argus.example.fi&worker=w&token=t")
+        assert "https://" in error.cget("text")
+        paste(app, key_of(running))
+        pump_until(app, root, lambda: app.connection.state.status == "ok")
+        assert not error.winfo_ismapped()
+    finally:
+        root.destroy()
+
+
+def test_a_rejected_token_shows_tunnus_hylatty(
+    display: str,  # noqa: F811 - pytest fixture
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    running: contract_server.ContractServer,
+) -> None:
+    monkeypatch.setenv("ARGUS_COLLECTOR_HOME", str(tmp_path))
+    write_config(tmp_path)
+    root = make_tk_root()
+    try:
+        app = contract.create_app(root)
+        paste(app, key_of(running, "not-a-real-token"))
         pump_until(app, root, lambda: app.connection.state.status == "rejected")
         assert app.view.connection.state_label.cget("text") == "Tunnus hylätty"
-        assert worker_auth.load_token() is None
+        assert not app.connection.connected
     finally:
         root.destroy()
 
@@ -98,19 +158,19 @@ def test_argus_down_keeps_the_last_heartbeat_and_shows_ei_verkkoa(
     tmp_path: Path,
 ) -> None:
     srv = contract_server.start(port=0, tokens={TOKEN: WORKER_ID})
-    address = contract_server.base_url(srv)
+    key = key_of(srv)
     monkeypatch.setenv("ARGUS_COLLECTOR_HOME", str(tmp_path))
-    write_config(tmp_path, address)
+    write_config(tmp_path)
     root = make_tk_root()
     try:
         app = contract.create_app(root)
-        app.connection.test_connection(address, WORKER_ID, TOKEN)
+        paste(app, key)
         pump_until(app, root, lambda: app.view.delivery.state_label.cget("text") == "Lähetetty")
         seen = app.view.connection.heartbeat_label.cget("text")
         assert seen.startswith("Viimeksi:")
         srv.shutdown()
         srv.server_close()
-        app.connection.test_connection(address, WORKER_ID, "")
+        app.connection.start_if_saved()  # the next start: the saved key, ARGUS gone
         pump_until(app, root, lambda: app.view.delivery.state_label.cget("text") == "Ei verkkoa")
         assert app.view.delivery.state_label.cget("text") == "Ei verkkoa", "nothing pending"
         assert app.view.connection.state_label.cget("text").startswith("Ei verkkoa")

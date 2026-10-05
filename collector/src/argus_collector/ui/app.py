@@ -45,7 +45,7 @@ class PanelApp:
         self.collect = CollectController(self, self.connection.api_target)
         callbacks = Callbacks(
             self.open_browser, self.collect.start, self.local_test, self.collect.stop,
-            self.walk.open_source, self.connection.test_connection, self.open_attention,
+            self.walk.open_source, self.connection.pair, self.open_attention,
             self.attention_done,
         )
         self.view = PanelView(root, self.props(), callbacks)

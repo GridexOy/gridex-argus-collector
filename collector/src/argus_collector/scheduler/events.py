@@ -19,6 +19,7 @@ from argus_collector.walk import contract as walk
 
 MIME_HTML = "text/html; charset=utf-8"
 CHANNEL_FIELDS = ("phone", "email")
+EXTRA = "extra"
 
 
 def envelope(cls: Callable[..., api.Event], job_id: str, run_id: str, payload: Any) -> MakeEvent:
@@ -83,7 +84,7 @@ def locator(found: walk.FieldFinding, text_sha256: str) -> api.Locator:
         return api.LocatorDom(value=f'[data-cfemail="{found.raw}"]', text_sha256=text_sha256)
     if found.locator == "html:lang":
         return api.LocatorDom(value="html[lang]", text_sha256=text_sha256)
-    scheme = "tel" if found.field == "phone" else "mailto"
+    scheme = "mailto" if found.field == "email" else "tel"
     return api.LocatorDom(value=f'a[href^="{scheme}:"]', text_sha256=text_sha256)
 
 
@@ -94,8 +95,10 @@ def observation(
     found: walk.FieldFinding, evidence_id: str, text_sha256: str,
     change: tuple[str, str | None] = ("new", None),
 ) -> api.Observation:
+    extra = found.field in walk.EXTRA_FIELDS  # field "extra" + extra_label (ANSWERS_S5 2-3)
     return api.Observation(
-        observation_id=found.observation_id, field=found.field, raw_value=found.raw,
+        observation_id=found.observation_id, field=EXTRA if extra else found.field,
+        extra_label=found.field if extra else None, raw_value=found.raw,
         normalized_value=found.value,
         extraction_status=api.ObservationExtractionStatus(found.status),
         evidence_id=evidence_id, locator=locator(found, text_sha256), quote=found.raw,
@@ -107,8 +110,9 @@ def observation(
 def field_audit(evidence_id: str, entries: tuple[walk.AuditEntry, ...]) -> api.FieldAudit:
     items = [
         api.FieldAuditItem(
-            source_field=e.source_field, disposition=api.FieldAuditItemDisposition("mapped"),
-            observation_ids=list(e.observation_ids), raw_value=e.raw, reason="",
+            source_field=e.source_field,
+            disposition=api.FieldAuditItemDisposition("extra" if e.extra_label else "mapped"),
+            observation_ids=list(e.observation_ids), raw_value=e.raw, reason=e.extra_label,
         )
         for e in entries
     ]

@@ -6,7 +6,6 @@ from contract_server.tests import builders
 from contract_server.tests.client import Client
 from contract_server.tests.flow import Flow
 from contract_server.tests.rerun import (
-    FIRST_STAMP,
     LATER_STAMP,
     MOVED_PAGE,
     NEW_PHONE,
@@ -76,30 +75,13 @@ def test_claim_returns_known_contacts_of_other_jobs(flow: Flow) -> None:
     assert list(by_id) == [known.person_id, known.org_id]
     person, org = by_id[known.person_id], by_id[known.org_id]
     assert person["entity_type"] == "person"
-    assert person["fields"] == {
-        "full_name": [
-            {
-                "value": "Anna Virtanen",
-                "raw_value": "Anna Virtanen",
-                "observation_id": "o-name",
-                "observed_at": FIRST_STAMP,
-            }
-        ],
-        "phone": [
-            {
-                "value": PHONE,
-                "raw_value": PHONE,
-                "observation_id": "o-phone-2",
-                "observed_at": LATER_STAMP,
-            }
-        ],
-    }
+    assert person["fields"] == {"full_name": "Anna Virtanen", "phone": PHONE}, "ANSWERS_S5 1"
     assert (person["last_seen_at"], person["channel_status"]) == (LATER_STAMP, "published_direct")
     assert (org["entity_type"], org["channel_status"]) == (
         "organization_channel",
         "published_general",
     )
-    assert org["fields"]["phone"][0]["observation_id"] == "o-switch"
+    assert org["fields"] == {"phone": SWITCHBOARD}
 
 
 def test_reconfirmed_value_adds_no_row(flow: Flow, client: Client) -> None:
@@ -154,7 +136,7 @@ def test_changed_supersedes_the_old_value(flow: Flow, client: Client) -> None:
     assert rows["o2-phone"]["superseded_by"] is None
     _, item = rerun(flow, reason="again")
     person = next(c for c in item["known_contacts"] if c["canonical_contact_id"] == known.person_id)
-    assert [p["value"] for p in person["fields"]["phone"]] == [NEW_PHONE]
+    assert person["fields"]["phone"] == NEW_PHONE
 
 
 def test_invalid_supersedes_is_rejected(flow: Flow, client: Client) -> None:

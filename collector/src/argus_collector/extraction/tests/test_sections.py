@@ -53,5 +53,8 @@ def test_no_sections_without_a_country_list() -> None:
 
 def test_fax_label_on_the_line_or_above() -> None:
     text = "Puh. 09 123 4567, faksi 09 123 4568\nTelefax\n09 123 4569\nVaihde 09 123 4500"
-    values = sorted(c.value for c in extraction.extract_channels("", text, "FI"))
-    assert values == ["+35891234500", "+35891234567"]
+    found = sorted((c.kind, c.value) for c in extraction.extract_channels("", text, "FI"))
+    assert found == [
+        ("fax", "+35891234568"), ("fax", "+35891234569"),
+        ("phone", "+35891234500"), ("phone", "+35891234567"),
+    ], "a fax is kept as kind fax (sent only as extra `fax`), never as a phone"

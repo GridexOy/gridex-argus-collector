@@ -1,5 +1,32 @@
 # ARGUS20_COLLECTOR_CHANGELOG
 
+## 0.4.7.0 — 2026-10-05
+
+**Шаг `stage-5/step-6-pairing`: паринг в один клик (решение владельца 05.10.2026) и поля `extra` по `docs/ANSWERS_S5.md` (ответы ARGUS на вопросы STAGE5_REPORT §T2.9, решения владельца 05.10.2026; файл положен как есть из `GridexOy/gridex-argus20` `main` 8c0279c, blob d8b6c3d).** Контракт (`docs/ARGUS20_COLLECTOR_OPENAPI.json`) не менялся.
+
+**Что видно.**
+- Блок Yhteys: вместо трёх полей (адрес, worker_id, токен) и «Testaa yhteys» — одно поле «Paritusavain» и кнопка «Yhdistä» (или Enter). В поле вставляется строка из ARGUS `argus://pair?url=…&worker=…&token=…`; панель её разбирает, сохраняет (адрес и worker_id — `worker_connection.json`, токен — DPAPI `worker_token.bin`), сразу шлёт heartbeat и показывает `Paritettu: <адрес> · <worker_id> · tunnus ****abcd` и `Yhdistetty`. Поле замаскировано, не заполняется и очищается сразу после нажатия.
+- При каждом следующем запуске панель подключается сама (`Tarkistetaan…` → `Yhdistetty`); пока ARGUS недоступен — `Ei verkkoa: …`, heartbeat повторяется каждые 30 с; `Tunnus hylätty` останавливает повторы до нового ключа.
+- Неверный ключ — красная строка `Paritusavain ei kelpaa: …` (не тот формат, нет url/worker/token, поле дважды, пробелы или управляющие символы, не https), ничего не сохраняется и не отправляется; прежний паринг остаётся.
+- Значения по умолчанию пустые: в `config.example.yaml` и в `runtime.Config` больше нет адреса ARGUS (`argus.base_url` убран; в старом `config.yaml` этот ключ просто игнорируется). Адреса стенда в коде сборщика нет: адрес приходит только из ключа.
+- Контракт-сервер при старте печатает ключ паринга на каждый токен: `pairing key worker-main-pc: argus://pair?url=http%3A%2F%2F127.0.0.1%3A8900&worker=worker-main-pc&token=test-token-abc`.
+- В ARGUS (ANSWERS_S5 §2–3): страна, отдел, название и адрес офиса и факс приходят только как `field="extra"` с `extra_label` = `country` / `department` / `office_name` / `address` / `fax`, с цитатой (`quote`) и locator; строка field audit — `disposition: "extra"`, `reason` = тот же ключ (страна теперь тоже в аудите). Факс больше не выбрасывается: он идёт как `extra` `fax` у офиса страны (или у общих каналов компании), телефоном не становится. Контракт-сервер отклоняет `country` и т. п. как прямое поле и `extra` без `extra_label` (`invalid_input`).
+- Известные контакты (ANSWERS_S5 §1): `KnownContact.fields` — ключ = имя поля (extra — по метке: `country`, `department`, `office_name`, `address`), значение — строка или список строк (первый — основной); так их читает сборщик и так их теперь отдаёт контракт-сервер (адреса в нижнем регистре). Без `observation_id` в ответе ARGUS `changed` уходит без `supersedes_observation_id` (поле в контракте допускает null).
+
+**Как работает.** `worker_auth.parse_pairing_key` (чистая функция): схема `argus`, действие `pair`, значения percent-decoded, `+` остаётся `+` (токены base64), каждое поле ровно один раз и без пробелов/управляющих символов; `url` — http(s) с хостом, http только для этой машины (127.0.0.1 / localhost / ::1 — стенд), хвост `/api/collector` снимается. `ui.app_connection.pair` → `save_pairing` → heartbeat; `start_if_saved` при запуске; ответы для заменённого ключа отбрасываются. `walk.sink.EXTRA_FIELDS` + `AuditEntry.extra_label`; `scheduler.events.observation` ставит `field="extra"` и `extra_label`, `field_audit` — `extra` с `reason`; `scheduler.history` читает известные поля по имени (строка / список строк / объекты). Стенд: `identity.field_name` (у `extra` — метка) в истории и known_contacts, `known.fields_of` в форме ANSWERS_S5 §1.
+
+**Модули.** Изменены: `ui` (connection_lines, view_connection, app_connection, view, app), `worker_auth` (service, contract), `runtime` (Config без адреса ARGUS), `extraction` (вид канала `fax`, JSON-LD `faxNumber`, роль факса — общий канал компании), `walk` (sink, findings, offices, contract), `scheduler` (events, history), `contract_server` (server — ключ паринга; contacts — правило extra; identity, history — поле `extra` по метке; known — форма ANSWERS_S5 §1). Документ: `docs/ANSWERS_S5.md` (как есть). Тесты: `worker_auth/tests/test_pairing_key.py`, `ui/tests/test_ui_connection.py` (вставка ключа, автоподключение при запуске, неверный ключ, отклонённый токен, ARGUS недоступен), `scheduler/tests/test_extra_fields.py`, `contract_server/tests/test_extra_rule.py`, правки тестов факса и страны.
+
+**Решения (поправь, если не так).**
+1. Порядок «разобрал → сохранил → подключился» (как в задании): ключ сохраняется до ответа ARGUS, поэтому при `Ei verkkoa` панель сама подключится позже; при `Tunnus hylätty` ключ остаётся сохранённым, но повторы останавливаются до нового ключа.
+2. `url` в ключе — адрес ARGUS без `/api/collector` (с ним тоже принимается). Нешифрованный http — только для этой машины: токен не уходит открытым текстом по сети.
+3. `raw_value` и `quote` у `extra` — текст источника (заголовок раздела, вкладка, строки адреса, номер факса как напечатан; у страны из `<html lang>` — значение атрибута, locator `dom html[lang]`), `normalized_value` — ISO-код / нормализованный текст / E.164 (как в примерах ANSWERS_S5).
+4. Факс вне раздела страны — общий канал компании (`organization_channel`, binding `caption`: подпись «Fax» и есть заголовок).
+5. Коммита `04022ca` в `GridexOy/gridex-argus20` нет; файл взят из `main` на 8c0279c (первая попытка — на 4ac8e0f — файла ещё не было), blob d8b6c3d. Из репозитория ARGUS прочитан только этот файл (частичный клон без содержимого, один blob). В `docs/KIT_MANIFEST.md` (документ ARGUS) не вносил.
+6. «Avaa työselain» в Resurssit по-прежнему открывает тестовый сайт (TZ_SELAIN, S2) — это не адрес ARGUS и не трогался.
+
+**Найдено живой проверкой.** В смотровом виде контракт-сервера (`/_stand/.../contacts`) не было `extra_label` — добавлен.
+
 ## 0.4.6.0 — 2026-10-05
 
 **Шаг `stage-5/step-5-a5-pilot`: пара 5 TZ_TANDEM «Пилот» (A5) — подготовка сборщика.** Сам пилот (8 компаний Sähkö-Electricity 2027 против прода ARGUS на MAIN-PC, `owner_known_url` для Schneider / Prysmian / Phoenix Contact) — действие владельца и сессии ARGUS (B2–B4 на проде); в контейнере не проводился.

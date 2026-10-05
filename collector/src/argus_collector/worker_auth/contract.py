@@ -1,22 +1,47 @@
 """Single entry point of the `worker_auth` module.
 
 Local, per-user storage of the ARGUS connection: the worker token (DPAPI,
-secret) and the address/worker_id the owner typed in (plain, not secret).
-Nothing here talks to the network; see `api_client` for that.
+secret) and the address/worker_id of the pairing key the owner pasted
+(plain, not secret), plus the parser of that key. Nothing here talks to the
+network; see `api_client` for that.
 """
 
 from __future__ import annotations
 
 from argus_collector.worker_auth import repository, service
-from argus_collector.worker_auth.service import SavedConnection, mask_token
+from argus_collector.worker_auth.service import (
+    REASON_CHARACTERS,
+    REASON_DUPLICATE,
+    REASON_FORMAT,
+    REASON_HTTPS,
+    REASON_MISSING,
+    REASON_URL,
+    PairingKey,
+    PairingKeyError,
+    SavedConnection,
+    is_loopback,
+    mask_token,
+    parse_pairing_key,
+)
 
 __all__ = [
+    "REASON_CHARACTERS",
+    "REASON_DUPLICATE",
+    "REASON_FORMAT",
+    "REASON_HTTPS",
+    "REASON_MISSING",
+    "REASON_URL",
+    "PairingKey",
+    "PairingKeyError",
     "SavedConnection",
     "clear_token",
+    "is_loopback",
     "load_connection",
     "load_token",
     "mask_token",
+    "parse_pairing_key",
     "save_connection",
+    "save_pairing",
     "save_token",
 ]
 
@@ -41,3 +66,9 @@ def save_token(token: str) -> None:
 
 def clear_token() -> None:
     repository.clear_token()
+
+
+def save_pairing(key: PairingKey) -> None:
+    """Keep a parsed pairing key: address + worker_id plain, the token with DPAPI."""
+    save_connection(key.base_url, key.worker_id)
+    save_token(key.token)
