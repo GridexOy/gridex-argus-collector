@@ -14,8 +14,11 @@ A2.4, A3.1). Entry point: `contract.py`.
 | `reconcile_info(conn, run)` | last contiguous acknowledged seq, pending event and evidence ids |
 
 Results per event: `accepted` / `duplicate` -> done; `rejected` +
-`evidence_missing` -> the snapshot is re-queued and the event retried;
-`sequence_gap` -> retried from the first pending seq; any other code ->
+`evidence_missing` -> `retry.py` (0.4.8.5): the snapshot is uploaded again first,
+at most 3 retries with that code; a snapshot not stored here or a 4th refusal
+gives the event up (`todiste puuttuu`, counted, never sent again) and a
+`source.blocked` stand-in takes its free seq; `sequence_gap` -> retried from the
+first pending seq, not counted; any other code ->
 `rejected` with the code (shown in Jono). Request errors: no answer ->
 backoff with jitter (`offline` only with the heartbeat, `transport.py`); 401/403 -> `delivery_error`; 409
 `lease_expired` / `lease_mismatch` / `job_cancelled` -> the scheduler

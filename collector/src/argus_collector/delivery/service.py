@@ -30,7 +30,7 @@ ERROR_RETRY = "retry"  # 5xx or retryable=true
 LEASE_CODES = ("lease_expired", "lease_mismatch", "job_cancelled")
 REASONS = {  # what an ARGUS code means, for the journal (the panel's words are in fi.json)
     "host_not_approved": "the host is not approved for this job",
-    "evidence_missing": "the snapshot was not uploaded, sent again",
+    "evidence_missing": "the snapshot is missing in ARGUS",
     "evidence_hash_mismatch": "the quote is not in the snapshot",
     "field_audit_missing": "the field audit is missing",
     "invalid_input": "ARGUS refused the content",

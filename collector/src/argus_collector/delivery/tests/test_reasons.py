@@ -81,7 +81,7 @@ def test_each_rejected_event_has_its_id_code_and_words(home: Path, tmp_path: Pat
         assert hooks.calls == [("j1", "contact.observed", "evidence_hash_mismatch",
                                 "event e2 seq 2")]
         log = journal(home)
-        assert "event e3 seq 3 rejected sequence_gap (a gap in seq, sent again)" in log
+        assert "job j1: 1 events from seq 3 wait for the seq before them (sequence_gap" in log
         assert "1 accepted/duplicate, 1 rejected" in log
         assert delivery.stats(conn).last_code == "evidence_hash_mismatch"
     finally:

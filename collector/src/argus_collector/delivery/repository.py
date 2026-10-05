@@ -119,11 +119,13 @@ def reset_upload(conn: sqlite3.Connection, evidence_ids: list[str]) -> None:
 
 
 def totals(conn: sqlite3.Connection, job_id: str | None = None) -> tuple[int, int]:
-    """(pending events + uploads, rejected events + uploads), for one job or all."""
+    """(pending events + uploads, rejected events + uploads), for one job or all; an event
+    given up whose seq carries a stand-in (`retry.py`) counts as rejected."""
     where, args = ("WHERE job_id = ?", (job_id,)) if job_id else ("", ())
     sql = (
-        "SELECT SUM(status = 'pending'), SUM(status = 'rejected') FROM ("
-        f"SELECT status FROM outbox {where} UNION ALL SELECT status FROM evidence_uploads {where})"
+        "SELECT SUM(status = 'pending'), SUM(status = 'rejected' OR lost != '') FROM ("
+        f"SELECT status, replaced_type AS lost FROM outbox {where} UNION ALL"
+        f" SELECT status, '' FROM evidence_uploads {where})"
     )
     row = conn.execute(sql, args * 2).fetchone()
     return int(row[0] or 0), int(row[1] or 0)
@@ -165,10 +167,12 @@ def local_evidence_id(conn: sqlite3.Connection, evidence_id: str) -> str | None:
 
 
 def rejected_rows(conn: sqlite3.Connection) -> list[sqlite3.Row]:
-    """Rejected events and snapshots, the latest first (job, kind, id, seq, code, at)."""
+    """Rejected events (given-up ones by their own id) and snapshots, the latest first."""
     return conn.execute(
         "SELECT job_id, type AS kind, event_id AS item_id, seq, code, sent_at AS at"
-        " FROM outbox WHERE status = 'rejected' UNION ALL"
+        " FROM outbox WHERE status = 'rejected' AND replaced_type = '' UNION ALL"
+        " SELECT job_id, replaced_type, replaced_event_id, seq, retry_code, sent_at"
+        " FROM outbox WHERE replaced_type != '' UNION ALL"
         " SELECT job_id, 'evidence', evidence_id, NULL, code, acked_at"
         " FROM evidence_uploads WHERE status = 'rejected' ORDER BY at DESC"
     ).fetchall()

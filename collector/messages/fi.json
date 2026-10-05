@@ -138,7 +138,7 @@
   "delivery.state.offline": "Ei verkkoa",
   "delivery.state.delivery_error": "Lähetys epäonnistui",
   "delivery.rejected.host_not_approved": "verkkotunnusta ei ole hyväksytty",
-  "delivery.rejected.evidence_missing": "lähdettä ei ole lähetetty",
+  "delivery.rejected.evidence_missing": "todiste puuttuu",
   "delivery.rejected.evidence_hash_mismatch": "lainaus ei vastaa lähdettä",
   "delivery.rejected.field_audit_missing": "kenttätarkistus puuttuu",
   "delivery.rejected.invalid_input": "virheellinen tieto",

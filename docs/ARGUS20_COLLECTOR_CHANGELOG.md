@@ -1,5 +1,23 @@
 # ARGUS20_COLLECTOR_CHANGELOG
 
+## 0.4.8.5 — 2026-10-05
+
+**Правка 5 шага 7 (`stage-5/step-7-evidence-loop`), приоритет владельца 05.10: петля доставки `evidence_missing`.** ARGUS отклонял `contact.observed` как `evidence_missing` (16 событий, 5 заданий, например job 87e9f874 seq 9–156), сборщик писал «the snapshot was not uploaded, sent again» и повторял событие каждые ~90 с без конца (шесть кругов за 8 минут по `delivery_check` 20:03–20:11 UTC). Контракт не менялся.
+
+**Что сделано.**
+- `evidence_missing`: сначала снимки, которые называет событие, снова ставятся в загрузку, событие ждёт их (как и раньше) и уходит снова — не более 3 повторов с этим кодом (`retry_count` в outbox). Снимка нет здесь (строка загрузки есть, файлов нет) или ARGUS отказал в 4-й раз — событие отброшено: `Hylätty N: todiste puuttuu` в Jono, `Lähetysvirhe: N (todiste puuttuu)` в Lähetys, в `pilot rejected` / `delivery_check.ps1` — его event_id и код; больше не отправляется.
+- ARGUS не засчитывает seq события, отклонённого как `evidence_missing` (контракт: «observations require already uploaded evidence», seq остаётся свободным, следующие события получают `sequence_gap`). Чтобы остаток прогона, включая `job.finished`, дошёл, свободный seq занимает событие `source.blocked` без снимков: `status` `evidence_missing`, URL страницы, `detail` — какое событие и почему не доставлено. Если ARGUS этот seq уже засчитал (`last_contiguous_seq` ≥ seq), замены нет.
+- `sequence_gap` — следствие пропуска перед ним, в лимит повторов не входит; переходы транспорта и ошибки запроса (нет ответа, 5xx, 429) — не отказ события и тоже не считаются.
+- Журнал: `… rejected evidence_missing (the snapshot is missing in ARGUS): snapshot uploaded again first (was {…: 'duplicate'}), retry 1 of 3` — со статусом прошлой загрузки снимка (если ARGUS отвечал `duplicate`, а событие всё равно `evidence_missing`, расхождение на стороне ARGUS видно в журнале); отказ — строка с компанией и причиной; замена — `seq N carries source.blocked <id> instead of contact.observed <id>`.
+- Тесты больше не пишут в рабочий журнал MAIN-PC (`conftest.py` в корне: временный `ARGUS_COLLECTOR_HOME` на весь прогон). Раньше `install.ps1` во время тестов дописывал в `%LOCALAPPDATA%\Gridex\ArgusCollector\logs` строки тестовых заданий (`transport …`, `collecting on/off`, страницы, вызовы модели) — например, 18:17:54–18:18:38 в выводе установки 0.4.8.4; базу, паринг и токен тесты не трогали.
+
+**Модули.** Новые файлы: `delivery/retry.py`, `conftest.py` (корень). Изменены: `delivery` (results, repository, service, README), `storage` (миграция 3: `outbox.retry_code`, `retry_count`, `replaced_type`, `replaced_event_id`), `collector/messages/fi.json` (`delivery.rejected.evidence_missing`: «todiste puuttuu»). Тесты: `delivery/tests/test_retry.py`, `collector/tests/contract/test_evidence_loop.py` (контракт-сервер: отброшенное событие, замена на его seq, следующее событие принято).
+
+**Решения (поправь, если не так).**
+1. Замена `source.blocked` на свободном seq — без неё отброшенное событие навсегда держало бы остаток прогона в `sequence_gap`, а лимит в 3 повтора отбросил бы и весь хвост.
+2. Лимит 3 повтора — только для отказов события с кодом, при которых оно остаётся в очереди (`evidence_missing`); `sequence_gap` и ошибки связи — не считаются.
+3. Изоляция тестов включена в эту правку: строки тестов в рабочем журнале путали разбор живых логов.
+
 ## 0.4.8.4 — 2026-10-05
 
 **Правка 4 шага 7 (`stage-5/step-7-heartbeat-win2`): `install.ps1` на MAIN-PC остановился на двух тестах 0.4.8.3.** Контракт и поведение панели не менялись — правка только в тестах.
