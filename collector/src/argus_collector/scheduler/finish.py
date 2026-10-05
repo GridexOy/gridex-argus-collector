@@ -2,7 +2,8 @@
 
 Crawl completion and coverage confirmation are separate (TZ_SELAIN 8.10):
 without a catalog total the confirmation is always `unverified`, and
-`completed` + `unverified` is the normal result.
+`completed` + `unverified` is the normal result; a directory that states
+its size gives `expected_count` and, when all were found, `verified_*`.
 """
 
 from __future__ import annotations
@@ -52,19 +53,33 @@ def counts(conn: sqlite3.Connection, facts: RunFacts) -> api.Counts:
     )
 
 
+def _scope(facts: RunFacts) -> str:
+    cp = facts.checkpoint
+    parts = [f"{cp.pages} pages and {len(cp.seen_keys)} page states on {', '.join(facts.hosts)}"]
+    if cp.acted:
+        parts.append(f"{len(cp.acted)} tabs, sections or country choices opened")
+    if cp.declared_total:
+        parts.append(f"the directory states {cp.declared_total} records")
+    parts.append(f"{len(cp.frontier)} links left unvisited, {len(cp.gaps)} gaps")
+    return "; ".join(parts)
+
+
 def coverage(facts: RunFacts, found: int) -> api.Coverage:
+    """basis: catalog_total when a directory stated its size, frontier_exhausted when the
+    relevant frontier was walked to its end, else unknown (TZ_SELAIN 8.10)."""
     cp = facts.checkpoint
     status = service.frontier_status(facts.end_reason, cp.pages)
     basis = "frontier_exhausted" if status == "exhausted" else "unknown"
-    scope = (
-        f"{cp.pages} pages and {len(cp.seen_keys)} page states on {', '.join(facts.hosts)};"
-        f" {len(cp.frontier)} links left unvisited"
-    )
+    confirmation = "unverified"
+    if cp.declared_total:
+        basis = "catalog_total"
+        if found >= cp.declared_total:
+            confirmation = "verified_against_catalog_total"
     return api.Coverage(
         frontier_status=api.CoverageFrontierStatus(status),
-        confirmation=api.CoverageConfirmation("unverified"), basis=api.CoverageBasis(basis),
-        scope_description=scope, expected_count=None, found_count=found,
-        gap_count=len(cp.gaps), evidence_ids=[],
+        confirmation=api.CoverageConfirmation(confirmation), basis=api.CoverageBasis(basis),
+        scope_description=_scope(facts), expected_count=cp.declared_total or None,
+        found_count=found, gap_count=len(cp.gaps), evidence_ids=[],
     )
 
 
@@ -129,14 +144,12 @@ def finished(
     facts: RunFacts,
     scope: api.Scope,
     outcome: tuple[str, str, int],
-    known_contacts: int,
+    summary: api.FinishedPayloadFreshnessSummary,
 ) -> api.FinishedPayload:
-    """outcome = (run_result_status, completion_reason, seq of this job.finished)."""
+    """outcome = (run_result_status, completion_reason, seq of this job.finished);
+    summary = the counts of the run's contact.freshness checks."""
     result, reason, seq = outcome
     found = counts(conn, facts)
-    summary = api.FinishedPayloadFreshnessSummary(
-        reconfirmed=0, changed=0, not_seen_in_checked_scope=0, not_checked=known_contacts
-    )
     return api.FinishedPayload(
         run_result_status=api.FinishedPayloadRunResultStatus(result),
         completion_reason=api.FinishedPayloadCompletionReason(reason),

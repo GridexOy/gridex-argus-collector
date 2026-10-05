@@ -95,6 +95,12 @@ def map_entity_tx(
     return cursor.rowcount == 1
 
 
+def entity_types(conn: sqlite3.Connection, job_id: str) -> dict[str, str]:
+    rows = conn.execute("SELECT entity_key, entity_type FROM entity_map WHERE job_id = ?",
+                        (job_id,))
+    return {str(r[0]): str(r[1]) for r in rows}
+
+
 def entity_counts(conn: sqlite3.Connection, job_id: str) -> dict[str, int]:
     rows = conn.execute(
         "SELECT entity_type, COUNT(*) FROM entity_map WHERE job_id = ? GROUP BY entity_type",

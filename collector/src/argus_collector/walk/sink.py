@@ -58,6 +58,7 @@ class WalkCheckpoint:
     claimed: dict[str, str] = field(default_factory=dict)
     gaps: list[WalkGap] = field(default_factory=list)
     acted: list[str] = field(default_factory=list)  # structural actions done (url|label)
+    declared_total: int = 0  # the largest record count a directory page declared
     pages: int = 0
     actions: int = 0
     active_seconds: float = 0.0
@@ -81,6 +82,7 @@ class WalkCheckpoint:
             claimed={str(k): str(v) for k, v in data.get("claimed", {}).items()},
             gaps=[WalkGap(**g) for g in data.get("gaps", [])],
             acted=[str(v) for v in data.get("acted", [])],
+            declared_total=int(data.get("declared_total", 0)),
             pages=int(data.get("pages", 0)),
             actions=int(data.get("actions", 0)),
             active_seconds=float(data.get("active_seconds", 0.0)),

@@ -12,7 +12,7 @@ from argus_collector.api_client import contract as api
 from argus_collector.delivery import contract as delivery
 from argus_collector.models.contract import CallRecord
 from argus_collector.runtime import contract as runtime
-from argus_collector.scheduler import events, finish, service
+from argus_collector.scheduler import events, finish, history, service
 from argus_collector.scheduler import repository as repo
 from argus_collector.storage import contract as storage
 from argus_collector.walk import contract as walk
@@ -29,6 +29,7 @@ class RunContext:
     hosts: tuple[str, ...]
     consumed: service.Consumed
     started_at: datetime  # when the run was claimed (wall time of job.finished)
+    known: tuple[history.Known, ...] = ()  # ClaimedJob.known_contacts (a re-run)
 
 
 class JobSink:
@@ -39,6 +40,7 @@ class JobSink:
         self.transport = transport
         self.source_id: str | None = None
         self._last_progress = 0.0
+        self.known = history.KnownIndex(list(ctx.known))
 
     def _wire(self, source: walk.PageSource) -> str:
         sha = source.snapshot.html_sha256
@@ -65,8 +67,9 @@ class JobSink:
         fields = 0
         for entity in found.entities:
             evidence = (wire, source.snapshot.text_sha256)
-            self._enqueue(conn, events.contact(ctx.job_id, ctx.run_id, entity, evidence, audit),
-                          [wire])
+            change = self._change_of(entity)
+            self._enqueue(conn, events.contact(ctx.job_id, ctx.run_id, entity, evidence, audit,
+                                               change), [wire])
             fields += len(entity.fields)
             self._count(conn, entity)
         fields_of = (source.source_id, source.url, source.state_key, source.parent_source_id,
@@ -78,6 +81,13 @@ class JobSink:
             f"job {ctx.job_id}: {len(found.entities)} entities, {fields} new fields,"
             f" {len(found.audit)} audited fields on {runtime.safe_url(source.url)}",
         )
+
+    def _change_of(self, entity: walk.EntityFinding) -> events.Change:
+        values: dict[str, set[str]] = {}
+        for f in entity.fields:
+            values.setdefault(f.field, set()).add(f.value)
+        known = self.known.match(entity.entity_type, entity.entity_key, values)
+        return lambda f: self.known.change(known, f.field, f.value)
 
     def _count(self, conn: sqlite3.Connection, entity: walk.EntityFinding) -> None:
         ctx = self.ctx

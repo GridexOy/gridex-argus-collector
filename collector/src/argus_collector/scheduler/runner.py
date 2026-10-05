@@ -15,7 +15,7 @@ from argus_collector.delivery import contract as delivery
 from argus_collector.discovery import contract as discovery
 from argus_collector.models.contract import ModelConfig
 from argus_collector.runtime import contract as runtime
-from argus_collector.scheduler import events, finish, service
+from argus_collector.scheduler import events, finish, freshness, history, service
 from argus_collector.scheduler import repository as repo
 from argus_collector.scheduler.sink import JobSink, RunContext
 from argus_collector.storage import contract as storage
@@ -104,6 +104,7 @@ def context(row: sqlite3.Row, claimed: api.ClaimedJob, env: WalkEnv) -> RunConte
     return RunContext(
         row["job_id"], row["run_id"], row["company_id"], env.version, hosts, consumed(claimed),
         datetime.fromisoformat(row["claimed_at"]),
+        tuple(history.parse_known(claimed.known_contacts)),
     )
 
 
@@ -133,10 +134,14 @@ def finish_run(
     found = int(current["persons"]) + int(current["channels"]) > 0
     result, reason = service.outcome(end_reason, found, cancelled)
     facts = JobSink(context(row, claimed, env), lambda: "synced").facts(checkpoint, end_reason)
+    ids = (row["job_id"], row["run_id"])
+    cover = finish.coverage(facts, finish.counts(conn, facts).persons)
+    checks = freshness.checks(conn, ids, claimed.known_contacts, checkpoint, cover)
     with storage.transaction(conn):
+        freshness.enqueue_tx(conn, ids, checks)
         seq = delivery.next_seq(conn, row["run_id"])
         payload = finish.finished(
-            conn, facts, claimed.job.scope, (result, reason, seq), len(claimed.known_contacts)
+            conn, facts, claimed.job.scope, (result, reason, seq), freshness.summary(checks)
         )
         make = events.envelope(api.JobFinishedEvent, row["job_id"], row["run_id"], payload)
         delivery.enqueue_event(conn, row["job_id"], row["run_id"], make, [], seq=seq)

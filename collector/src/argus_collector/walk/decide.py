@@ -12,11 +12,9 @@ from argus_collector.walk.state import WalkState
 
 
 def end_budget(state: WalkState) -> None:
+    """Budget used: every relevant link left is a resumable gap `budget_reached`."""
     state.end_reason = service.END_BUDGET
-    if state.cp.frontier:
-        best = max(state.cp.frontier.values(), key=lambda link: link.score)
-        detail = f"run budget used; {len(state.cp.frontier)} links left in the frontier"
-        state.add_gap(best.url, "budget_reached", detail, True)
+    state.gap_unwalked("budget_reached", "the run budget was used up before this link")
 
 
 def _guard_finish(state: WalkState, candidates: list[discovery.Candidate]) -> Action:

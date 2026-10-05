@@ -18,6 +18,7 @@ from typing import cast
 
 from argus_collector.api_client import contract as api
 from argus_collector.delivery import contract as delivery
+from argus_collector.runtime import contract as runtime
 from argus_collector.scheduler import leases, runner, service
 from argus_collector.scheduler import repository as repo
 from argus_collector.storage import contract as storage
@@ -89,8 +90,14 @@ class CollectorHooks:
         self.on_change()
 
     def applied(self, conn: sqlite3.Connection, job_id: str, resp: api.EventsResponse) -> None:
-        if resp.job_state.value == "cancelled":
+        """ARGUS's job state in every events answer: a pause or cancel takes effect after
+        the current page, not only with the next heartbeat (owner 05.10.2026)."""
+        state = resp.job_state.value
+        if state == "cancelled":
             self.dispatch(conn, job_id, service.STOP_CANCEL)
+        elif state == "paused" and job_id == self.running_job:
+            runtime.journal("http", f"job {job_id}: paused in ARGUS (events answer)")
+            self.dispatch(conn, job_id, service.STOP_PAUSE)
 
     # Heartbeat ----------------------------------------------------------------------
     def heartbeat_fields(self) -> leases.HeartbeatFields:

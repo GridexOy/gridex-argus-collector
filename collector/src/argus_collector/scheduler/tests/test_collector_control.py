@@ -74,3 +74,24 @@ def test_stop_file_stops_walking_and_claiming_but_not_delivery(
     assert collector.queue_view().rows[0].state == "stopped"
     assert system.job(job_id)["counts"]["persons"] > 0, "what was found got delivered"
     collector.deliverer.stop()
+
+
+def test_pause_takes_effect_after_the_current_page_without_a_heartbeat(
+    tmp_path: Path, argus: contract_server.ContractServer, site: ThreadingHTTPServer,
+    model: FakeModelServer,
+) -> None:
+    system = System(argus)
+    job_id = system.batch(site, ["fixture_oy"])["fixture_oy"]
+    collector = make_collector(tmp_path, argus, model.endpoint)
+    collector.deliverer.start()
+    collector.start()
+    wait_for(lambda: any(r.persons > 0 for r in collector.queue_view().rows))
+    command = system.control(job_id, "pause")
+    wait_for(lambda: not collector.walking, timeout_s=30)
+    assert collector.queue_view().rows[0].state == "paused", "no heartbeat was needed"
+    heartbeat(collector, argus)
+    heartbeat(collector, argus)
+    ack = argus.stand.state["commands"][command["command_id"]]["ack"]
+    assert ack["status"] == "applied", "the command is still acknowledged"
+    collector.stop()
+    collector.deliverer.stop()

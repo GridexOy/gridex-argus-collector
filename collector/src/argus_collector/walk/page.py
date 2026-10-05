@@ -9,7 +9,7 @@ from argus_collector.extraction import contract as extraction
 from argus_collector.models import contract as models
 from argus_collector.normalization import contract as norm
 from argus_collector.storage import contract as storage
-from argus_collector.walk import findings, prompts, repository, service, structure
+from argus_collector.walk import coverage, findings, prompts, repository, service, structure
 from argus_collector.walk.context import PageContext
 from argus_collector.walk.service import WalkEvent
 from argus_collector.walk.sink import PageFindings, PageSource
@@ -48,6 +48,8 @@ def observe(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState) 
     key = discovery.page_key(page.url, evidence.sha256_text(text))
     offered = structure.offered(state, page.candidates)
     links = discovery.rank_candidates(offered, set(state.cp.visited), state.hosts)
+    if state.job_mode:
+        coverage.note_foreign_links(state, page.url, [c for c in offered if c.kind == "link"])
     state.remember_links(page.url, [c for c in links if c.kind == "link"])
     if key not in state.cp.seen_keys:
         state.cp.seen_keys.append(key)
@@ -91,6 +93,7 @@ def _extract(
     if extraction.has_contact_signals(text, channels):
         contacts = _parse_cards(state, page, text, channels, region)
     state.page_has_contacts = bool(contacts or channels)
+    coverage.note_total(state, text, len(contacts))
     bindings = wb.bindings(findings.probes(contacts)) if state.job_mode and contacts else []
     context = PageContext(tuple(sections), lang)
     found, keys = findings.build_findings(state, source, contacts, bindings, channels, context)

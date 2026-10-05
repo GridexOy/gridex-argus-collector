@@ -1,5 +1,26 @@
 # ARGUS20_COLLECTOR_CHANGELOG
 
+## 0.4.5.0 — 2026-10-05
+
+**Шаг `stage-5/step-4-a4-history`: пара 4 TZ_TANDEM «История и полнота» (A4) и сокращение паузы по решению владельца 05.10.2026.**
+
+**Что видно (в ARGUS / контракт-сервере; в панели — те же Jono / Lähetys).**
+- Повторный пакет той же компании (`rerun_reason`): тот же человек приходит как `reconfirmed` — строк в ARGUS не прибавляется, `last_seen_at` — сегодня; изменённое поле — `changed` со ссылкой на прежнее наблюдение (`supersedes_observation_id`); человек, которого на сайте больше нет, — `contact.freshness` `not_seen_in_checked_scope` («Ei löytynyt tarkistetusta laajuudesta»), контакт остаётся.
+- `job.finished`: `freshness_summary` = счёт проверок; `coverage.basis` / `expected_count` / `found_count` (каталог с заявленным размером — `catalog_total`, найдены все — `verified_against_catalog_total`); `scope_description` — страницы, состояния, хосты, открытые вкладки/разделы, заявленный размер, остаток frontier и число gaps.
+- Gap на каждую непройденную ветвь: кончился бюджет — каждая оставшаяся релевантная ссылка `budget_reached` (возобновляемо); три сбоя подряд — `no_progress`; релевантная ссылка на хост того же бренда вне `approved_hosts` (`ledvance.fi` рядом с `ledvance.com`) — `domain_ownership_unresolved` (не возобновляемо, владелец может внести `owner_known_url`).
+- «Pysäytä» из ARGUS исполняется после текущей страницы: состояние `paused` приходит в ответе на каждый пакет событий (обход шлёт их после каждой страницы), heartbeat для этого больше не нужен; команда по-прежнему подтверждается в heartbeat (`applied`).
+
+**Как работает.** `scheduler.history`: известные контакты из claim (форма `fields` в контракте открыта — читаются строка, список, объект с `value`/`observation_id` и список объектов); человек сопоставляется по нормализованному имени, офис/общий канал — по телефону или почте; значение = известному → `reconfirmed`, другое значение известного поля → `changed` + `supersedes`, иначе `new`. `scheduler.freshness`: в конце прогона — по проверке на каждое поле каждого известного контакта, из наблюдений задания (checkpoint), с evidence наблюдения; события по ≤ 50 проверок перед `job.finished`. `walk.coverage`: заявленный размер каталога, gaps внешних ссылок бренда; `walk.state.gap_unwalked`; `walk.actions` — выполнение действий вынесено из `runner.py`.
+
+**Модули.** Новые файлы: `scheduler/history.py`, `scheduler/freshness.py`, `walk/coverage.py`, `walk/actions.py`. Изменены: `scheduler` (events, sink, runner, finish, hooks, repository), `walk` (state, decide, page, runner, sink). Тесты: `scheduler/tests/test_history.py`, `test_collector_history.py` (повтор → reconfirmed без новых строк; вариант фикстуры без Pekka Salo → not_seen, контакт на месте), `test_collector_control.py::test_pause_takes_effect_after_the_current_page_without_a_heartbeat`, `walk/tests/test_coverage.py`.
+
+**Решения (поправь, если не так).**
+1. Формат `KnownContact.fields` контракт не фиксирует; сборщик читает все разумные формы, контракт-сервер отдаёт `{поле: [{value, raw_value, observation_id, observed_at}]}` — вопрос Архивариусу: какой формат отдаёт B4.
+2. `not_seen_in_checked_scope` — только при исчерпанном frontier (`coverage.frontier_status=exhausted`); прогон, закончившийся бюджетом, отменой или сбоями, даёт `not_checked`.
+3. `changed` для поля с несколькими значениями (телефоны) — когда ни одно известное значение на странице не встретилось; новое значение рядом с подтверждённым — `new`.
+4. Gap на «непройденную ветвь» — только для релевантных ссылок (`discovery.strong_link`: контакты, команда, версия страны); слабые ссылки (продукты, новости) gap не дают, но входят в `scope_description` числом.
+5. Заявленный размер каталога берётся только со страницы, где найдены люди, и только если он не меньше найденного там.
+
 ## 0.4.4.0 — 2026-10-05
 
 **Шаг `stage-5/step-3-a2-country`: дополнение владельца к A2 от 05.10.2026, пп. 1–5 (страна выставки, вкладки отделов, проверка «не бот»).** S5 (cv0.4.3.1) принят владельцем 05.10.2026; тег `v0.4.3` поставлен локально на `b700d40` (отправить его не даёт git-прокси сессии — см. отчёт).

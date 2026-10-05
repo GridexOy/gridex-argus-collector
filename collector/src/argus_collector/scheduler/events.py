@@ -87,13 +87,20 @@ def locator(found: walk.FieldFinding, text_sha256: str) -> api.Locator:
     return api.LocatorDom(value=f'a[href^="{scheme}:"]', text_sha256=text_sha256)
 
 
-def observation(found: walk.FieldFinding, evidence_id: str, text_sha256: str) -> api.Observation:
+Change = Callable[[walk.FieldFinding], tuple[str, str | None]]  # change_kind, supersedes
+
+
+def observation(
+    found: walk.FieldFinding, evidence_id: str, text_sha256: str,
+    change: tuple[str, str | None] = ("new", None),
+) -> api.Observation:
     return api.Observation(
         observation_id=found.observation_id, field=found.field, raw_value=found.raw,
         normalized_value=found.value,
         extraction_status=api.ObservationExtractionStatus(found.status),
         evidence_id=evidence_id, locator=locator(found, text_sha256), quote=found.raw,
-        binding=api.Binding(found.binding), change_kind=api.ObservationChangeKind("new"),
+        binding=api.Binding(found.binding), change_kind=api.ObservationChangeKind(change[0]),
+        supersedes_observation_id=change[1],
     )
 
 
@@ -110,19 +117,26 @@ def field_audit(evidence_id: str, entries: tuple[walk.AuditEntry, ...]) -> api.F
 
 def contact(
     job_id: str, run_id: str, entity: walk.EntityFinding, evidence: tuple[str, str],
-    audit: api.FieldAudit,
+    audit: api.FieldAudit, change: Change | None = None,
 ) -> MakeEvent:
     """contact.observed for a new entity, contact.enriched for new fields; evidence =
-    (wire evidence id, canonical text sha256)."""
+    (wire evidence id, canonical text sha256); `change` gives the change_kind of a
+    field against the job's known contacts (A4)."""
     relationship = None if entity.entity_type == "person" else "company"
+    kind_of = change or (lambda _f: ("new", None))
     payload = api.ContactPayload(
         entity_id=entity.entity_id, entity_type=api.ContactPayloadEntityType(entity.entity_type),
-        observations=[observation(f, evidence[0], evidence[1]) for f in entity.fields],
+        observations=[observation(f, evidence[0], evidence[1], kind_of(f)) for f in entity.fields],
         field_audit=audit,
         relationship=api.ContactPayloadRelationship(relationship) if relationship else None,
     )
     cls = api.ContactObservedEvent if entity.is_new else api.ContactEnrichedEvent
     return envelope(cls, job_id, run_id, payload)
+
+
+def freshness(job_id: str, run_id: str, checks: list[api.FreshnessCheck]) -> MakeEvent:
+    payload = api.FreshnessPayload(checks=checks)
+    return envelope(api.ContactFreshnessEvent, job_id, run_id, payload)
 
 
 def model_usage(record: CallRecord) -> api.ModelUsage:

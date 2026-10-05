@@ -18,6 +18,7 @@ Emit = Callable[[WalkEvent], None]
 ShouldStop = Callable[[], bool]
 MAX_FRONTIER = 500
 MAX_FAILURES_IN_ROW = 3
+MAX_BRANCH_GAPS = 30  # unwalked relevant links reported as gaps per run
 FRONTIER_INDEX_BASE = 10_000  # frontier links shown to the model get indexes from here
 
 
@@ -84,6 +85,14 @@ class WalkState:
         self.cp.gaps.append(gap)
         if self.sink is not None:
             self.sink.gap(self.conn, gap)
+
+    def gap_unwalked(self, reason: str, detail: str) -> None:
+        """A gap for each relevant link left in the frontier (TANDEM A4.3)."""
+        links = sorted(self.cp.frontier.values(), key=lambda link: -link.score)
+        relevant = [link for link in links
+                    if discovery.strong_link(link.text, link.url, self.focus)]
+        for link in relevant[:MAX_BRANCH_GAPS]:
+            self.add_gap(link.url, reason, f"{detail}; linked from {link.parent_url}", True)
 
     def clear_gap(self, url: str, reason: str) -> None:
         """A gap solved later in the run (a bot check the owner passed) is no gap."""

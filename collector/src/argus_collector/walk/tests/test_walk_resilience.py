@@ -9,7 +9,8 @@ import pytest
 
 from argus_collector.browser import contract as browser
 from argus_collector.browser.contract import PageState
-from argus_collector.walk import contract, runner, service
+from argus_collector.walk import actions, contract, service
+from argus_collector.walk.state import WalkState
 from argus_collector.walk.tests.conftest import settings_for
 from argus_collector.walk.tests.fake_policy import GoldPolicy
 from collector.tests.fake_model_server import FakeModelServer
@@ -20,18 +21,18 @@ def test_a_failed_action_is_a_gap_and_the_walk_goes_on(
 ) -> None:
     policy = GoldPolicy(gold["persons"])
     fake = FakeModelServer(policy).start()
-    real_perform = runner._perform
+    real_perform = actions._perform
     calls = {"n": 0}
 
     def flaky_perform(
-        state: runner.WalkState, wb: browser.WalkBrowser, page: PageState, action: service.Action
+        state: WalkState, wb: browser.WalkBrowser, page: PageState, action: service.Action
     ) -> PageState:
         calls["n"] += 1
         if calls["n"] == 2:
             raise browser.ActionError("boom: locator.click timed out")
         return real_perform(state, wb, page, action)
 
-    monkeypatch.setattr(runner, "_perform", flaky_perform)
+    monkeypatch.setattr(actions, "_perform", flaky_perform)
     events: list[contract.WalkEvent] = []
     settings = settings_for(site, fake, tmp_path)
     try:

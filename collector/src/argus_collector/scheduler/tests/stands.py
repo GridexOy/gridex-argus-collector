@@ -55,10 +55,11 @@ class System:
         except urllib.error.HTTPError as err:
             return err.code, json.loads(err.read().decode("utf-8"))
 
-    def batch(self, site: ThreadingHTTPServer, ids: list[str], **policy: Any) -> dict[str, str]:
-        """Batch of fixture companies -> {company_id: job_id}."""
+    def batch(self, site: ThreadingHTTPServer, ids: list[str], rerun: str | None = None,
+              **policy: Any) -> dict[str, str]:
+        """Batch of fixture companies -> {company_id: job_id} (`rerun`: rerun_reason)."""
         chosen = [c for c in companies.companies(site.server_address[1]) if c["company_id"] in ids]
-        inputs = [stand.company_input(c, None) for c in chosen]
+        inputs = [stand.company_input(c, rerun) for c in chosen]
         for item in inputs:
             item["policy"].update(policy)
         body = {"client_request_id": str(uuid.uuid4()), "companies": inputs}
@@ -68,6 +69,11 @@ class System:
 
     def job(self, job_id: str) -> dict[str, Any]:
         status, data = self.call("GET", f"/api/collector/jobs/{job_id}")
+        assert status == 200, data
+        return dict(data)
+
+    def company(self, company_id: str) -> dict[str, Any]:
+        status, data = self.call("GET", f"/_stand/companies/{company_id}/contacts")
         assert status == 200, data
         return dict(data)
 
