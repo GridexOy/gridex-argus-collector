@@ -23,7 +23,12 @@ from argus_collector.browser.binding import (
     parse_result,
     probe_payload,
 )
-from argus_collector.browser.scripts import CANDIDATES_JS, CHALLENGE_JS, IDX_ATTR
+from argus_collector.browser.scripts import (
+    CANDIDATES_JS,
+    CHALLENGE_JS,
+    HIDDEN_LINKS_JS,
+    IDX_ATTR,
+)
 from argus_collector.browser.service import is_challenge, launch_kwargs
 from argus_collector.discovery.contract import Candidate
 from argus_collector.runtime import contract as runtime
@@ -44,6 +49,7 @@ class PageState:
     text: str
     candidates: list[Candidate]
     challenge: bool = False  # a bot check that did not clear within 20 s
+    hidden_hrefs: tuple[str, ...] = ()  # mailto:/tel: links not rendered now
 
 
 class WalkBrowser:
@@ -116,7 +122,7 @@ class WalkBrowser:
             self._settle()
         state = self.observe()
         return PageState(state.url, state.title, state.html, state.text, state.candidates,
-                         challenge=challenged)
+                         challenge=challenged, hidden_hrefs=state.hidden_hrefs)
 
     def goto(self, url: str) -> PageState:
         """Navigate, wait for DOM content + a short settle, observe."""
@@ -173,10 +179,12 @@ class WalkBrowser:
             for item in raw
         ]
         text = self.page.evaluate("() => document.body ? document.body.innerText : ''")
+        hidden = self.page.evaluate(HIDDEN_LINKS_JS)
         return PageState(
             url=self.page.url,
             title=self.page.title(),
             html=self.page.content(),
             text=str(text),
             candidates=candidates,
+            hidden_hrefs=tuple(str(h) for h in hidden),
         )

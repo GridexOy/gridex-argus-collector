@@ -43,6 +43,7 @@ def test_bot_check_waits_for_the_owner_and_the_run_goes_on(tmp_path: Path) -> No
         wait_for(lambda: collector.delivery_view().pending == 0)
         status = system.job(job_id)
         assert status["runs_completed"] == 1, "the same run went on"
+        assert status["gaps"] == [], "the bot check the owner passed is no gap"
         people = [c for c in system.contacts(job_id)["contacts"] if c["entity_type"] == "person"]
         assert len(people) == len(gold("ledvance")["persons"])
         assert collector.attention_view() == []

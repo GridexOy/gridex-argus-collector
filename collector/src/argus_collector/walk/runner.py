@@ -80,6 +80,7 @@ def _walk(state: WalkState) -> None:
             if page.challenge:
                 _attention(state, page)
                 return
+            state.clear_gap(page.url, CHALLENGE_GAP)
             state.check_stop()
             state.tick()
             if state.budget_spent() or not page_step.enter(state, page):

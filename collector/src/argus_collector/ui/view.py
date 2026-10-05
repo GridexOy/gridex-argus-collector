@@ -21,6 +21,7 @@ from argus_collector.ui.view_attention import AttentionBlock
 from argus_collector.ui.view_collect import CollectBlock
 from argus_collector.ui.view_connection import ConnectionBlock
 from argus_collector.ui.view_queue import DeliveryBlock, QueueBlock
+from argus_collector.ui.view_scroll import ScrollBody
 
 BG = "#ffffff"
 FG = "#1f2328"
@@ -77,9 +78,9 @@ class PanelView:
         self.resource_labels: list[ttk.Label] = []
         _style(root)
         root.title(props.title)
-        root.minsize(MIN_WIDTH, MIN_HEIGHT)
-        self.body = ttk.Frame(root)
-        self.body.pack(fill="both", expand=True)
+        root.minsize(MIN_WIDTH, min(MIN_HEIGHT, root.winfo_screenheight() - 80))
+        self.scroll = ScrollBody(root, BG)
+        self.body = self.scroll.inner
         self._build_connection(props, on.test_connection)
         self._heading(props.collecting_title)
         self.collect = CollectBlock(self.body, props.collect, on)
@@ -95,7 +96,8 @@ class PanelView:
             self.body, self.stop_label, on.open_attention, on.attention_done
         )
         self.version_label = ttk.Label(root, style="Version.TLabel")
-        self.version_label.pack(side="bottom", anchor="w", padx=12, pady=6)
+        self.version_label.pack(side="bottom", anchor="w", padx=12, pady=6,
+                                before=self.scroll.outer)
         self.render(props)
 
     def _heading(self, text: str) -> None:
@@ -153,8 +155,11 @@ class PanelView:
         self.delivery.render(delivery)
 
     def render_attention(self, props: AttentionProps | None) -> None:
-        """Huomio: shown only while a job needs the owner."""
+        """Huomio: shown only while a job needs the owner (scrolled into view once)."""
+        appears = props is not None and not self.attention.visible
         self.attention.render(props)
+        if appears:
+            self.scroll.show(self.attention.frame)
 
     def set_browser_status(self, line: Line) -> None:
         self._set_line(self.browser_status, line)

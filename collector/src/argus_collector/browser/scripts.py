@@ -79,3 +79,11 @@ CHALLENGE_JS = """
   return {title: document.title || '', text: text.slice(0, 800), length: text.length, markers};
 }
 """
+
+# mailto:/tel: links the page does not render now (a closed tab, accordion or
+# reveal): their values are taken when the section is opened, not before.
+HIDDEN_LINKS_JS = """
+() => Array.from(document.querySelectorAll('a[href^="mailto:" i], a[href^="tel:" i]'))
+  .filter(a => !a.getClientRects().length || getComputedStyle(a).visibility === 'hidden')
+  .map(a => (a.getAttribute('href') || '').trim())
+"""

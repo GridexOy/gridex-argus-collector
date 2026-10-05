@@ -80,21 +80,29 @@ def _channel(
     return Channel(kind, value, visible or raw, locator, span)
 
 
-def _href_channels(finds: reader.RawFinds, text: str, region: Region) -> list[Channel | None]:
+def _href_channels(
+    finds: reader.RawFinds, text: str, region: Region, skip: frozenset[str]
+) -> list[Channel | None]:
     out: list[Channel | None] = []
     for href, visible in finds.tel_hrefs:
-        out.append(_channel(KIND_PHONE, href, "href:tel", text, visible, region))
+        if href not in skip:
+            out.append(_channel(KIND_PHONE, href, "href:tel", text, visible, region))
     for href, visible in finds.mailto_hrefs:
-        out.append(_channel(KIND_EMAIL, href, "href:mailto", text, visible))
+        if href not in skip:
+            out.append(_channel(KIND_EMAIL, href, "href:mailto", text, visible))
     return out
 
 
 def extract_channels(
-    html: str, text: str, region: str = norm.DEFAULT_REGION, region_at: Region | None = None
+    html: str,
+    text: str,
+    region: str = norm.DEFAULT_REGION,
+    region_at: Region | None = None,
+    skip_hrefs: frozenset[str] = frozenset(),
 ) -> list[Channel]:
     finds = reader.raw_finds(html)
     where = region_at or _fixed(region)
-    found = _href_channels(finds, text, where)
+    found = _href_channels(finds, text, where, skip_hrefs)
     for kind, raw, pointer in reader.jsonld_channels(finds.jsonld):
         found.append(_channel(kind, raw, pointer, text, region=where))
     for encoded in finds.cfemails:

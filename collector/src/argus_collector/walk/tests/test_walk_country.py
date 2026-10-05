@@ -63,6 +63,9 @@ def test_ledvance_finland_office_and_local_people(site: ThreadingHTTPServer,  # 
     assert "00100 Helsinki" in finland[0]["address"]
     values = {f.value for e in sink.entities().values() for f in e.fields}
     assert "+358974223301" not in values, "the fax is not taken"
+    others = gold("ledvance")["excluded"][1]["offices"]
+    leaked = {v for o in others for v in (o["email"], o["phone"])} & values
+    assert not leaked, "closed country sections are not read"
     assert {fields(e).get("country") for e in offices} == {"FI"}, "no other country opened"
     order = page_order(sink)
     assert not [p for p in order if p.startswith(("de-de", "sv-se", "fr-fr"))], order
@@ -96,3 +99,7 @@ def test_malux_every_tab_finnish_first_then_sweden(site: ThreadingHTTPServer,  #
     assert max(first_seen.index(n) for n in finns) < min(first_seen.index(n) for n in swedes)
     joakim = by_name["joakim flakholm"]
     assert joakim["job_title"] == "Maajohtaja" and joakim["department"] == "Johto"
+    company = [fields(e) for f in sink.findings for e in f.entities if e.entity_type != "person"]
+    assert all(c.get("country") in ("FI", "SE") for c in company if "phone" in c or "email" in c)
+    kinds = {e.entity_type for f in sink.findings for e in f.entities}
+    assert "unassigned_channel" not in kinds, "an email of a closed tab waits for its card"

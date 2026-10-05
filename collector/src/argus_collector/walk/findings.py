@@ -97,7 +97,9 @@ def _add_person(
     return key
 
 
-def _add_channel(page: PageBuilder, channel: extraction.Channel) -> None:
+def _add_channel(
+    page: PageBuilder, channel: extraction.Channel, context: ctx.PageContext
+) -> None:
     claim = f"{channel.kind}|{channel.value}"
     source_field = f"channel:{channel.kind}:{channel.locator}"
     if claim in page.state.cp.claimed:
@@ -114,7 +116,12 @@ def _add_channel(page: PageBuilder, channel: extraction.Channel) -> None:
         channel.locator,
     )
     found, obs_id = page.finding(key, channel.kind, vf, role.binding, CONFIRMED)
-    page.add_entity(key, role.entity_type, [found] if found else [])
+    new = [found] if found else []
+    country = ctx.country_field(context, span.start if span else -1)
+    if country is not None:  # the company header in ARGUS keeps other countries apart
+        other, _ = page.finding(key, "country", country, BINDING_CAPTION, CONFIRMED)
+        new += [other] if other else []
+    page.add_entity(key, role.entity_type, new)
     page.audit.append(AuditEntry(source_field, (obs_id,), channel.raw))
 
 
@@ -136,5 +143,5 @@ def build_findings(
     ]
     add_offices(page, where, channels)
     for channel in channels:
-        _add_channel(page, channel)
+        _add_channel(page, channel, where)
     return PageFindings(source, tuple(page.entities), tuple(page.audit)), keys

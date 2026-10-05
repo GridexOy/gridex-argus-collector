@@ -84,7 +84,8 @@ def _extract(
     region = region or settings.region_fallback
     sections = extraction.country_sections(text)
     channels = extraction.extract_channels(
-        page.html, text, region, extraction.region_resolver(sections, region)
+        page.html, text, region, extraction.region_resolver(sections, region),
+        frozenset(page.hidden_hrefs),
     )
     contacts: list[extraction.Contact] = []
     if extraction.has_contact_signals(text, channels):

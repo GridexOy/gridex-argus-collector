@@ -85,6 +85,11 @@ class WalkState:
         if self.sink is not None:
             self.sink.gap(self.conn, gap)
 
+    def clear_gap(self, url: str, reason: str) -> None:
+        """A gap solved later in the run (a bot check the owner passed) is no gap."""
+        key = discovery.normalize_url(url)
+        self.cp.gaps = [g for g in self.cp.gaps if not (g.state_key == key and g.reason == reason)]
+
     def remember_links(self, page_url: str, links: list[discovery.Candidate]) -> None:
         for cand in links:
             key = discovery.normalize_url(cand.href)
