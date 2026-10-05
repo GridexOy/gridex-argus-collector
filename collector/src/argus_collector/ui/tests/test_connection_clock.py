@@ -61,11 +61,15 @@ class FakeHost:
         return None
 
 
-def wait_for(predicate: Callable[[], bool], timeout_s: float = 10.0) -> None:
-    deadline = time.monotonic() + timeout_s
-    while not predicate() and time.monotonic() < deadline:
+def wait_for(predicate: Callable[[], bool], timeout_s: float = 10.0,
+             seen: Callable[[], object] = lambda: "") -> float:
+    """Seconds until `predicate` held; on a time-out the assertion shows `seen()`."""
+    started = time.monotonic()
+    while not predicate() and time.monotonic() < started + timeout_s:
         time.sleep(0.02)
-    assert predicate()
+    waited = time.monotonic() - started
+    assert predicate(), f"not after {waited:.1f} s: {seen()}"
+    return waited
 
 
 @pytest.fixture
@@ -120,11 +124,18 @@ def test_a_rejected_token_and_a_panel_fault_do_not_stop_the_clock(stand: SlowArg
     ctl.loop.stop()
 
 
-def test_no_answer_at_all_is_ei_verkkoa(stand: SlowArgus) -> None:
+def test_no_answer_at_all_is_ei_verkkoa(
+    stand: SlowArgus, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Windows refuses a closed localhost port only after ~2 s (TCP re-sends the SYN),
+    so the read time-out here is 10 s, as in the panel it is 30 s (MAIN-PC, 0.4.8.4)."""
+    monkeypatch.setattr(heartbeat_loop, "HEARTBEAT_TIMEOUT_S", 10.0)
     host = FakeHost()
     ctl = ConnectionController(host)
     ctl.pair(contract_server.pairing_key("http://127.0.0.1:9", WORKER, TOKEN))
-    wait_for(lambda: ctl.state.status == STATE_ERROR)
+    waited = wait_for(lambda: ctl.state.status == STATE_ERROR, timeout_s=30.0,
+                      seen=lambda: (ctl.state.status, ctl.state.slow_s, ctl.state.error_detail))
+    print(f"refused port answered as Ei verkkoa after {waited:.1f} s")
     assert ctl.props(load_messages()).state_text.startswith("Ei verkkoa: ")
     assert host.failed and host.failed[0] == 0
     ctl.loop.stop()
