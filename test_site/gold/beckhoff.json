@@ -1,0 +1,650 @@
+{
+  "fixture": "beckhoff",
+  "host": "beckhoff.localhost",
+  "case": "International company, exhibition country Finland; owner case 05.10.2026 (a live walk went 'Global presence -> Germany' instead of 'Beckhoff Worldwide -> Finland -> /fi-fi/'). The seed is the English global site en-en/; its contact page only points to Global presence (en-en/company/global-presence/, also in the footer of every en-en page). That page has two tabs: Germany is selected on load and shows the headquarters in Verl, 8 German sales offices and a link to /de-de/; Beckhoff Worldwide is hidden on load and holds regions Europe, Americas and Asia / Pacific with an accordion of 19 countries, all closed. The trap: the open Germany tab is another country. Correct path: tab Beckhoff Worldwide -> open only the Finland section (office: name, address, switchboard, general email, fax as extra) -> its local site /fi-fi/ -> Yhteystiedot (6 people in departments Myynti, Tekninen tuki, Hallinto); fi-fi/yritys/johto/ shows 2 managers as visible cards and as schema.org JSON-LD Person items with the same values. The Germany panel's headquarters and sales offices are never the Finnish office: if sent at all, only with country DE. Other countries' closed sections are never opened or read, and /de-de/ (header link Deutsch, Germany panel link) is never visited with exhibition country Finland. Every en-en page carries the same header and footer menus, so a decision on the menu is made once.",
+  "seed": "en-en/",
+  "tabs": {
+    "page": "en-en/company/global-presence/",
+    "labels": [
+      "Germany",
+      "Beckhoff Worldwide"
+    ],
+    "open": "Germany",
+    "walk": "Beckhoff Worldwide"
+  },
+  "path": [
+    {
+      "page": "en-en/",
+      "action": "link",
+      "label": "Global presence",
+      "href": "/en-en/company/global-presence/"
+    },
+    {
+      "page": "en-en/company/global-presence/",
+      "action": "tab",
+      "label": "Beckhoff Worldwide"
+    },
+    {
+      "page": "en-en/company/global-presence/",
+      "action": "expand",
+      "label": "Finland"
+    },
+    {
+      "page": "en-en/company/global-presence/",
+      "action": "link",
+      "label": "www.beckhoff.com/fi-fi",
+      "href": "/fi-fi/"
+    },
+    {
+      "page": "fi-fi/",
+      "action": "link",
+      "label": "Yhteystiedot",
+      "href": "/fi-fi/yhteystiedot/"
+    },
+    {
+      "page": "fi-fi/",
+      "action": "link",
+      "label": "Yritys",
+      "href": "/fi-fi/yritys/"
+    },
+    {
+      "page": "fi-fi/yritys/",
+      "action": "link",
+      "label": "Johto",
+      "href": "/fi-fi/yritys/johto/"
+    }
+  ],
+  "company": {
+    "name": "Beckhoff Automation Oy",
+    "offices": [
+      {
+        "name": "Beckhoff Automation Oy",
+        "address_lines": [
+          "Testikuja 2",
+          "01510 Vantaa"
+        ],
+        "phone": "+358201233800",
+        "phone_text": "020 123 3800",
+        "email": "finland@beckhoff.example",
+        "fax": "+358201233801",
+        "fax_text": "020 123 3801",
+        "country": "FI",
+        "page": "en-en/company/global-presence/",
+        "tab": "Beckhoff Worldwide",
+        "region": "Europe",
+        "section": "Finland",
+        "local_site": {
+          "href": "/fi-fi/",
+          "text": "www.beckhoff.com/fi-fi"
+        },
+        "also_on": "fi-fi/yhteystiedot/"
+      }
+    ]
+  },
+  "excluded": [
+    {
+      "kind": "foreign_tab",
+      "country": "DE",
+      "page": "en-en/company/global-presence/",
+      "tab": "Germany",
+      "reason": "the tab open on load is Germany, not the exhibition country: its headquarters and sales offices are never the Finnish office; if sent at all, only with country DE",
+      "offices": [
+        {
+          "section": "Headquarters",
+          "name": "Beckhoff Automation GmbH & Co. KG",
+          "address_lines": [
+            "Testweg 20",
+            "33415 Verl"
+          ],
+          "phone": "+4952460000",
+          "phone_text": "+49 5246 000-0",
+          "fax": "+495246000198",
+          "fax_text": "+49 5246 000-198",
+          "email": "info@beckhoff.example",
+          "local_site": "/de-de/"
+        },
+        {
+          "section": "Sales offices in Germany",
+          "name": "Beckhoff Automation GmbH & Co. KG",
+          "office": "Sales office Balingen",
+          "address_lines": [
+            "Teststraße 4",
+            "72336 Balingen"
+          ],
+          "phone": "+497433123450",
+          "phone_text": "07433 123 450",
+          "email": "balingen@beckhoff.example"
+        },
+        {
+          "section": "Sales offices in Germany",
+          "name": "Beckhoff Automation GmbH & Co. KG",
+          "office": "Sales office Berlin",
+          "address_lines": [
+            "Testallee 12",
+            "10115 Berlin"
+          ],
+          "phone": "+493012345670",
+          "phone_text": "030 1234 5670",
+          "email": "berlin@beckhoff.example"
+        },
+        {
+          "section": "Sales offices in Germany",
+          "name": "Beckhoff Automation GmbH & Co. KG",
+          "office": "Sales office Frankfurt",
+          "address_lines": [
+            "Testweg 7",
+            "60311 Frankfurt"
+          ],
+          "phone": "+496912345680",
+          "phone_text": "069 1234 5680",
+          "email": "frankfurt@beckhoff.example"
+        },
+        {
+          "section": "Sales offices in Germany",
+          "name": "Beckhoff Automation GmbH & Co. KG",
+          "office": "Sales office Hamburg",
+          "address_lines": [
+            "Teststraße 21",
+            "20095 Hamburg"
+          ],
+          "phone": "+494012345690",
+          "phone_text": "040 1234 5690",
+          "email": "hamburg@beckhoff.example"
+        },
+        {
+          "section": "Sales offices in Germany",
+          "name": "Beckhoff Automation GmbH & Co. KG",
+          "office": "Sales office Hannover",
+          "address_lines": [
+            "Testring 3",
+            "30159 Hannover"
+          ],
+          "phone": "+495111234560",
+          "phone_text": "0511 123 4560",
+          "email": "hannover@beckhoff.example"
+        },
+        {
+          "section": "Sales offices in Germany",
+          "name": "Beckhoff Automation GmbH & Co. KG",
+          "office": "Sales office Munich",
+          "address_lines": [
+            "Testplatz 9",
+            "80331 Munich"
+          ],
+          "phone": "+498912345600",
+          "phone_text": "089 1234 5600",
+          "email": "munich@beckhoff.example"
+        },
+        {
+          "section": "Sales offices in Germany",
+          "name": "Beckhoff Automation GmbH & Co. KG",
+          "office": "Sales office Nuremberg",
+          "address_lines": [
+            "Testgasse 15",
+            "90402 Nuremberg"
+          ],
+          "phone": "+499111234570",
+          "phone_text": "0911 123 4570",
+          "email": "nuremberg@beckhoff.example"
+        },
+        {
+          "section": "Sales offices in Germany",
+          "name": "Beckhoff Automation GmbH & Co. KG",
+          "office": "Sales office Stuttgart",
+          "address_lines": [
+            "Teststraße 30",
+            "70173 Stuttgart"
+          ],
+          "phone": "+497111234580",
+          "phone_text": "0711 123 4580",
+          "email": "stuttgart@beckhoff.example"
+        }
+      ]
+    },
+    {
+      "kind": "closed_country_sections",
+      "page": "en-en/company/global-presence/",
+      "tab": "Beckhoff Worldwide",
+      "reason": "only the exhibition country's section is opened; other countries' offices and local sites are neither read nor walked",
+      "offices": [
+        {
+          "section": "Austria",
+          "region": "Europe",
+          "country": "AT",
+          "name": "Beckhoff Automation GmbH",
+          "address_lines": [
+            "Testgasse 12",
+            "1120 Wien"
+          ],
+          "phone": "+43123456810",
+          "phone_text": "01 23456 810",
+          "fax": "+43123456811",
+          "fax_text": "01 23456 811",
+          "email": "austria@beckhoff.example",
+          "local_site": "/de-at/"
+        },
+        {
+          "section": "Belgium",
+          "region": "Europe",
+          "country": "BE",
+          "name": "Beckhoff Automation BV",
+          "address_lines": [
+            "Teststraat 21",
+            "2000 Antwerpen"
+          ],
+          "phone": "+3231234570",
+          "phone_text": "03 123 45 70",
+          "fax": "+3231234571",
+          "fax_text": "03 123 45 71",
+          "email": "belgium@beckhoff.example",
+          "local_site": "/nl-be/"
+        },
+        {
+          "section": "Denmark",
+          "region": "Europe",
+          "country": "DK",
+          "name": "Beckhoff Automation ApS",
+          "address_lines": [
+            "Testvej 14",
+            "8000 Aarhus C"
+          ],
+          "phone": "+4586123450",
+          "phone_text": "86 12 34 50",
+          "fax": "+4586123451",
+          "fax_text": "86 12 34 51",
+          "email": "denmark@beckhoff.example",
+          "local_site": "/da-dk/"
+        },
+        {
+          "section": "France",
+          "region": "Europe",
+          "country": "FR",
+          "name": "Beckhoff Automation SARL",
+          "address_lines": [
+            "15 rue de l'Essai",
+            "69002 Lyon"
+          ],
+          "phone": "+33412345670",
+          "phone_text": "04 12 34 56 70",
+          "fax": "+33412345671",
+          "fax_text": "04 12 34 56 71",
+          "email": "france@beckhoff.example",
+          "local_site": "/fr-fr/"
+        },
+        {
+          "section": "Italy",
+          "region": "Europe",
+          "country": "IT",
+          "name": "Beckhoff Automation S.r.l.",
+          "address_lines": [
+            "Via di Prova 14",
+            "22100 Como"
+          ],
+          "phone": "+390311234560",
+          "phone_text": "031 123 4560",
+          "fax": "+390311234561",
+          "fax_text": "031 123 4561",
+          "email": "italy@beckhoff.example",
+          "local_site": "/it-it/"
+        },
+        {
+          "section": "Netherlands",
+          "region": "Europe",
+          "country": "NL",
+          "name": "Beckhoff Automation B.V.",
+          "address_lines": [
+            "Testweg 8",
+            "5651 GH Eindhoven"
+          ],
+          "phone": "+31401234560",
+          "phone_text": "040 123 4560",
+          "fax": "+31401234561",
+          "fax_text": "040 123 4561",
+          "email": "netherlands@beckhoff.example",
+          "local_site": "/nl-nl/"
+        },
+        {
+          "section": "Norway",
+          "region": "Europe",
+          "country": "NO",
+          "name": "Beckhoff Automation AS",
+          "address_lines": [
+            "Testveien 9",
+            "1366 Lysaker"
+          ],
+          "phone": "+4767123450",
+          "phone_text": "67 12 34 50",
+          "fax": "+4767123451",
+          "fax_text": "67 12 34 51",
+          "email": "norway@beckhoff.example",
+          "local_site": "/nb-no/"
+        },
+        {
+          "section": "Poland",
+          "region": "Europe",
+          "country": "PL",
+          "name": "Beckhoff Automation Sp. z o.o.",
+          "address_lines": [
+            "ul. Testowa 7",
+            "02-001 Warszawa"
+          ],
+          "phone": "+48221234570",
+          "phone_text": "22 123 45 70",
+          "fax": "+48221234571",
+          "fax_text": "22 123 45 71",
+          "email": "poland@beckhoff.example",
+          "local_site": "/pl-pl/"
+        },
+        {
+          "section": "Spain",
+          "region": "Europe",
+          "country": "ES",
+          "name": "Beckhoff Automation S.A.",
+          "address_lines": [
+            "Calle de Prueba 11",
+            "08001 Barcelona"
+          ],
+          "phone": "+34931234560",
+          "phone_text": "93 123 45 60",
+          "fax": "+34931234561",
+          "fax_text": "93 123 45 61",
+          "email": "spain@beckhoff.example",
+          "local_site": "/es-es/"
+        },
+        {
+          "section": "Sweden",
+          "region": "Europe",
+          "country": "SE",
+          "name": "Beckhoff Automation AB",
+          "address_lines": [
+            "Testgatan 12",
+            "211 20 Malmö"
+          ],
+          "phone": "+4640123450",
+          "phone_text": "040-12 34 50",
+          "fax": "+4640123451",
+          "fax_text": "040-12 34 51",
+          "email": "sweden@beckhoff.example",
+          "local_site": "/sv-se/"
+        },
+        {
+          "section": "Switzerland",
+          "region": "Europe",
+          "country": "CH",
+          "name": "Beckhoff Automation AG",
+          "address_lines": [
+            "Testweg 4",
+            "8200 Schaffhausen"
+          ],
+          "phone": "+41521234560",
+          "phone_text": "052 123 45 60",
+          "fax": "+41521234561",
+          "fax_text": "052 123 45 61",
+          "email": "switzerland@beckhoff.example",
+          "local_site": "/de-ch/"
+        },
+        {
+          "section": "United Kingdom",
+          "region": "Europe",
+          "country": "GB",
+          "name": "Beckhoff Automation Ltd",
+          "address_lines": [
+            "3 Test Street",
+            "Bicester OX26 4LD"
+          ],
+          "phone": "+441632960450",
+          "phone_text": "01632 960 450",
+          "fax": "+441632960451",
+          "fax_text": "01632 960 451",
+          "email": "uk@beckhoff.example",
+          "local_site": "/en-gb/"
+        },
+        {
+          "section": "Brazil",
+          "region": "Americas",
+          "country": "BR",
+          "name": "Beckhoff Automação Ltda.",
+          "address_lines": [
+            "Rua de Teste 100",
+            "04571-010 São Paulo"
+          ],
+          "phone": "+551123456780",
+          "phone_text": "(11) 2345-6780",
+          "fax": "+551123456781",
+          "fax_text": "(11) 2345-6781",
+          "email": "brazil@beckhoff.example",
+          "local_site": "/pt-br/"
+        },
+        {
+          "section": "Canada",
+          "region": "Americas",
+          "country": "CA",
+          "name": "Beckhoff Automation Ltd.",
+          "address_lines": [
+            "100 Test Avenue",
+            "Mississauga, ON L4W 1A1"
+          ],
+          "phone": "+19055550150",
+          "phone_text": "(905) 555-0150",
+          "fax": "+19055550151",
+          "fax_text": "(905) 555-0151",
+          "email": "canada@beckhoff.example",
+          "local_site": "/en-ca/"
+        },
+        {
+          "section": "USA",
+          "region": "Americas",
+          "country": "US",
+          "name": "Beckhoff Automation LLC",
+          "address_lines": [
+            "200 Test Drive",
+            "Savage, MN 55378"
+          ],
+          "phone": "+19525550190",
+          "phone_text": "(952) 555-0190",
+          "fax": "+19525550191",
+          "fax_text": "(952) 555-0191",
+          "email": "usa@beckhoff.example",
+          "local_site": "/en-us/"
+        },
+        {
+          "section": "China",
+          "region": "Asia / Pacific",
+          "country": "CN",
+          "name": "Beckhoff Automation (Shanghai) Co., Ltd.",
+          "address_lines": [
+            "No. 10 Test Road",
+            "200233 Shanghai"
+          ],
+          "phone": "+862166312600",
+          "phone_text": "021 6631 2600",
+          "fax": "+862166312601",
+          "fax_text": "021 6631 2601",
+          "email": "china@beckhoff.example",
+          "local_site": "/zh-cn/"
+        },
+        {
+          "section": "India",
+          "region": "Asia / Pacific",
+          "country": "IN",
+          "name": "Beckhoff Automation Pvt. Ltd.",
+          "address_lines": [
+            "Test Road 12",
+            "411001 Pune"
+          ],
+          "phone": "+912040001200",
+          "phone_text": "020 4000 1200",
+          "fax": "+912040001201",
+          "fax_text": "020 4000 1201",
+          "email": "india@beckhoff.example",
+          "local_site": "/en-in/"
+        },
+        {
+          "section": "Japan",
+          "region": "Asia / Pacific",
+          "country": "JP",
+          "name": "Beckhoff Automation K.K.",
+          "address_lines": [
+            "1-2-3 Test-cho",
+            "220-0012 Yokohama"
+          ],
+          "phone": "+81451234560",
+          "phone_text": "045-123-4560",
+          "fax": "+81451234561",
+          "fax_text": "045-123-4561",
+          "email": "japan@beckhoff.example",
+          "local_site": "/ja-jp/"
+        }
+      ]
+    },
+    {
+      "kind": "foreign_site",
+      "country": "DE",
+      "pages": [
+        "de-de/",
+        "de-de/kontakt/"
+      ],
+      "reason": "the German site (header link Deutsch, Germany panel link) is never visited with exhibition country Finland",
+      "persons": [
+        {
+          "name": "Stefan Brandt",
+          "title": "Vertriebsleiter",
+          "email": "stefan.brandt@beckhoff.example",
+          "phone": "+491702345611",
+          "phone_text": "0170 2345 611",
+          "department": "Vertrieb Deutschland",
+          "country": "DE",
+          "source_page": "de-de/kontakt/"
+        },
+        {
+          "name": "Julia Lorenz",
+          "title": "Vertriebsingenieurin",
+          "email": "julia.lorenz@beckhoff.example",
+          "phone": "+4915123456122",
+          "phone_text": "0151 2345 6122",
+          "department": "Vertrieb Deutschland",
+          "country": "DE",
+          "source_page": "de-de/kontakt/"
+        },
+        {
+          "name": "Tobias Kern",
+          "title": "Technischer Support",
+          "email": "tobias.kern@beckhoff.example",
+          "phone": "+495211234433",
+          "phone_text": "0521 123 4433",
+          "department": "Vertrieb Deutschland",
+          "country": "DE",
+          "source_page": "de-de/kontakt/"
+        }
+      ]
+    }
+  ],
+  "forbidden_pages": [
+    "de-de/",
+    "de-de/kontakt/"
+  ],
+  "priority_pages": [
+    "en-en/company/global-presence/",
+    "fi-fi/",
+    "fi-fi/yhteystiedot/",
+    "fi-fi/yritys/johto/"
+  ],
+  "persons": [
+    {
+      "name": "Jukka Mäkinen",
+      "title": "Myyntipäällikkö",
+      "email": "jukka.makinen@beckhoff.example",
+      "phone": "+358407182231",
+      "phone_text": "040 718 2231",
+      "department": "Myynti",
+      "country": "FI",
+      "source_page": "fi-fi/yhteystiedot/",
+      "priority": true,
+      "jsonld": false
+    },
+    {
+      "name": "Noora Kettunen",
+      "title": "Myynti-insinööri",
+      "email": "noora.kettunen@beckhoff.example",
+      "phone": "+358504617720",
+      "phone_text": "050 461 7720",
+      "department": "Myynti",
+      "country": "FI",
+      "source_page": "fi-fi/yhteystiedot/",
+      "priority": true,
+      "jsonld": false
+    },
+    {
+      "name": "Tapio Heinonen",
+      "title": "Aluemyyntipäällikkö",
+      "email": "tapio.heinonen@beckhoff.example",
+      "phone": "+358407182235",
+      "phone_text": "040 718 2235",
+      "department": "Myynti",
+      "country": "FI",
+      "source_page": "fi-fi/yhteystiedot/",
+      "priority": true,
+      "jsonld": false
+    },
+    {
+      "name": "Janne Järvinen",
+      "title": "Sovellusinsinööri",
+      "email": "janne.jarvinen@beckhoff.example",
+      "phone": "+358504617724",
+      "phone_text": "050 461 7724",
+      "department": "Tekninen tuki",
+      "country": "FI",
+      "source_page": "fi-fi/yhteystiedot/",
+      "priority": true,
+      "jsonld": false
+    },
+    {
+      "name": "Outi Lindroos",
+      "title": "Tukiasiantuntija",
+      "email": "outi.lindroos@beckhoff.example",
+      "phone": "+358407182238",
+      "phone_text": "040 718 2238",
+      "department": "Tekninen tuki",
+      "country": "FI",
+      "source_page": "fi-fi/yhteystiedot/",
+      "priority": true,
+      "jsonld": false
+    },
+    {
+      "name": "Riitta Salminen",
+      "title": "Toimistopäällikkö",
+      "email": "riitta.salminen@beckhoff.example",
+      "phone": "+358504617729",
+      "phone_text": "050 461 7729",
+      "department": "Hallinto",
+      "country": "FI",
+      "source_page": "fi-fi/yhteystiedot/",
+      "priority": true,
+      "jsonld": false
+    },
+    {
+      "name": "Ari Kinnunen",
+      "title": "Toimitusjohtaja",
+      "email": "ari.kinnunen@beckhoff.example",
+      "phone": "+358407182201",
+      "phone_text": "040 718 2201",
+      "department": null,
+      "country": "FI",
+      "source_page": "fi-fi/yritys/johto/",
+      "priority": true,
+      "jsonld": true
+    },
+    {
+      "name": "Katja Honkanen",
+      "title": "Talousjohtaja",
+      "email": "katja.honkanen@beckhoff.example",
+      "phone": "+358504617702",
+      "phone_text": "050 461 7702",
+      "department": null,
+      "country": "FI",
+      "source_page": "fi-fi/yritys/johto/",
+      "priority": true,
+      "jsonld": true
+    }
+  ]
+}

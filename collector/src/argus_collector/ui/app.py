@@ -13,6 +13,7 @@ from collections.abc import Callable
 
 from argus_collector.api_client import contract as api
 from argus_collector.diagnostics import contract as diagnostics
+from argus_collector.models import contract as models
 from argus_collector.runtime import contract as runtime
 from argus_collector.scheduler import contract as scheduler
 from argus_collector.ui import attention_lines, queue_lines, service
@@ -21,6 +22,7 @@ from argus_collector.ui.app_collect import CollectController
 from argus_collector.ui.app_connection import ConnectionController
 from argus_collector.ui.app_walk import WalkController
 from argus_collector.ui.repository import Messages
+from argus_collector.ui.route_lines import RouteHealth
 from argus_collector.ui.service import Activity
 from argus_collector.ui.view import Callbacks, PanelView
 
@@ -37,6 +39,7 @@ class PanelApp:
         self.config = config
         self.report: diagnostics.Report | None = None
         self.report_error: str | None = None
+        self.routes: tuple[RouteHealth, ...] = ()
         self.browser = WorkBrowserController(self)
         self.ui_queue: queue.Queue[Callable[[], None]] = queue.Queue()
         self._pumps = 0
@@ -90,6 +93,7 @@ class PanelApp:
             self.connection.props(self.msgs),
             self.activity(),
             self.blocks(),
+            self.routes,
         )
 
     def refresh(self) -> None:
@@ -130,7 +134,18 @@ class PanelApp:
             self.report_error = None
         except diagnostics.DiagnosticsError as exc:
             self.report_error = str(exc)
+        self.routes = self._routes()
         self.ui_queue.put(self.refresh)
+
+    def _routes(self) -> tuple[RouteHealth, ...]:
+        """The navigation and vision models: pulled on the local endpoint or not."""
+        cfg, out = self.config, []
+        for role, name in (("navigation", cfg.model_navigation), ("vision", cfg.model_vision)):
+            target = models.resolve_role(cfg.model_endpoint, name)
+            if target is not None:
+                out.append(RouteHealth(role, name, models.health(target.endpoint, name)
+                                       .model_listed))
+        return tuple(out)
 
     def test_site_url(self) -> str:
         return f"http://127.0.0.1:{self.config.test_site_port}/"

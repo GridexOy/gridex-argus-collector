@@ -3,7 +3,10 @@
 Adapter of the local model (M2, TZ_SELAIN section 4.2) on the RTX 4090:
 any OpenAI-compatible chat endpoint on loopback. Default: Ollama
 `http://127.0.0.1:11434/v1` with `qwen2.5:14b-instruct` (installed by
-`scripts/install_model.ps1`); a llama.cpp server works unchanged.
+`scripts/install_model.ps1`); a llama.cpp server works unchanged. 0.4.8.0 routing
+(owner 05.10.2026): the walk keeps one client per role (cards 14b, navigation 7b,
+vision VL, `resolve_role`); `chat_json(..., images=)` sends screenshots as
+OpenAI-style `image_url` parts.
 
 Entry point: `contract.py`.
 

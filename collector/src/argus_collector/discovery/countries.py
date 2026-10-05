@@ -58,7 +58,12 @@ def url_country(url: str) -> str | None:
         return TLD_COUNTRIES[labels[-1]]
     if len(labels) >= 3 and labels[0] in tables.SUBDOMAIN_COUNTRIES:
         return tables.SUBDOMAIN_COUNTRIES[labels[0]]
-    segment = parts.path.strip("/").split("/", 1)[0].lower()
+    return path_country(parts.path)
+
+
+def path_country(path: str) -> str | None:
+    """Country of a locale path segment: `/fi-fi/` FI, `/sv/` SE, `/en-en/` none."""
+    segment = path.strip("/").split("/", 1)[0].lower()
     match = LOCALE_SEGMENT_RE.match(segment)
     if match is None:
         return None
@@ -87,3 +92,33 @@ def department_rank(label: str) -> int:
            for w in tables.DEPARTMENT_LAST):
         return 2
     return 1
+
+
+def is_worldwide(label: str) -> bool:
+    """A control or link that leads to the list of countries (`Beckhoff Worldwide`)."""
+    words = " ".join(PUNCT_RE.sub(" ", fold(label)).split())
+    if not words or len(words) > LABEL_MAX_LEN or label_country(label) is not None:
+        return False
+    return any(re.search(rf"(?<![a-z]){re.escape(w)}(?![a-z])", words)
+               for w in tables.WORLDWIDE_WORDS)
+
+
+def foreign_country(text: str, href: str, country: str) -> str | None:
+    """The other country a control or a version link names: its label (`Germany`) or
+    its locale path (`/de-de/`); the domain is not looked at (a `.de` company's links)."""
+    named = label_country(text)
+    if named is None and href:
+        try:
+            named = path_country(urlsplit(href).path)
+        except ValueError:
+            named = None
+    return named if named is not None and named != country.upper() else None
+
+
+def locale_segment(href: str) -> str:
+    """The locale path segment of a link (`fi-fi`, `en-en`, `sv`), "" when it has none."""
+    try:
+        segment = urlsplit(href).path.strip("/").split("/", 1)[0].lower()
+    except ValueError:
+        return ""
+    return segment if LOCALE_SEGMENT_RE.match(segment) else ""

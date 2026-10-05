@@ -24,6 +24,7 @@ def apply(
     job_id: str,
     rows: dict[str, sqlite3.Row],
     resp: api.EventsResponse,
+    elapsed_ms: int = 0,
 ) -> None:
     updates: list[tuple[str, str, str, str | None, str | None]] = []
     for result in resp.results:
@@ -42,6 +43,7 @@ def apply(
     runtime.journal(
         "delivery",
         f"job {job_id}: {len(resp.results)} events sent, {accepted} accepted/duplicate,"
-        f" {len(updates) - accepted} rejected, last_contiguous_seq={resp.last_contiguous_seq}",
+        f" {len(updates) - accepted} rejected, last_contiguous_seq={resp.last_contiguous_seq}"
+        f" in {elapsed_ms} ms",
     )
     hooks.applied(conn, job_id, resp)

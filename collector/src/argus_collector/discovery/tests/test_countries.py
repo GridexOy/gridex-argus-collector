@@ -76,3 +76,17 @@ def test_department_rank_sales_first_support_last() -> None:
     assert ranks["Försäljning"] == 0
     assert ranks["ATEX/Teollisuus"] == ranks["Valaistus"] == 1
     assert ranks["Hallinto"] == ranks["Varasto"] == ranks["Logistiikka"] == ranks["IT"] == 2
+
+
+def test_worldwide_controls_and_foreign_versions() -> None:
+    from argus_collector.discovery import contract as discovery
+
+    for label in ("Beckhoff Worldwide", "Global presence", "Weltweit", "Maailmalla"):
+        assert discovery.is_worldwide(label), label
+    for label in ("Germany", "Global (English)", "Contact", "Finland"):
+        assert not discovery.is_worldwide(label), label
+    assert discovery.foreign_country("Germany", "", "FI") == "DE"
+    assert discovery.foreign_country("www.beckhoff.com/de-de", "/de-de/", "FI") == "DE"
+    assert discovery.foreign_country("Suomi", "/fi-fi/", "FI") is None
+    assert discovery.foreign_country("Products", "/en-en/products/", "FI") is None
+    assert discovery.foreign_country("Kontakt", "https://vogel.de/kontakt", "FI") is None

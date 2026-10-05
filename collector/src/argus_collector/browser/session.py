@@ -9,7 +9,7 @@ decided by the caller), buttons by clicking the numbered element.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from types import TracebackType
 
@@ -23,7 +23,7 @@ from argus_collector.browser.binding import (
     parse_result,
     probe_payload,
 )
-from argus_collector.browser.scripts import HIDDEN_LINKS_JS
+from argus_collector.browser.scripts import HIDDEN_LINKS_JS, TAB_PANELS_JS
 from argus_collector.browser.service import launch_kwargs
 from argus_collector.discovery.contract import Candidate
 from argus_collector.runtime import contract as runtime
@@ -31,7 +31,8 @@ from argus_collector.runtime import contract as runtime
 NAVIGATION_TIMEOUT_MS = 45_000
 LOAD_TIMEOUT_MS = 10_000
 CLICK_TIMEOUT_MS = 10_000
-SETTLE_MS = 800
+SETTLE_MS = 800  # longest wait for a quiet DOM after load / click
+QUIET_MS = 300  # no DOM mutation for this long: the page is ready
 CHALLENGE_WAIT_S = 20.0  # target state timeout (TZ_SELAIN 8.5)
 CHALLENGE_POLL_MS = 1000
 
@@ -46,6 +47,8 @@ class PageState:
     challenge: bool = False  # a bot check that did not clear within 20 s
     hidden_hrefs: tuple[str, ...] = ()  # mailto:/tel: links not rendered now
     consent: str = ""  # the cookie banner answered on this page (`necessary: <text>`)
+    tab_panels: tuple[tuple[str, str], ...] = ()  # (selected tab label, its panel's text)
+    challenge_hint: bool = False  # one bot-check sign only: the vision model may look
 
 
 class WalkBrowser:
@@ -95,11 +98,8 @@ class WalkBrowser:
         return self._page
 
     def _settle(self) -> None:
-        try:
-            self.page.wait_for_load_state("load", timeout=LOAD_TIMEOUT_MS)
-        except Exception:  # noqa: BLE001 - readiness is by content, not by `load`
-            pass
-        self.page.wait_for_timeout(SETTLE_MS)
+        """`load`, then a quiet DOM (300 ms without a mutation, 800 ms at most)."""
+        tools.settle(self.page, LOAD_TIMEOUT_MS, QUIET_MS, SETTLE_MS)
 
     def _challenged(self) -> bool:
         found = tools.challenged(self.page)
@@ -112,19 +112,32 @@ class WalkBrowser:
         """Observe; a bot check is waited out for up to 20 s (it clears by itself),
         a cookie banner is answered (necessary cookies preferred)."""
         deadline = time.monotonic() + CHALLENGE_WAIT_S
-        challenged = self._challenged()
+        challenged = waited = self._challenged()
         while challenged and time.monotonic() < deadline:
             self.page.wait_for_timeout(CHALLENGE_POLL_MS)
             challenged = self._challenged()
         consent = ""
         if not challenged:
-            self._settle()
+            if waited:  # the check cleared: the real page has just loaded
+                self._settle()
             consent = tools.answer_consent(self.page, self._consented)
             if consent:
                 self._settle()
         state = self.observe()
-        return PageState(state.url, state.title, state.html, state.text, state.candidates,
-                         challenge=challenged, hidden_hrefs=state.hidden_hrefs, consent=consent)
+        hint = not challenged and tools.challenge_hint(self.page)
+        return replace(state, challenge=challenged, consent=consent, challenge_hint=hint)
+
+    def wait_out_challenge(self) -> PageState:
+        """The vision model saw a bot check: wait up to 20 s for it to clear, observe."""
+        deadline = time.monotonic() + CHALLENGE_WAIT_S
+        while tools.challenge_hint(self.page) and time.monotonic() < deadline:
+            self.page.wait_for_timeout(CHALLENGE_POLL_MS)
+        state = self._ready()
+        return replace(state, challenge=state.challenge or state.challenge_hint)
+
+    def screenshot(self) -> bytes:
+        """The visible part of the page as JPEG (for the vision model)."""
+        return self.page.screenshot(type="jpeg", quality=70)
 
     def goto(self, url: str) -> PageState:
         """Navigate, wait for DOM content + a short settle, observe."""
@@ -169,6 +182,7 @@ class WalkBrowser:
         candidates = tools.candidates(self.page)
         text = self.page.evaluate("() => document.body ? document.body.innerText : ''")
         hidden = self.page.evaluate(HIDDEN_LINKS_JS)
+        panels = self.page.evaluate(TAB_PANELS_JS) or []
         return PageState(
             url=self.page.url,
             title=self.page.title(),
@@ -176,4 +190,6 @@ class WalkBrowser:
             text=str(text),
             candidates=candidates,
             hidden_hrefs=tuple(str(h) for h in hidden),
+            tab_panels=tuple((str(p.get("label", "")), str(p.get("text", ""))) for p in panels
+                             if isinstance(p, dict)),
         )

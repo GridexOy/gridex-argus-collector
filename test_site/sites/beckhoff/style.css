@@ -1,0 +1,19 @@
+body { font-family: Arial, Helvetica, sans-serif; margin: 0; color: #1d1d1b; background: #fff; }
+.site-header { display: flex; gap: 24px; align-items: center; padding: 12px 24px; background: #e2001a; }
+.site-header .logo { font-weight: bold; text-decoration: none; color: #fff; letter-spacing: 2px; margin-right: auto; }
+.site-header nav a { margin-left: 16px; color: #fff; }
+main { max-width: 760px; margin: 24px auto; padding: 0 16px; }
+[role="tablist"] { display: flex; gap: 4px; border-bottom: 1px solid #ccc; }
+[role="tab"] { padding: 8px 12px; border: 1px solid #ccc; border-bottom: 0; background: #f4f4f4; cursor: pointer; }
+[role="tab"][aria-selected="true"] { background: #fff; font-weight: bold; }
+.accordion h4 { margin: 0; border-top: 1px solid #ddd; }
+button.acc { width: 100%; padding: 10px 0; border: 0; background: none; text-align: left; font-size: 16px; cursor: pointer; }
+button.acc[aria-expanded="true"] { font-weight: bold; }
+.office { padding: 0 0 12px 16px; }
+.office p { margin: 4px 0; }
+.people { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.person { padding: 8px; border: 1px solid #eee; }
+.person p { margin: 2px 0; }
+.person .name { font-weight: bold; }
+.site-footer { margin-top: 48px; padding: 16px 24px; border-top: 1px solid #ddd; font-size: 14px; color: #555; }
+.site-footer nav a { margin-right: 16px; color: #555; }

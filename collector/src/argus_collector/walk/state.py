@@ -9,10 +9,12 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from argus_collector.discovery import contract as discovery
+from argus_collector.extraction import contract as extraction
 from argus_collector.models import contract as models
 from argus_collector.walk import service
 from argus_collector.walk.service import WalkEvent, WalkSettings
 from argus_collector.walk.sink import FrontierLink, WalkCheckpoint, WalkGap, WalkSink
+from argus_collector.walk.timing import PageTiming
 
 Emit = Callable[[WalkEvent], None]
 ShouldStop = Callable[[], bool]
@@ -30,7 +32,7 @@ class StopRequested(Exception):
 class WalkState:
     settings: WalkSettings
     conn: sqlite3.Connection
-    client: models.ModelClient
+    client: models.ModelClient  # person cards (14b)
     emit: Emit
     should_stop: ShouldStop
     run_id: str
@@ -45,7 +47,19 @@ class WalkState:
     page_has_contacts: bool = False  # the last extracted page state had people or channels
     source_id: str | None = None
     end_reason: str = service.END_FINISHED
+    timing: PageTiming = field(default_factory=PageTiming)  # the page state being handled
+    nav_client: models.ModelClient | None = None  # next steps (7b); None: `client`
+    vision_client: models.ModelClient | None = None  # screenshots (VL); None: no vision
+    menu_cache: dict[str, tuple[str, str]] = field(default_factory=dict)  # menu -> choice
+    read_cache: dict[str, list[extraction.Contact]] = field(default_factory=dict)  # text sha
     _mark: float = field(default_factory=time.monotonic)
+
+    def navigator(self) -> models.ModelClient:
+        """The navigation model; the card model once the navigation model failed."""
+        return self.nav_client or self.client
+
+    def navigation_failed(self) -> None:
+        self.nav_client = None
 
     @property
     def job_mode(self) -> bool:

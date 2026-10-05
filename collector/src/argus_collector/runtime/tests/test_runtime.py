@@ -108,6 +108,13 @@ def test_config_defaults_and_mapping() -> None:
     assert service.config_from_mapping({}, "d").model_name == ""
 
 
+def test_config_routed_models_default_and_can_be_switched_off() -> None:
+    cfg = service.config_from_mapping({}, "d")
+    assert (cfg.model_navigation, cfg.model_vision) == ("qwen2.5:7b", "qwen2.5-vl:7b")
+    off = service.config_from_mapping({"model": {"navigation": "", "vision": ""}}, "x")
+    assert (off.model_navigation, off.model_vision) == ("", "")
+
+
 def test_config_rejects_bad_page_budget() -> None:
     with pytest.raises(ValueError):
         service.config_from_mapping({"walk": {"page_budget": 0}}, "x")

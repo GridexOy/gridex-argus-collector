@@ -26,12 +26,16 @@ __all__ = [
     "Candidate",
     "Focus",
     "approved_hosts_for",
+    "contact_link",
     "country_members",
     "department_rank",
     "focus_brief",
+    "foreign_country",
     "host_of",
     "is_allowed_url",
     "is_local_seed",
+    "is_worldwide",
+    "locale_segment",
     "is_social_url",
     "label_country",
     "link_country",
@@ -97,6 +101,12 @@ def focus_brief(focus: Focus | None) -> str:
     return focus_rules.focus_brief(focus)
 
 
+def contact_link(text: str, href: str) -> bool:
+    """A contact / people link by its own words (`Yhteystiedot`, `Contact`, `Kontakt`),
+    the exhibition-country bonus not counted (a rule may follow it without the model)."""
+    return service.base_score(text, href) >= service.STRONG_LINK_SCORE
+
+
 def strong_link(text: str, href: str, focus: Focus | None) -> bool:
     """A link the model may not skip before finishing: contact link, the exhibition-
     country version, and with a local seed another country version (walked after)."""
@@ -125,6 +135,21 @@ def link_country(text: str, href: str) -> str | None:
 def is_local_seed(seed_url: str, country: str) -> bool:
     """The seed is already the exhibition-country version (`.fi`, `/fi/`, `fi.`)."""
     return countries.is_local_seed(seed_url, country)
+
+
+def is_worldwide(label: str) -> bool:
+    """A control or link behind which the page lists its countries (`Beckhoff Worldwide`)."""
+    return countries.is_worldwide(label)
+
+
+def foreign_country(text: str, href: str, country: str) -> str | None:
+    """Another country than `country` named by a label or a locale path (`/de-de/`)."""
+    return countries.foreign_country(text, href, country)
+
+
+def locale_segment(href: str) -> str:
+    """`fi-fi` of `/fi-fi/yhteystiedot/`; "" for a link without a locale segment."""
+    return countries.locale_segment(href)
 
 
 def department_rank(label: str) -> int:

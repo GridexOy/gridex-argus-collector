@@ -23,7 +23,9 @@ class Config:
     """Settings of `config.example.yaml`; empty model strings mean the `models` defaults."""
 
     model_endpoint: str = ""
-    model_name: str = ""
+    model_name: str = ""  # person cards (14b); "" -> the `models` default
+    model_navigation: str = "qwen2.5:7b"  # next steps; "" -> the card model
+    model_vision: str = "qwen2.5-vl:7b"  # screenshots; "" -> no vision model
     walk_page_budget: int = 15
     test_site_port: int = 8765
     network_proxy: str = "system"
@@ -125,6 +127,8 @@ def config_from_mapping(data: dict[str, object], source: str) -> Config:
     return Config(
         model_endpoint=str(model.get("endpoint", defaults.model_endpoint) or ""),
         model_name=str(model.get("name", defaults.model_name) or ""),
+        model_navigation=str(model.get("navigation", defaults.model_navigation) or ""),
+        model_vision=str(model.get("vision", defaults.model_vision) or ""),
         walk_page_budget=_positive_int(walk, "page_budget", defaults.walk_page_budget, 1000),
         test_site_port=_positive_int(site, "port", defaults.test_site_port, 65536),
         network_proxy=_proxy_mode(network, defaults.network_proxy),

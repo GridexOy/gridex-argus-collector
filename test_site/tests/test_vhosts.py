@@ -85,6 +85,6 @@ def test_companies_json_matches_the_default_port() -> None:
     on_disk = json.loads(companies.JSON_FILE.read_text(encoding="utf-8"))
     assert on_disk == companies.companies(companies.DEFAULT_PORT)
     ids = [c["company_id"] for c in on_disk]
-    assert ids == ["fixture_oy", "nordtec", "vogel", "katsa", "ledvance", "malux"]
+    assert ids == ["fixture_oy", "nordtec", "vogel", "katsa", "ledvance", "malux", "beckhoff"]
     for company in on_disk:
         assert company["priority_countries"] == ["FI"]

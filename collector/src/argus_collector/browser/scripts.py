@@ -88,6 +88,35 @@ HIDDEN_LINKS_JS = """
   .map(a => (a.getAttribute('href') || '').trim())
 """
 
+# Resolves once the DOM had no mutation for `quiet` ms (or after `max` ms): the
+# page is ready by its content, not by a fixed wait (0.4.8.0: 2 x 800 ms before).
+QUIET_DOM_JS = """
+([quiet, max]) => new Promise(resolve => {
+  const start = Date.now();
+  let timer = null;
+  const done = () => { observer.disconnect(); clearTimeout(timer); resolve(Date.now() - start); };
+  const observer = new MutationObserver(() => {
+    clearTimeout(timer);
+    timer = setTimeout(done, quiet);
+  });
+  observer.observe(document.documentElement,
+                   {subtree: true, childList: true, attributes: true, characterData: true});
+  timer = setTimeout(done, quiet);
+  setTimeout(done, max);
+})
+"""
+
+# The selected tabs and the visible text of their panels: a tab labelled with a
+# country (`Germany`) makes its panel that country's section (Beckhoff, 0.4.8.0).
+TAB_PANELS_JS = """
+() => Array.from(document.querySelectorAll('[role="tab"][aria-selected="true"]')).map(tab => {
+  const id = tab.getAttribute('aria-controls');
+  const panel = id ? document.getElementById(id) : null;
+  if (!panel || !panel.getClientRects().length) return null;
+  return {label: (tab.innerText || '').trim(), text: panel.innerText || ''};
+}).filter(item => item && item.label && item.text.trim())
+"""
+
 # A visible cookie-consent banner and its buttons (OneTrust, Cookiebot, generic
 # dialogs and bars that talk about cookies); `service.consent_choice` picks one.
 CONSENT_JS = """

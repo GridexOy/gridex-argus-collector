@@ -123,3 +123,8 @@ def job_facts(conn: sqlite3.Connection, batch_id: str | None) -> list[JobFacts]:
             tuple(delivery.run_ids(conn, row["job_id"])),
         ))
     return out
+
+
+def job_companies(conn: sqlite3.Connection) -> dict[str, str]:
+    """job_id -> company name of every job claimed on this PC (timing report)."""
+    return {str(row["job_id"]): str(row["company_name"]) for row in repo.jobs(conn)}

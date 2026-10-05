@@ -21,6 +21,7 @@ from argus_collector.scheduler.views import (
     JobFacts,
     QueueRow,
     QueueView,
+    job_companies,
     job_facts,
 )
 
@@ -39,6 +40,7 @@ __all__ = [
     "QueueView",
     "Settings",
     "WalkEnv",
+    "job_companies",
     "job_facts",
 ]
 

@@ -6,14 +6,14 @@ from argus_collector.browser import contract as browser
 from argus_collector.discovery import contract as discovery
 from argus_collector.evidence import contract as evidence
 from argus_collector.extraction import contract as extraction
-from argus_collector.models import contract as models
 from argus_collector.normalization import contract as norm
 from argus_collector.storage import contract as storage
-from argus_collector.walk import coverage, findings, prompts, repository, service, structure
+from argus_collector.walk import cards, coverage, findings, repository, service, structure
 from argus_collector.walk.context import PageContext
 from argus_collector.walk.service import WalkEvent
 from argus_collector.walk.sink import PageFindings, PageSource
 from argus_collector.walk.state import WalkState
+from argus_collector.walk.timing import timed
 
 MAX_LINKS_SHOWN = 30
 MAX_BUTTONS_SHOWN = 10
@@ -35,7 +35,8 @@ def enter(state: WalkState, page: browser.PageState) -> bool:
 
 def ranked(state: WalkState, page: browser.PageState) -> list[discovery.Candidate]:
     """Page links plus frontier links from earlier pages, then the page's buttons."""
-    pool = structure.offered(state, page.candidates) + state.frontier_candidates()
+    frontier = [c for c in state.frontier_candidates() if not structure.foreign(state, c)]
+    pool = structure.offered(state, page.candidates) + frontier
     ordered = discovery.rank_candidates(pool, set(state.cp.visited), state.hosts, state.focus)
     links = [c for c in ordered if c.kind == "link"][:MAX_LINKS_SHOWN]
     buttons = [c for c in ordered if c.kind == "button" and c.selector not in state.failed_targets]
@@ -66,12 +67,10 @@ def _learn_language(state: WalkState, lang: str) -> None:
         state.focus = state.focus.with_native(state.cp.native_language)
 
 
-def _extract(
-    state: WalkState, wb: browser.WalkBrowser, page: browser.PageState, text: str, key: str
-) -> None:
-    settings = state.settings
+def _store(state: WalkState, page: browser.PageState, text: str, key: str) -> PageSource:
+    """Evidence file + `source.processed` of a new page state."""
     snapshot = evidence.store_snapshot(
-        state.conn, page.url, page.url, page.html, page.text, settings.evidence_dir
+        state.conn, page.url, page.url, page.html, page.text, state.settings.evidence_dir
     )
     source = PageSource(
         state.uid("source", key), state.source_id, page.url, page.url, key, snapshot, text
@@ -79,50 +78,45 @@ def _extract(
     state.source_id = source.source_id
     if state.sink is not None:
         state.sink.page_stored(state.conn, source)
-    state.step(service.STEP_EXTRACTING, "", page.url)
+    return source
+
+
+def _channels(
+    state: WalkState, page: browser.PageState, text: str
+) -> tuple[str, str, list[extraction.Section], list[extraction.Channel]]:
+    """(html lang, phone region, country sections, channels) of a page state."""
+    settings = state.settings
     lang = extraction.html_language(page.html)
     _learn_language(state, lang)
     region = norm.region_for_page(page.url, lang, settings.region_fallback)
     region = region or settings.region_fallback
-    sections = extraction.country_sections(text)
+    panels = [(label, evidence.canonical_text(body)) for label, body in page.tab_panels]
+    sections = extraction.country_sections(text) + extraction.panel_sections(text, panels)
     channels = extraction.extract_channels(
         page.html, text, region, extraction.region_resolver(sections, region),
         frozenset(page.hidden_hrefs),
     )
-    contacts: list[extraction.Contact] = []
-    if extraction.has_contact_signals(text, channels):
-        contacts = _parse_cards(state, page, text, channels, region)
+    return lang, region, sections, channels
+
+
+def _extract(
+    state: WalkState, wb: browser.WalkBrowser, page: browser.PageState, text: str, key: str
+) -> None:
+    with timed(state.timing, "snapshot"):
+        source = _store(state, page, text, key)
+    state.step(service.STEP_EXTRACTING, "", page.url)
+    with timed(state.timing, "extract"):
+        lang, region, sections, channels = _channels(state, page, text)
+    contacts = cards.read(state, page, text, channels, sections, region)
     state.page_has_contacts = bool(contacts or channels)
     coverage.note_total(state, text, len(contacts))
-    bindings = wb.bindings(findings.probes(contacts)) if state.job_mode and contacts else []
-    context = PageContext(tuple(sections), lang)
-    found, keys = findings.build_findings(state, source, contacts, bindings, channels, context)
-    _record(state, source, found, list(zip(keys, contacts, strict=True)))
-
-
-def _parse_cards(
-    state: WalkState,
-    page: browser.PageState,
-    text: str,
-    channels: list[extraction.Channel],
-    region: str,
-) -> list[extraction.Contact]:
-    state.step(service.STEP_MODEL, "cards", page.url)
-    system, user = prompts.cards_prompt(page.url, page.title, text)
-    try:
-        reply = state.client.chat_json(system, user, prompts.PURPOSE_CARDS)
-    except models.ModelError as exc:
-        state.step(service.STEP_MODEL, f"cards failed: {exc}", page.url)
-        return []
-    out: list[extraction.Contact] = []
-    seen: set[str] = set()
-    for item in prompts.cards_from_reply(reply):
-        card = extraction.card_from_json(item)
-        contact = extraction.verify_card(card, text, channels, region) if card else None
-        if contact is not None and contact.name.value.casefold() not in seen:
-            seen.add(contact.name.value.casefold())
-            out.append(contact)
-    return out
+    with timed(state.timing, "bind"):
+        bindings = wb.bindings(findings.probes(contacts)) if state.job_mode and contacts else []
+    with timed(state.timing, "record"):
+        context = PageContext(tuple(sections), lang)
+        found, keys = findings.build_findings(state, source, contacts, bindings, channels,
+                                              context)
+        _record(state, source, found, list(zip(keys, contacts, strict=True)))
 
 
 def _record(

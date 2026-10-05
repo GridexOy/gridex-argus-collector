@@ -33,6 +33,7 @@ __all__ = [
     "ModelReply",
     "health",
     "resolve_config",
+    "resolve_role",
 ]
 
 CallListener = Callable[[CallRecord], None]
@@ -44,6 +45,11 @@ PROVIDER = "local"
 def resolve_config(endpoint: str = "", name: str = "") -> ModelConfig:
     """ModelConfig from `config.yaml` values; empty strings take the defaults."""
     return ModelConfig(endpoint=endpoint or DEFAULT_ENDPOINT, name=name or DEFAULT_MODEL)
+
+
+def resolve_role(endpoint: str, name: str) -> ModelConfig | None:
+    """A routed model (navigation, vision) from `config.yaml`; "" -> None (not used)."""
+    return ModelConfig(endpoint=endpoint or DEFAULT_ENDPOINT, name=name) if name else None
 
 
 def health(endpoint: str, name: str, timeout_s: float = service.HEALTH_TIMEOUT_S) -> Health:
@@ -73,9 +79,12 @@ class ModelClient:
         body = service.request_body(self.config, system, user, json_mode=False)
         return self._send(body, purpose)
 
-    def chat_json(self, system: str, user: str, purpose: str) -> dict[str, Any]:
-        """One chat completion in JSON mode, parsed to a dict (one retry on bad JSON)."""
-        body = service.request_body(self.config, system, user, json_mode=True)
+    def chat_json(
+        self, system: str, user: str, purpose: str, images: tuple[bytes, ...] = ()
+    ) -> dict[str, Any]:
+        """One chat completion in JSON mode, parsed to a dict (one retry on bad JSON);
+        `images` (PNG / JPEG bytes) go with the user message to a vision model."""
+        body = service.request_body(self.config, system, user, json_mode=True, images=images)
         reply = self._send(body, purpose)
         parsed = service.parse_json_reply(reply.content)
         if parsed is None:

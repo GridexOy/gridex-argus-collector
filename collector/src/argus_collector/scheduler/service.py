@@ -38,7 +38,8 @@ STOP_PAUSE = "pause"  # command pause
 STOP_CANCEL = "cancel"  # command cancel / lease cancelled
 STOP_LEASE = "lease"  # lease expired or lost
 
-PURPOSES = {"walk.cards": "card_parsing", "walk.action": "action_planning"}
+PURPOSES = {"walk.cards": "card_parsing", "walk.action": "action_planning",
+            "walk.vision": "vision"}
 
 
 @dataclass(frozen=True)

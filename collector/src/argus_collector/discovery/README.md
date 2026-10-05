@@ -21,6 +21,11 @@ Entry point: `contract.py`.
 
 | `label_country` / `url_country` / `link_country` / `is_local_seed` / `country_members` / `strong_link` / `department_rank` | 0.4.4.0 (`countries.py`, tables `country_names.py`, owner 05.10.2026): a label naming a country (`Finland`, `Suomi`, `FI`), a URL's country version (ccTLD, `fi.` host, `/fi-fi/`, `/fi/`), a page listing >= 3 countries, the seed already being the exhibition-country version (then other country versions are walked after it), links the model may not skip, sales / marketing tabs first |
 
+0.4.8.0 (Beckhoff): `is_worldwide` (`Beckhoff Worldwide`, `Global presence`, `Weltweit`:
+the country list is behind it), `foreign_country` (another country by its label or
+locale path, never by the domain), `locale_segment`, `contact_link` (contact words
+without the country bonus: a rule may follow it without the model).
+
 A job walk takes its hosts from the job's `approved_hosts` (K7 ed. 02:
 basis `seed`; `redirect_from_seed` waits for the owner's "ok"); a walk
 started from the panel knows only the seed and its redirect.

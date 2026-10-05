@@ -13,12 +13,13 @@ from dataclasses import dataclass, field
 from html.parser import HTMLParser
 
 TRACKED = ("div", "button", "select", "option")
-BREAKS = {"br", "p", "div", "li", "h1", "h2", "h3", "section"}  # line breaks in innerText
+BREAKS = {"br", "p", "div", "li", "h1", "h2", "h3", "h4", "section"}  # line breaks in innerText
 CALLING = {
     "AT": "43", "BE": "32", "DK": "45", "FI": "358", "FR": "33", "DE": "49",
-    "IT": "39", "NO": "47", "PL": "48", "SE": "46", "GB": "44",
+    "IT": "39", "NO": "47", "PL": "48", "SE": "46", "GB": "44", "NL": "31", "ES": "34",
+    "CH": "41", "BR": "55", "CA": "1", "US": "1", "CN": "86", "IN": "91", "JP": "81",
 }  # fmt: skip
-NO_TRUNK_PREFIX = {"DK", "IT", "NO", "PL"}  # the leading digit stays (Italy) or is no 0
+NO_TRUNK_PREFIX = {"DK", "IT", "NO", "PL", "ES"}  # the leading digit stays (Italy) or is no 0
 
 
 @dataclass
@@ -91,8 +92,10 @@ def by_id(found: list[Block], element_id: str) -> Block:
 
 
 def e164(text: str, country: str) -> str:
-    """Local number as shown on the page -> E.164 (fixture countries only)."""
+    """Number as shown on the page -> E.164 (`+49 5246 000-0` as is; fixture countries only)."""
     digits = re.sub(r"\D", "", text)
+    if text.strip().startswith("+"):
+        return f"+{digits}"
     if country not in NO_TRUNK_PREFIX:
         digits = digits.removeprefix("0")
     return f"+{CALLING[country]}{digits}"

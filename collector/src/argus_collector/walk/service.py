@@ -50,7 +50,9 @@ END_ATTENTION = "attention"  # a bot check did not clear: the owner solves it (8
 @dataclass(frozen=True)
 class WalkSettings:
     """`approved_hosts`/`limits`/`focus`/`resume`/`id_namespace` are set in job mode;
-    a panel walk leaves them empty (hosts = seed + redirect, budget = page_budget)."""
+    a panel walk leaves them empty (hosts = seed + redirect, budget = page_budget).
+    `model` reads the person cards (14b); `navigation` chooses the next step when no
+    rule does (7b; None: `model`); `vision` looks at a screenshot (VL; None: never)."""
 
     start_url: str
     model: ModelConfig
@@ -66,6 +68,8 @@ class WalkSettings:
     resume: WalkCheckpoint | None = None
     id_namespace: str = ""
     region_fallback: str = "FI"
+    navigation: ModelConfig | None = None
+    vision: ModelConfig | None = None
 
     def run_limits(self) -> WalkLimits:
         if self.limits is not None:
@@ -106,6 +110,7 @@ class Action:
     kind: str
     candidate: Candidate | None = None
     option: str = ""  # ACTION_SELECT: the option label to choose
+    source: str = ""  # who chose it: structure | rule | cache | model:<name> | fallback | finish
 
 
 def validate_start_url(raw: str) -> str | None:

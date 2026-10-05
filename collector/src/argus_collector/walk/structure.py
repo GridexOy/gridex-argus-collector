@@ -4,6 +4,11 @@ Owner decisions 05.10.2026:
 1. A country list (accordion headers, tabs, a dropdown, links naming >= 3
    countries): only the exhibition country is opened or selected; the other
    countries' controls are not offered to the model and not remembered.
+   0.4.8.0 (Beckhoff): when the seed is not the exhibition-country version, a
+   control or version link naming another country (`Germany`, `/de-de/`) is
+   never offered either, nor, once `/fi-fi/` is reached, another language
+   version (`/en-en/`); a closed `Worldwide` / `Global presence` control is
+   opened when the exhibition country is not on the page yet.
 2. Department tabs, and collapsed department sections on a page with
    contacts: every one is opened once, sales and marketing first.
 Each structural action is done once per page URL and label (`cp.acted`).
@@ -29,15 +34,38 @@ def _country(state: WalkState) -> str:
     return state.focus.country if state.focus is not None else ""
 
 
+def _local_segment(state: WalkState, country: str) -> str:
+    """`fi-fi` once the walk reached the exhibition-country version by its locale path."""
+    for url in state.cp.visited:
+        if discovery.url_country(url) == country and discovery.locale_segment(url):
+            return discovery.locale_segment(url)
+    return ""
+
+
+def foreign(state: WalkState, cand: discovery.Candidate) -> bool:
+    """Another country's control or version link while the seed is not local (Beckhoff);
+    once `/fi-fi/` is reached, the other language versions (`/en-en/`) too."""
+    focus = state.focus
+    if focus is None or not focus.country or focus.local_seed:
+        return False
+    if discovery.foreign_country(cand.text, cand.href, focus.country) is not None:
+        return True
+    local = _local_segment(state, focus.country) if cand.href else ""
+    segment = discovery.locale_segment(cand.href) if local else ""
+    return bool(segment) and segment != local
+
+
 def offered(state: WalkState, candidates: list[discovery.Candidate]) -> list[discovery.Candidate]:
-    """Candidates without the other countries of a country list (and without dropdowns)."""
+    """Candidates without the other countries (of a country list, or any while the seed
+    is not local) and without dropdowns."""
     members = discovery.country_members(candidates)
     country = _country(state)
     others = {
         id(c) for code, group in members.items() if code != country for c in group
         if c.kind != discovery.KIND_SELECT
     }
-    return [c for c in candidates if id(c) not in others and c.kind != discovery.KIND_SELECT]
+    return [c for c in candidates if id(c) not in others and c.kind != discovery.KIND_SELECT
+            and not foreign(state, c)]
 
 
 def _once(state: WalkState, url: str, cand: discovery.Candidate, label: str) -> bool:
@@ -67,6 +95,20 @@ def _open_country(state: WalkState, page: browser.PageState) -> Action | None:
     return None
 
 
+def _open_worldwide(state: WalkState, page: browser.PageState) -> Action | None:
+    """A closed `Beckhoff Worldwide` tab or section while the exhibition country is not
+    named by any control of the page: open it once (the country list is behind it)."""
+    country = _country(state)
+    if not country or any(discovery.label_country(c.text) == country for c in page.candidates):
+        return None
+    for cand in page.candidates:
+        closable = cand.role in (TAB, EXPAND) or cand.kind == discovery.KIND_BUTTON
+        if closable and cand.state != ON and discovery.is_worldwide(cand.text):
+            if _once(state, page.url, cand, cand.text):
+                return Action(service.ACTION_CLICK, cand)
+    return None
+
+
 def _departments(state: WalkState, page: browser.PageState) -> Action | None:
     tabs = [c for c in page.candidates if c.role == TAB and not discovery.label_country(c.text)]
     sections = [c for c in page.candidates if c.role == EXPAND and c.state != ON
@@ -86,4 +128,4 @@ def _departments(state: WalkState, page: browser.PageState) -> Action | None:
 
 def structural_action(state: WalkState, page: browser.PageState) -> Action | None:
     """The next structure action of this page state, None when the model decides."""
-    return _open_country(state, page) or _departments(state, page)
+    return _open_country(state, page) or _open_worldwide(state, page) or _departments(state, page)

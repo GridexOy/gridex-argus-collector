@@ -107,5 +107,23 @@
       "en"
     ],
     "project_id": "fixture-expo-2027"
+  },
+  {
+    "company_id": "beckhoff",
+    "company_name": "Beckhoff Automation Oy",
+    "seed_urls": [
+      "http://beckhoff.localhost:8765/en-en/"
+    ],
+    "approved_hosts": [
+      "beckhoff.localhost"
+    ],
+    "priority_countries": [
+      "FI"
+    ],
+    "priority_languages": [
+      "fi",
+      "en"
+    ],
+    "project_id": "fixture-expo-2027"
   }
 ]

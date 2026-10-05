@@ -67,6 +67,35 @@ def country_sections(text: str) -> list[Section]:
     return out
 
 
+def _panel_span(text: str, panel: str) -> tuple[int, int] | None:
+    """Where a panel's text is in the page text: whole, else first to last line."""
+    lines = [line.strip() for line in panel.splitlines() if line.strip()]
+    if not lines:
+        return None
+    first = text.find(lines[0])
+    if first < 0:
+        return None
+    last = text.find(lines[-1], first)
+    return (first, last + len(lines[-1])) if last >= 0 else None
+
+
+def panel_sections(text: str, panels: list[tuple[str, str]]) -> list[Section]:
+    """A selected tab labelled with a country (`Germany`) makes its panel that country's
+    section; the heading quote is the tab label in the page text (0.4.8.0)."""
+    out: list[Section] = []
+    for label, panel in panels:
+        code = discovery.label_country(label)
+        span = _panel_span(text, panel) if code else None
+        if code is None or span is None:
+            continue
+        head = text.rfind(label.strip(), 0, span[0])
+        head = head if head >= 0 else text.find(label.strip())
+        if head < 0:
+            continue
+        out.append(Section(code, _span(text, head, head + len(label.strip())), span[0], span[1]))
+    return out
+
+
 def section_at(sections: list[Section], offset: int) -> Section | None:
     for section in sections:
         if section.start <= offset < section.end:

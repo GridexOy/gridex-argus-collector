@@ -12,6 +12,7 @@ Entry point: `contract.py`; command line `python -m argus_collector.pilot
 | `PhoneCheck` | the snapshot behind the observation: its host is in the job's approved_hosts, the quote is at its `text_span` (or in the snapshot text / html) |
 | `PilotReport.threshold_met` | >= 50 % of the companies have such a person (BLOCKS block 6) |
 | `render_markdown` | the two tables for `docs/ARGUS20_COLLECTOR_STAGE6_REPORT.md` |
+| `timing_markdown(lines, names, source)` | 0.4.8.0 (`timing.py`, `timing_render.py`): a collecting day's journal per company: page phases (load, snapshot, extract, cards, bind, record, next step), who decided (rules / each model / cache / fallback), model calls (model, purpose, ms, tokens), delivery; `python -m argus_collector.pilot timing --log FILE [--out FILE]`, `scripts\walk_timing.ps1` |
 
 No tables of its own: jobs from `scheduler.job_facts`, events and ARGUS's
 answers from `delivery.run_results`, snapshots from `evidence`. Gold P / R,

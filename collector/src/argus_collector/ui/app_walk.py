@@ -50,6 +50,8 @@ class WalkController:
         return walk.WalkSettings(
             start_url=url,
             model=models.resolve_config(cfg.model_endpoint, cfg.model_name),
+            navigation=models.resolve_role(cfg.model_endpoint, cfg.model_navigation),
+            vision=models.resolve_role(cfg.model_endpoint, cfg.model_vision),
             page_budget=cfg.walk_page_budget,
             headless=False,
             stop_files=tuple(runtime.stop_files()) or (runtime.repo_root() / "STOP",),

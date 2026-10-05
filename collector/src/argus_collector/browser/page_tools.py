@@ -10,8 +10,14 @@ from __future__ import annotations
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Page
 
-from argus_collector.browser.scripts import CANDIDATES_JS, CHALLENGE_JS, CONSENT_JS, IDX_ATTR
-from argus_collector.browser.service import consent_choice, is_challenge
+from argus_collector.browser.scripts import (
+    CANDIDATES_JS,
+    CHALLENGE_JS,
+    CONSENT_JS,
+    IDX_ATTR,
+    QUIET_DOM_JS,
+)
+from argus_collector.browser.service import consent_choice, is_challenge, is_challenge_hint
 from argus_collector.discovery.contract import Candidate, host_of
 from argus_collector.runtime import contract as runtime
 
@@ -30,12 +36,32 @@ def candidates(page: Page) -> list[Candidate]:
     ]
 
 
+def settle(page: Page, load_timeout_ms: int, quiet_ms: int, max_ms: int) -> None:
+    """`load`, then a quiet DOM: `quiet_ms` without a mutation, `max_ms` at most."""
+    try:
+        page.wait_for_load_state("load", timeout=load_timeout_ms)
+    except PlaywrightError:  # readiness is by content, not by `load`
+        pass
+    try:
+        page.evaluate(QUIET_DOM_JS, [quiet_ms, max_ms])
+    except PlaywrightError:  # a navigation during the wait: settled enough
+        page.wait_for_timeout(quiet_ms)
+
+
 def challenged(page: Page) -> bool | None:
     """True / False, None while the page navigates (a check that reloads itself)."""
     try:
         return is_challenge(page.evaluate(CHALLENGE_JS))
     except PlaywrightError:
         return None
+
+
+def challenge_hint(page: Page) -> bool:
+    """One bot-check sign only (an uncertain case for the vision model)."""
+    try:
+        return is_challenge_hint(page.evaluate(CHALLENGE_JS))
+    except PlaywrightError:
+        return False
 
 
 def answer_consent(page: Page, done: set[str]) -> str:

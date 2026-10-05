@@ -10,6 +10,7 @@ Playwright driver of the work browser. Entry point: `contract.py`.
 | `WalkBrowser(headless, profile_dir)` | context manager of a walk (`session.py`): one persistent-profile context, one tab; `goto(url)`, `click(candidate)`, `scroll()`, `back()`, `observe()` return `PageState(url, title, html, text, candidates)` |
 | `WalkBrowser.bindings(probes)` | 0.4.3.0 (`binding.py`): DOM binding of each verified person field: `card` / `table_row` (name and value meet in a small container with no other person) / `proximity_only` / `none` (TZ_SELAIN 8.11, 9.4); 0.4.4.0: plus the person's group (nearest heading before the card in its tab panel / section, else its tab label) |
 | `PageState.consent` | 0.4.6.0 (`page_tools.py`): a cookie banner is answered once per host before the page is read: necessary cookies, else reject, accept only when nothing else (TZ_SELAIN 8.5); the choice is journaled |
+| `PageState.tab_panels` / `challenge_hint`, `screenshot()`, `wait_out_challenge()` | 0.4.8.0: the selected tabs with their panel text (a `Germany` tab is that country's section); one bot-check sign only (the vision model may look); a JPEG of the view; a check the vision model saw, waited out for 20 s |
 | `WalkBrowser.select(candidate, option)`, `PageState.challenge` | 0.4.4.0 (`scripts.py`): tabs, accordion headers (`aria-expanded`, `summary`) and dropdowns are candidates; a bot check (two of: title, text, challenge element; short page) is waited out for up to 20 s, still there -> `challenge=True` |
 
 `PageState.candidates` are the visible, enabled links (`a[href]` with an
@@ -18,7 +19,8 @@ http(s) href, acted on by navigation) and buttons (`button`, `role=button`,
 links are values, not actions (TZ section 8.4); submit buttons of a form are
 never pressed (no forms in this step). Each element gets `data-argus-idx="<n>"`
 so the model's chosen index is clicked exactly. Readiness: DOM content +
-`load` (10 s cap) + 0.8 s settle; navigation timeout 45 s (section 8.5).
+`load` (10 s cap) + a quiet DOM (0.4.8.0: 300 ms without a mutation, 0.8 s at most,
+once; it was a fixed 2 x 0.8 s); navigation timeout 45 s (section 8.5).
 
 `service.py` holds the decisions (channel, args, failure text);
 `repository.py` and `session.py` are the only files that import Playwright.

@@ -35,6 +35,7 @@ Server features (`pages.py`):
 | `katsa` | seed redirects (302) off its approved host: gap `domain_ownership_unresolved`, nothing sent | `katsa.json` |
 | `ledvance` | global `en-int/company/contact/`: accordion of 11 countries, open only Finland (office, switchboard, email, not the fax), follow `/fi-fi/` (bot check) for 6 people; `contact-select/` the same as a dropdown | `ledvance.json` |
 | `malux` | seed `/fi/`; `fi/yhteystiedot/` 4 department tabs (only the first open), every tab walked, sales/marketing first; sister site `malux-se.localhost/sv/` after, people with country SE | `malux.json` |
+| `beckhoff` | seed `en-en/`, the same header and footer menus on every en-en page; `en-en/company/global-presence/` has 2 tabs and Germany is open on load (HQ, 8 sales offices, link `/de-de/`; the trap of 05.10.2026). Correct path: tab "Beckhoff Worldwide", then open only Finland in the 19-country accordion (office with switchboard, email and fax), then the local site `/fi-fi/`, where `yhteystiedot/` has 6 people under department headings and `yritys/johto/` 2 managers as cards and as JSON-LD `Person`. `/de-de/` is never visited | `beckhoff.json` |
 
 Gold files list every record the collector must find (E.164 `phone`, the
 page's raw `phone_text`, `source_page`; `how` = `link` / `button` / `text`

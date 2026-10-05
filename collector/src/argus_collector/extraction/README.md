@@ -14,6 +14,7 @@ Entry point: `contract.py`.
 | `verify_card(card, text, channels, region)` | the verbatim check; returns `Contact` of `VerifiedField(value, quote, start, end, locator)` or None |
 | `classify_unattached(channel, text)` | 0.4.3.0 (`roles.py`): a channel no person claims is `organization_channel` (generic mailbox, switchboard line, JSON-LD), `office` (its line names an office) or `unassigned_channel`, with the binding to send |
 | `country_sections(text)` / `region_resolver` / `office_lines` | 0.4.4.0 (`sections.py`, owner 05.10.2026): on a page naming >= 3 countries on lines of their own, each country heading starts a section; a phone in it is read in that country (`09-7422 3300` under Finland -> +358974223300); the office's company line and address lines. A number labelled fax (`Fax`, `Faksi`, `Telefax`) or JSON-LD `faxNumber` is a channel of kind `fax` (0.4.7.0: sent only as extra `fax`) |
+| `jsonld_people(html)` / `panel_sections(text, panels)` | 0.4.8.0 (`jsonld_people.py`, `sections.py`): schema.org `Person` items as cards (read without the model, verified like model cards); a selected tab labelled with a country makes its panel that country's section |
 | `html_language(html)` | `<html lang>`; with the URL it gives the phone region (`normalization.region_for_page`) |
 
 Verbatim rules of `verify_card`:

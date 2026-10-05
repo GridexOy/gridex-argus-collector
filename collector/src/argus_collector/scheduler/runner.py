@@ -35,6 +35,8 @@ class WalkEnv:
     db_path: Path | None
     stop_files: tuple[Path, ...]
     version: str
+    navigation: ModelConfig | None = None  # next steps (7b); None: `model`
+    vision: ModelConfig | None = None  # screenshots (VL); None: never
 
 
 def claimed_job(row: sqlite3.Row) -> api.ClaimedJob:
@@ -96,6 +98,7 @@ def walk_settings(
         limits=service.run_limits(api.to_json(job.policy), consumed(claimed)),
         resume=resume, id_namespace=job.job_id,
         region_fallback=countries[0].upper() if countries else DEFAULT_REGION,
+        navigation=env.navigation, vision=env.vision,
     )
 
 

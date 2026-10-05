@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from argus_collector.extraction import jsonld_people as jsonld
 from argus_collector.extraction import repository, roles, sections, service
 from argus_collector.extraction.roles import ChannelRole
 from argus_collector.extraction.sections import OfficeLines, Section
@@ -37,7 +38,9 @@ __all__ = [
     "extract_channels",
     "has_contact_signals",
     "html_language",
+    "jsonld_people",
     "office_lines",
+    "panel_sections",
     "region_resolver",
     "section_at",
     "verify_card",
@@ -69,6 +72,11 @@ def country_sections(text: str) -> list[Section]:
     return sections.country_sections(text)
 
 
+def panel_sections(text: str, panels: list[tuple[str, str]]) -> list[Section]:
+    """Sections of selected tabs labelled with a country (tab label, panel text)."""
+    return sections.panel_sections(text, panels)
+
+
 def section_at(found: list[Section], offset: int) -> Section | None:
     return sections.section_at(found, offset)
 
@@ -86,6 +94,11 @@ def office_lines(text: str, section: Section) -> OfficeLines:
 def has_contact_signals(text: str, channels: list[Channel]) -> bool:
     """True when the page is worth a model card parse (channels or contact words)."""
     return service.has_contact_signals(text, channels)
+
+
+def jsonld_people(html: str) -> list[PersonCard]:
+    """schema.org `Person` items of the page's JSON-LD (unverified, like model cards)."""
+    return jsonld.people(repository.raw_finds(html).jsonld)
 
 
 def card_from_json(data: object) -> PersonCard | None:

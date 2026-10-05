@@ -76,10 +76,10 @@ CHALLENGE_TEXTS = (
 CHALLENGE_MAX_TEXT = 2500
 
 
-def is_challenge(signals: object) -> bool:
-    """True for an interstitial bot check page (the CHALLENGE_JS result)."""
+def challenge_hits(signals: object) -> int:
+    """Bot-check signs of a short page (title, text, markers), 0 for a long page."""
     if not isinstance(signals, dict):
-        return False
+        return 0
     title = str(signals.get("title", "")).lower()
     text = str(signals.get("text", "")).lower()
     length = int(signals.get("length", 0) or 0)
@@ -89,7 +89,17 @@ def is_challenge(signals: object) -> bool:
         + any(p in text for p in CHALLENGE_TEXTS)
         + bool(markers)
     )
-    return hits >= 2 and length < CHALLENGE_MAX_TEXT
+    return int(hits) if length < CHALLENGE_MAX_TEXT else 0
+
+
+def is_challenge(signals: object) -> bool:
+    """True for an interstitial bot check page (the CHALLENGE_JS result)."""
+    return challenge_hits(signals) >= 2
+
+
+def is_challenge_hint(signals: object) -> bool:
+    """One sign only: the DOM cannot tell; the vision model looks (0.4.8.0)."""
+    return challenge_hits(signals) == 1
 
 
 # Cookie banners (TZ_SELAIN 8.5): automatic, the necessary cookies preferred.

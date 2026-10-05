@@ -21,9 +21,16 @@ model:
   # proxy. Ollama by default; a llama.cpp server works with its own /v1 URL.
   # diagnose.ps1 and the panel probe <endpoint>/models and expect `name` listed.
   endpoint: "http://127.0.0.1:11434/v1"
-  # Model installed by scripts\install_model.ps1 (fits the 24 GB RTX 4090 with
-  # a 16k context; strong JSON and Finnish). Alternative: "llama3.1:8b".
+  # Routing (owner 05.10.2026): rules first, no model; `navigation` chooses the
+  # next step when no rule does; `name` reads the person cards only when the
+  # rules and JSON-LD leave them unread; `vision` looks at a screenshot only for
+  # an uncertain bot check or a page without DOM text. All are pulled by
+  # scripts\install_model.ps1 (OLLAMA_MAX_LOADED_MODELS=2, OLLAMA_NUM_PARALLEL=3).
+  # An empty `navigation` lets the card model choose the steps; an empty
+  # `vision` never sends a screenshot.
   name: "qwen2.5:14b-instruct"
+  navigation: "qwen2.5:7b"
+  vision: "qwen2.5-vl:7b"
 
 walk:
   # Distinct pages one site walk may open before it finishes.

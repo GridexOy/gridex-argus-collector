@@ -2,7 +2,10 @@
 
 `FakeModelServer(policy)` serves `GET /v1/models` and `POST /v1/chat/completions`
 on 127.0.0.1; `policy(system, user) -> str` decides the reply content. Every
-request body is kept in `requests` so tests can inspect prompts.
+request body is kept in `requests` so tests can inspect prompts. A user
+message given as parts (text + `image_url`) reaches the policy as its text
+with `[image]` per picture; the reply names the requested model; a model in
+`missing` answers 404 like Ollama for a model that is not pulled.
 """
 
 from __future__ import annotations
@@ -18,9 +21,11 @@ MODEL_ID = "fake-instruct"
 
 
 class FakeModelServer:
-    def __init__(self, policy: Policy, model_id: str = MODEL_ID) -> None:
+    def __init__(self, policy: Policy, model_id: str = MODEL_ID,
+                 missing: frozenset[str] = frozenset()) -> None:
         self.policy = policy
         self.model_id = model_id
+        self.missing = missing
         self.requests: list[dict[str, Any]] = []
         self.fail_next = 0
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler_class())
@@ -67,13 +72,27 @@ class FakeModelServer:
                     owner.fail_next -= 1
                     self._send(500, {"error": "simulated failure"})
                     return
+                requested = str(body.get("model") or owner.model_id)
+                if requested in owner.missing:
+                    self._send(404, {"error": {"message": f"model '{requested}' not found"}})
+                    return
                 messages = body.get("messages", [])
                 system = next((m["content"] for m in messages if m["role"] == "system"), "")
-                user = next((m["content"] for m in messages if m["role"] == "user"), "")
+                user = text_of(next((m["content"] for m in messages if m["role"] == "user"), ""))
                 content = owner.policy(system, user)
-                self._send(200, completion(owner.model_id, content, len(user) // 4))
+                self._send(200, completion(requested, content, len(user) // 4))
 
         return Handler
+
+
+def text_of(content: Any) -> str:
+    """A message's text; parts (OpenAI vision format) joined, `[image]` per picture."""
+    if isinstance(content, str):
+        return content
+    parts = content if isinstance(content, list) else []
+    texts = [str(p.get("text", "")) if p.get("type") == "text" else "[image]"
+             for p in parts if isinstance(p, dict)]
+    return "\n".join(texts)
 
 
 def completion(model_id: str, content: str, prompt_tokens: int) -> dict[str, Any]:

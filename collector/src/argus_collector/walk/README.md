@@ -1,39 +1,38 @@
 # walk
 
-One company-site walk: the local model drives the visible Chrome (TZ_SELAIN
-8.4, 8.5). Entry point: `contract.run_walk(settings, on_event, should_stop, sink=None)`.
+One company-site walk in the visible Chrome (TZ_SELAIN 8.4, 8.5). Entry point:
+`contract.run_walk(settings, on_event, should_stop, sink=None)`.
 
 Per page (`runner.py` loop, `page.py`, `decide.py`):
-1. `enter`: a new URL counts against the page budget; `observe`: a page state
-   (URL + content hash) not seen before is snapshotted (`evidence.store_snapshot`).
-2. Channels (`extraction.extract_channels`, phone region from the page or its
-   country section), model cards (`walk.cards`) verified verbatim, DOM binding
-   and group heading of each person (`browser.bindings`, job mode), findings
-   (`findings.py`, `entities.py`): persons with department and country
-   (`context.py`), the office of each opened country section (`offices.py`),
-   other channels as organization / office / unassigned, the field audit;
-   local `observations` rows + the sink in one transaction.
-3. `structure.py` first (owner 05.10.2026): on a country list only the
-   exhibition country is opened / selected, the others are not offered; every
-   department tab is opened, sales and marketing first. Then links join a
-   frontier of the whole site and the model (`walk.action`, focus brief) picks;
-   in job mode it may not finish while a strong link (`discovery.strong_link`)
-   is unvisited. A bot check that does not clear in 20 s ends the walk as
-   `attention` (gap `captcha`, resumes on that URL).
-4. A failed action is a gap (`timeout` / `network_error` / `unsupported_widget`)
-   and the walk goes on; three in a row end it (`actions.py`). Every relevant
-   link left when the budget or the failures end the walk is a gap
-   (`budget_reached` / `no_progress`); own-brand relevant links on hosts
-   outside approved_hosts are gaps `domain_ownership_unresolved`; a directory
-   that states its size gives the expected count (`coverage.py`, A4.3).
+1. `enter`: a new URL counts against the page budget; a page state (URL + content
+   hash) not seen before is snapshotted (`evidence.store_snapshot`).
+2. Channels (`extraction`; phone region from the page, its country section or the
+   selected country tab), people read by `cards.py` (0.4.8.0 routing: JSON-LD,
+   same text read before, skip when no channel can be a person's and the page is no
+   contact page, else the card model `walk.cards`), verified verbatim; DOM binding
+   and group heading (`browser.bindings`); findings (`findings.py`, `entities.py`,
+   `context.py`, `offices.py`): country / department / office name / address /
+   fax as `extra`; local rows + the sink in one transaction.
+3. The next step (`decide.py`): `structure.py` (exhibition country of a country
+   list; a closed `Worldwide` control; every department tab; other countries'
+   controls and, once `/fi-fi/` is reached, other language versions never offered
+   while the seed is not local), then `rules.py` (exhibition-country version, the
+   country finder, a contact link by its words), the menu cache, the vision model
+   for a page without DOM text (`vision.py`), else the navigation model (7b; the
+   card model once it fails). No finish while a strong link is unvisited.
+4. A bot check that does not clear in 20 s ends the walk as `attention` (gap
+   `captcha`); one sign only: the vision model looks first, never solves it. A
+   failed action is a gap and the walk goes on; three in a row end it. Relevant
+   links left at the end are gaps (`budget_reached` / `no_progress`); own-brand
+   links outside approved_hosts are `domain_ownership_unresolved` (`coverage.py`).
+5. `timing.py`: one journal line per page state, `browser: job <id>: timing <url>
+   load= snapshot= extract= cards= bind= record= action= decide= reader=` (ms;
+   who decided, who read the cards) for `pilot timing`.
 
-Job mode (`WalkSettings.approved_hosts/limits/focus/resume/id_namespace`, TANDEM
-A2): hosts from the job (a seed landing elsewhere: gap `domain_ownership_unresolved`,
-end), run budget, ids stable within the job, checkpoint after every page, resume
-from it after a restart, a stop or a lost lease (tabs are not restored).
-`WalkSummary.end_reason`: finished / budget / stopped / error / attention /
-domain_unresolved / start_failed / action_failures.
-
-The sink (`sink.py`, implemented by `scheduler`) gets `page_stored`, `page_done`
-(inside the walk's transaction), `gap`, `model_called`, `checkpoint`; a panel walk
-has no sink. Tests: fixture site + fake model (`tests/fake_policy.py`).
+Job mode (`WalkSettings.approved_hosts/limits/focus/resume/id_namespace`): job
+hosts, run budget, stable ids, a checkpoint after every page and resume from it.
+`WalkSettings.model` reads cards, `navigation` chooses steps, `vision` looks at
+screenshots. `WalkSummary.end_reason`: finished / budget / stopped / error /
+attention / domain_unresolved / start_failed / action_failures. The sink
+(`sink.py`, implemented by `scheduler`) gets `page_stored`, `page_done`, `gap`,
+`model_called`, `checkpoint`. Tests: fixture site + fake model.

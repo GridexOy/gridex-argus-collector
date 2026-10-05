@@ -63,6 +63,8 @@ class CollectController:
             model=models.resolve_config(cfg.model_endpoint, cfg.model_name), headless=False,
             profile_dir=None, evidence_dir=None, db_path=None, stop_files=(),
             version=runtime.current_version_status().file_version,
+            navigation=models.resolve_role(cfg.model_endpoint, cfg.model_navigation),
+            vision=models.resolve_role(cfg.model_endpoint, cfg.model_vision),
         )
         settings = scheduler.Settings(env=env, stop_files=runtime.stop_files,
                                       browser_free=lambda: not host.work_browser_running())

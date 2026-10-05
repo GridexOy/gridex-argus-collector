@@ -7,7 +7,7 @@ from argus_collector.discovery import contract as discovery
 from argus_collector.models import contract as models
 from argus_collector.storage import contract as storage
 from argus_collector.walk import page as page_step
-from argus_collector.walk import repository, service
+from argus_collector.walk import repository, service, timing, vision
 from argus_collector.walk.actions import gap_reason, goto, perform_safely
 from argus_collector.walk.decide import decide, end_budget
 from argus_collector.walk.service import WalkEvent, WalkSettings, WalkSummary
@@ -31,6 +31,10 @@ def _state(
     conn = storage.connect(settings.db_path)
     listener = (lambda record: sink.model_called(conn, record)) if sink is not None else None
     client = models.ModelClient(settings.model, conn, listener)
+    nav = settings.navigation
+    nav_client = models.ModelClient(nav, conn, listener) if nav and nav != settings.model else None
+    vision = settings.vision
+    vision_client = models.ModelClient(vision, conn, listener) if vision else None
     run_id = repository.start_run(conn, settings.start_url)
     resume = settings.resume
     cp = WalkCheckpoint.from_json(resume.to_json()) if resume else WalkCheckpoint()
@@ -38,7 +42,8 @@ def _state(
     if focus is not None and cp.native_language:
         focus = focus.with_native(cp.native_language)
     return WalkState(
-        settings, conn, client, on_event, should_stop, run_id, sink, focus=focus, cp=cp
+        settings, conn, client, on_event, should_stop, run_id, sink, focus=focus, cp=cp,
+        nav_client=nav_client, vision_client=vision_client,
     )
 
 
@@ -74,6 +79,7 @@ def _walk(state: WalkState) -> None:
     with browser.WalkBrowser(settings.headless, settings.profile_dir) as wb:
         page = _open(state, wb)
         while page is not None:
+            page = _vision_bot_check(state, wb, page)
             if page.challenge:
                 _attention(state, page)
                 return
@@ -88,11 +94,34 @@ def _walk(state: WalkState) -> None:
                 return
             text = page_step.observe(state, wb, page)
             state.check_stop()
-            action = decide(state, page, text)
+            with timing.timed(state.timing, "action"):
+                action = decide(state, wb, page, text)
+            _flush_timing(state, page.url, action)
             if action.kind == service.ACTION_FINISH:
                 return
             state.check_stop()
-            page = perform_safely(state, wb, page, action)
+            with timing.timed(state.timing, "load"):
+                page = perform_safely(state, wb, page, action)
+
+
+def _vision_bot_check(
+    state: WalkState, wb: browser.WalkBrowser, page: browser.PageState
+) -> browser.PageState:
+    """One bot-check sign and the vision model sees a check: wait it out like one."""
+    if not vision.is_bot_check(state, wb, page):
+        return page
+    try:
+        with timing.timed(state.timing, "load"):
+            return wb.wait_out_challenge()
+    except browser.ActionError:
+        return page
+
+
+def _flush_timing(state: WalkState, url: str, action: service.Action) -> None:
+    """One `timing:` journal line per handled page state, then a fresh timer."""
+    state.timing.decide = action.source or action.kind
+    timing.flush(state.settings.id_namespace, url, state.timing)
+    state.timing = timing.PageTiming()
 
 
 def _attention(state: WalkState, page: browser.PageState) -> None:
@@ -109,7 +138,8 @@ def _open(state: WalkState, wb: browser.WalkBrowser) -> browser.PageState | None
     url = state.cp.last_url or settings.start_url
     state.step(service.STEP_LOADING, url, url)
     try:
-        page = goto(wb, url)
+        with timing.timed(state.timing, "load"):
+            page = goto(wb, url)
     except browser.ActionError as exc:
         state.add_gap(url, gap_reason(exc), str(exc).splitlines()[0], True)
         state.end_reason = service.END_START_FAILED

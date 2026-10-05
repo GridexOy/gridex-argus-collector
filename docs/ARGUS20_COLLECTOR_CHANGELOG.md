@@ -1,5 +1,35 @@
 # ARGUS20_COLLECTOR_CHANGELOG
 
+## 0.4.8.0 — 2026-10-05
+
+**Шаг `stage-5/step-7-routing`: разбор живого обхода Beckhoff (MAIN-PC, 05.10), тайминг по фазам и маршрутизация моделей (решения владельца 05.10.2026).** Контракт не менялся.
+
+**Что видно.**
+- Beckhoff (`beckhoff.com/en-en/company/global-presence`): обход идёт Global presence → «Beckhoff Worldwide» → Finland → `/fi-fi/` → Yhteystiedot (раньше — Global presence → Germany → `/de-de/`). Вкладка «Germany», открытая по умолчанию, — раздел страны DE: её офисы уходят с `extra:country DE` (Muut maat), не в шапку компании. Финский офис — телефон, email, `extra` название/адрес/факс/страна FI; люди с `/fi-fi/`, двое из JSON-LD без модели.
+- Пока seed не местная версия, элементы с другой страной (`Germany`, `/de-de/`, `Deutsch`) не предлагаются модели; после того как достигнута `/fi-fi/`, не предлагаются и другие языковые версии (`/en-en/`).
+- Resurssit: строка `Reititys: säännöt ensin · navigointi qwen2.5:7b · kuvakaappaus qwen2.5-vl:7b` (не скачанная модель — `puuttuu`, жёлтым).
+- В журнале — строка на каждое состояние страницы: `browser: job <id>: timing <url> load= snapshot= extract= cards= bind= record= action= total= decide=<кто выбрал шаг> reader=<кто читал карточки>`; у доставки — `... in N ms` для пакетов событий и снимков.
+- `scripts\walk_timing.ps1 [-Log <файл>]` (или `python -m argus_collector.pilot timing --log ...`) → `reports\timing-<дата>.md`: фазы, «кто решал» (правила / каждая модель / кэш / резерв), вызовы моделей (модель, назначение, мс, токены), доставка — по компаниям. Лог до 0.4.8.0 тоже читается (видны вызовы моделей и время между страницами).
+
+**Маршрутизация (владелец 05.10.2026).**
+1. Правила без модели: структура (страна выставки в списке стран; закрытый «Worldwide» / «Global presence», пока страны выставки на странице нет; вкладки отделов), затем ссылки: версия страны выставки (`Finland`, `/fi-fi/`), поиск страны (`Global presence`), контакты по своим словам (`Yhteystiedot`, `Contact`, `Kontakt`, `Johto`; бонус `/fi/` не считается). Кэш меню: выбор модели для того же набора ссылок повторяется, пока выбранная не посещена.
+2. Навигация — `model.navigation` (`qwen2.5:7b`); если её нет или она падает — карточная модель до конца прогона.
+3. Карточки людей — `model.name` (14b) только когда JSON-LD (`schema.org Person`) и правила не прочли людей: страница без канала, который может быть личным (не общий ящик, не vaihde, не блок офиса страны), и не страница контактов — пропуск; тот же текст на другом URL — повтор найденного.
+4. VL (`model.vision`, `qwen2.5-vl:7b`) — только по скриншоту: проверка «не бот» с одним признаком (DOM требует двух) — модель отвечает, проверка ли это; если да — ожидание 20 с и Huomio, как обычно (VL проверку не проходит и не кликает); страница без DOM-текста — шаг по скриншоту и списку элементов. Полей контактов со скриншота не берётся (у поля должна быть цитата из текста страницы).
+5. Каждый вызов — `model.called` с именем модели и purpose (`walk.vision` → `vision`).
+6. `install_model.ps1` докачивает `qwen2.5:7b` и `qwen2.5-vl:7b`, ставит `OLLAMA_MAX_LOADED_MODELS=2`, `OLLAMA_NUM_PARALLEL=3` (пользовательские переменные, перезапуск Ollama); не скачалась 7b или VL — предупреждение, не остановка.
+
+**Готовность страницы.** После загрузки / клика ожидание «тихого» DOM (300 мс без изменений, не дольше 800 мс) один раз вместо фиксированных 2 × 800 мс; повторное ожидание — только после прошедшей проверки «не бот» или ответа на cookie-баннер.
+
+**Модули.** Новые файлы: `walk/rules.py`, `walk/cards.py`, `walk/vision.py`, `walk/timing.py`, `extraction/jsonld_people.py`, `pilot/timing.py`, `pilot/timing_render.py`, `ui/route_lines.py`, `scripts/walk_timing.ps1`. Изменены: `walk` (decide, structure, page, runner, state, service), `browser` (session, page_tools, scripts, service), `extraction` (sections, contract), `discovery` (countries, country_names, contract), `models` (service, contract), `scheduler` (runner, service, views, contract), `delivery` (loop, results), `pilot` (contract, `__main__`), `ui` (app, app_collect, app_walk, service), `runtime` (Config), `scripts/install_model.ps1`, `config.example.yaml`. Фикстура `test_site/sites/beckhoff` + `gold/beckhoff.json` (субагент), `collector/tests/fake_model_server.py` (части с картинкой, имя запрошенной модели, `missing`). Тесты: `walk/tests/test_rules.py`, `test_cards_routing.py`, `test_vision_routing.py`, `test_walk_beckhoff.py`, `pilot/tests/test_timing.py`, `extraction/tests/test_jsonld_panels.py`, `models/tests/test_images.py`, `ui/tests/test_route_lines.py`, дополнения `discovery`/`runtime`, `test_site/tests/test_beckhoff*.py`.
+
+**Решения (поправь, если не так).**
+1. Карточная модель — прежняя `qwen2.5:14b-instruct` (то же семейство, что `qwen2.5:14b` в решении; уже скачана на MAIN-PC, перекачивать ~9 ГБ не нужно). Имя VL — как в решении, `qwen2.5-vl:7b`; если в библиотеке Ollama оно другое, `install_model.ps1` предупредит, сборщик работает без VL.
+2. Офисы открытой вкладки другой страны (Germany) отправляются с `extra:country DE` (для «Muut maat»), а не выбрасываются: они на странице, не «обход другой страны».
+3. Кэш меню хранит только переходы по ссылкам (повтор клика мог бы зациклиться); на фикстурах он не сработал ни разу — оставлен, его доля видна в отчёте тайминга.
+4. Параллельную доставку не делаю: поток доставки и так отдельный, обход его не ждёт (фаза `record` — до 30 мс на страницу); `... in N ms` в журнале покажет, нужна ли она для скорости появления данных в ARGUS.
+5. Параллельные вызовы 14b (карточки) и 7b (шаг) на одной странице (`OLLAMA_NUM_PARALLEL=3`) — следующим шагом после замера на MAIN-PC: нужно разнести запись вызова в SQLite и сам HTTP-вызов по потокам.
+
 ## 0.4.7.0 — 2026-10-05
 
 **Шаг `stage-5/step-6-pairing`: паринг в один клик (решение владельца 05.10.2026) и поля `extra` по `docs/ANSWERS_S5.md` (ответы ARGUS на вопросы STAGE5_REPORT §T2.9, решения владельца 05.10.2026; файл положен как есть из `GridexOy/gridex-argus20` `main` 8c0279c, blob d8b6c3d).** Контракт (`docs/ARGUS20_COLLECTOR_OPENAPI.json`) не менялся.

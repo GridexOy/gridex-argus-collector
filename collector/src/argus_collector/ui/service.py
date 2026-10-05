@@ -19,6 +19,7 @@ from argus_collector.runtime.contract import VersionStatus, finnish_stamp, versi
 from argus_collector.ui.connection_lines import ConnectionProps
 from argus_collector.ui.queue_lines import DeliveryProps, QueueProps
 from argus_collector.ui.repository import Messages
+from argus_collector.ui.route_lines import RouteHealth, route_line
 from argus_collector.ui.walk_lines import (
     Activity,
     CollectProps,
@@ -119,15 +120,19 @@ def model_lines(msgs: Messages, report: Report) -> list[Line]:
     return [Line(msgs.t(MODEL_KEYS[s.model]), level), Line(detail, LEVEL_INFO)]
 
 
-def resource_lines(msgs: Messages, report: Report) -> list[Line]:
-    """Chrome, model, disk, memory, GPU lines of the Resurssit block (section 5.1)."""
+def resource_lines(
+    msgs: Messages, report: Report, routes: tuple[RouteHealth, ...] = ()
+) -> list[Line]:
+    """Chrome, model (and the routed models), disk, memory, GPU lines of Resurssit (5.1)."""
     f, s = report.facts, report.states
+    routed = route_line(msgs, routes)
     chrome_level = LEVEL_OK if s.chrome is ChromeState.AVAILABLE else LEVEL_ERROR
     disk_level = LEVEL_OK if s.disk is DiskState.OK else LEVEL_WARN
     lines = [
         Line(msgs.t("resources.os", name=f.os_name, version=f.os_version), LEVEL_INFO),
         Line(msgs.t(CHROME_KEYS[s.chrome]), chrome_level),
         *model_lines(msgs, report),
+        *([Line(*routed)] if routed else []),
         Line(
             msgs.t("resources.disk", path=f.disk_path, free=f.disk_free_gb, pct=s.disk_used_pct),
             disk_level,
@@ -140,12 +145,13 @@ def resource_lines(msgs: Messages, report: Report) -> list[Line]:
     return lines + gpu_lines(msgs, report)
 
 
-def resources_props(msgs: Messages, report: Report | None, error: str | None) -> list[Line]:
+def resources_props(msgs: Messages, report: Report | None, error: str | None,
+                    routes: tuple[RouteHealth, ...] = ()) -> list[Line]:
     if error:
         return [Line(msgs.t("resources.error", error=error), LEVEL_ERROR)]
     if report is None:
         return [Line(msgs.t("resources.checking"), LEVEL_INFO)]
-    return resource_lines(msgs, report)
+    return resource_lines(msgs, report, routes)
 
 
 def build_props(
@@ -157,6 +163,7 @@ def build_props(
     connection: ConnectionProps,
     now: Activity | None = None,
     blocks: tuple[QueueProps, DeliveryProps] | None = None,
+    routes: tuple[RouteHealth, ...] = (),
 ) -> PanelProps:
     banner = Line(msgs.t("stop.active", files=stop_reason), LEVEL_ERROR) if stop_reason else None
     activity = now or Activity()
@@ -167,7 +174,7 @@ def build_props(
         collecting_title=msgs.t("collecting.title"),
         collect=collect_props(msgs, report, stop_reason, activity),
         resources_title=msgs.t("resources.title"),
-        resources=resources_props(msgs, report, report_error),
+        resources=resources_props(msgs, report, report_error, routes),
         open_browser_label=msgs.t("attention.openBrowser"),
         open_browser_enabled=not (activity.walking or activity.collecting),
         stop_banner=banner,

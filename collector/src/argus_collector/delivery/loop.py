@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -134,6 +135,7 @@ class Deliverer:
                 self._reject_upload(conn, job_id, evidence_id, "evidence_missing")
                 continue
             metadata = api.from_json(api.EvidenceMetadata, json.loads(row["metadata_json"]))
+            started = time.monotonic()
             try:
                 resp = api.upload_evidence(
                     target.base_url, target.token, job_id, token, metadata, snap.html,
@@ -145,6 +147,8 @@ class Deliverer:
                 continue
             self.link_down = False
             repo.mark_upload(conn, evidence_id, resp.status.value, "")
+            runtime.journal("delivery", f"job {job_id}: evidence {len(snap.html)} B uploaded"
+                            f" in {_ms(started)} ms")
 
     def _reject_upload(
         self, conn: sqlite3.Connection, job_id: str, evidence_id: str, code: str
@@ -167,6 +171,7 @@ class Deliverer:
             events = [api.event_from_json(json.loads(rows[p.event_id]["event_json"]))
                       for p in chunk]
             request = api.EventsRequest(execution_token=token, events=events)
+            started = time.monotonic()
             try:
                 resp = api.post_events(
                     target.base_url, target.token, job_id, request, proxy_mode=_mode(target)
@@ -176,7 +181,11 @@ class Deliverer:
                 repo.mark_events(conn, [(chunk[0].event_id, "rejected", code, None, None)])
                 continue
             self.link_down = False
-            results.apply(conn, self.hooks, job_id, rows, resp)
+            results.apply(conn, self.hooks, job_id, rows, resp, _ms(started))
+
+
+def _ms(started: float) -> int:
+    return int((time.monotonic() - started) * 1000)
 
 
 def _mode(target: ApiTarget) -> api.ProxyMode:

@@ -85,3 +85,15 @@ DEPARTMENT_LAST: tuple[str, ...] = (
     "warehouse", "lager", "logistiikka", "logistics", "it", "laskutus", "invoicing",
     "kirjanpito", "accounting", "tuotanto", "production",
 )
+
+# Controls and links behind which a page lists its countries (`Beckhoff Worldwide`,
+# `Global presence`, `Weltweit`): opened when the exhibition country is not on the page.
+WORLDWIDE_WORDS: tuple[str, ...] = (
+    "worldwide", "world wide", "global presence", "global network", "international",
+    "subsidiaries", "subsidiary", "sales network", "distributors", "representatives",
+    "all countries", "countries", "country selector", "choose your country",
+    "select your country", "where to buy", "weltweit", "international",
+    "niederlassungen", "tochtergesellschaften", "vertriebsnetz", "landerauswahl",
+    "maailmalla", "maailmanlaajuisesti", "kansainvalinen", "kansainvaliset", "maat",
+    "varlden", "hela varlden", "internationellt", "dotterbolag", "lander",
+)
