@@ -3,7 +3,8 @@
 `blocks(html)` returns every div/button/option/select with its attributes,
 its whole text, the last `<h3>` seen before it opened (`heading`) and the
 ids of the divs around it (`parents`), so a test can say "this card sits in
-panel p-hallinto under the heading Johto" without a browser.
+panel p-hallinto under the heading Johto" without a browser. `page_text(html)`
+is the text a reader sees, one line per block element, for "what comes first".
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from html.parser import HTMLParser
 
 TRACKED = ("div", "button", "select", "option")
 BREAKS = {"br", "p", "div", "li", "h1", "h2", "h3", "h4", "section"}  # line breaks in innerText
+UNSEEN = {"head", "script", "style", "template"}  # never part of innerText
 CALLING = {
     "AT": "43", "BE": "32", "DK": "45", "FI": "358", "FR": "33", "DE": "49",
     "IT": "39", "NO": "47", "PL": "48", "SE": "46", "GB": "44", "NL": "31", "ES": "34",
@@ -85,6 +87,43 @@ def blocks(html: str) -> list[Block]:
     parser.feed(html)
     parser.close()
     return parser.found
+
+
+class _Text(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self.unseen = 0
+
+    def _mark(self, tag: str, step: int) -> None:
+        if tag in UNSEEN:
+            self.unseen += step
+        if tag in BREAKS:
+            self.parts.append("\n")
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self._mark(tag, 1)
+
+    def handle_endtag(self, tag: str) -> None:
+        self._mark(tag, -1)
+
+    def handle_data(self, data: str) -> None:
+        if not self.unseen:  # a line break in the source is only a space
+            self.parts.append(re.sub(r"\s+", " ", data))
+
+
+def page_text(html: str) -> str:
+    """Visible text of a page or fragment, close to `document.body.innerText`.
+
+    One line per block element, whitespace inside a line collapsed, empty lines
+    dropped; `<head>`, scripts and styles are left out. CSS and the `hidden`
+    attribute are not applied, so it is the text of a page with nothing hidden.
+    """
+    parser = _Text()
+    parser.feed(html)
+    parser.close()
+    lines = (" ".join(line.split()) for line in "".join(parser.parts).splitlines())
+    return "\n".join(line for line in lines if line)
 
 
 def by_id(found: list[Block], element_id: str) -> Block:

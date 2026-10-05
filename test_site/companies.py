@@ -51,6 +51,7 @@ def companies(port: int = DEFAULT_PORT) -> list[dict[str, Any]]:
             vhost("beckhoff") + "en-en/",
             ["beckhoff.localhost"],
         ),
+        _company("ellego", "Ellego Powertec Oy", vhost("ellego"), ["ellego.localhost"]),
     ]
 
 

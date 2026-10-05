@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 from argus_collector.browser import contract as browser
 from argus_collector.discovery import contract as discovery
 from argus_collector.models import contract as models
@@ -20,6 +22,7 @@ from argus_collector.walk.state import (
 )
 
 DOMAIN_GAP = "domain_ownership_unresolved"
+MODEL_WORKERS = 3  # card-model windows at a time (OLLAMA_NUM_PARALLEL=3, owner 05.10.2026)
 CHALLENGE_GAP = "captcha"  # a bot check that did not clear: needs_attention (8.5)
 
 __all__ = ["StopRequested", "WalkState", "run"]
@@ -76,7 +79,9 @@ def run(
 
 def _walk(state: WalkState) -> None:
     settings = state.settings
-    with browser.WalkBrowser(settings.headless, settings.profile_dir) as wb:
+    with browser.WalkBrowser(settings.headless, settings.profile_dir) as wb, \
+            ThreadPoolExecutor(MODEL_WORKERS, thread_name_prefix="walk-model") as pool:
+        state.pool = pool
         page = _open(state, wb)
         while page is not None:
             page = _vision_bot_check(state, wb, page)
@@ -92,10 +97,11 @@ def _walk(state: WalkState) -> None:
             if state.budget_spent() or not page_step.enter(state, page):
                 end_budget(state)
                 return
-            text = page_step.observe(state, wb, page)
-            state.check_stop()
+            text, pending = page_step.observe(state, wb, page)
             with timing.timed(state.timing, "action"):
-                action = decide(state, wb, page, text)
+                action = decide(state, wb, page, text)  # the card model works meanwhile
+            page_step.complete(state, wb, page, pending)  # extracted before any navigation
+            state.check_stop()
             _flush_timing(state, page.url, action)
             if action.kind == service.ACTION_FINISH:
                 return

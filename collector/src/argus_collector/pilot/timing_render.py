@@ -7,7 +7,7 @@ from collections import Counter
 from argus_collector.pilot.timing import PHASES, JobTiming, decide_group
 
 PHASE_TITLES = ("Load", "Snapshot", "Extract", "Cards", "Bind", "Record", "Next step")
-RULE_READERS = ("skip", "jsonld", "cache", "none")
+RULE_READERS = ("skip", "jsonld", "rules", "cache", "none")
 
 
 def _s(ms: int) -> str:

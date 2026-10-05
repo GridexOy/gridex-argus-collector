@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from argus_collector.browser import contract as browser
 from argus_collector.discovery import contract as discovery
 from argus_collector.evidence import contract as evidence
@@ -39,12 +41,29 @@ def ranked(state: WalkState, page: browser.PageState) -> list[discovery.Candidat
     pool = structure.offered(state, page.candidates) + frontier
     ordered = discovery.rank_candidates(pool, set(state.cp.visited), state.hosts, state.focus)
     links = [c for c in ordered if c.kind == "link"][:MAX_LINKS_SHOWN]
-    buttons = [c for c in ordered if c.kind == "button" and c.selector not in state.failed_targets]
+    finished = discovery.normalize_url(page.url) in state.finished_urls  # finish_branch
+    buttons = [c for c in ordered if c.kind == "button" and c.selector not in state.failed_targets
+               and not finished]
     return links + buttons[:MAX_BUTTONS_SHOWN]
 
 
-def observe(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState) -> str:
-    """Snapshot and extract a page state not seen before; returns its canonical text."""
+@dataclass
+class Pending:
+    """A new page state whose people are being read: finished before any navigation."""
+
+    key: str
+    source: PageSource
+    lang: str
+    sections: list[extraction.Section]
+    channels: list[extraction.Channel]
+    read: cards.PendingRead
+
+
+def observe(
+    state: WalkState, wb: browser.WalkBrowser, page: browser.PageState
+) -> tuple[str, Pending | None]:
+    """Snapshot a page state not seen before and start reading its people (`complete`
+    finishes it before the next action); a state seen again feeds the loop detector."""
     text = evidence.canonical_text(page.text)
     key = discovery.page_key(page.url, evidence.sha256_text(text))
     offered = structure.offered(state, page.candidates)
@@ -52,12 +71,15 @@ def observe(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState) 
     if state.job_mode:
         coverage.note_foreign_links(state, page.url, [c for c in offered if c.kind == "link"])
     state.remember_links(page.url, [c for c in links if c.kind == "link"])
+    pending = None
     if key not in state.cp.seen_keys:
         state.cp.seen_keys.append(key)
-        _extract(state, wb, page, text, key)
+        pending = _start(state, page, text, key)
+    elif state.seen_again(page.url, key):
+        state.step(service.STEP_LOOP, "finish_branch", page.url)
     state.cp.last_url = page.url
     state.save_checkpoint()
-    return text
+    return text, pending
 
 
 def _learn_language(state: WalkState, lang: str) -> None:
@@ -99,24 +121,35 @@ def _channels(
     return lang, region, sections, channels
 
 
-def _extract(
-    state: WalkState, wb: browser.WalkBrowser, page: browser.PageState, text: str, key: str
-) -> None:
+def _start(state: WalkState, page: browser.PageState, text: str, key: str) -> Pending:
     with timed(state.timing, "snapshot"):
         source = _store(state, page, text, key)
     state.step(service.STEP_EXTRACTING, "", page.url)
     with timed(state.timing, "extract"):
         lang, region, sections, channels = _channels(state, page, text)
-    contacts = cards.read(state, page, text, channels, sections, region)
-    state.page_has_contacts = bool(contacts or channels)
-    coverage.note_total(state, text, len(contacts))
+        read = cards.start(state, page, text, channels, sections, region)
+    state.page_has_contacts = bool(read.people or read.calls or channels)
+    return Pending(key, source, lang, sections, channels, read)
+
+
+def complete(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState,
+             pending: Pending | None) -> None:
+    """The page's people read, bound and recorded: always before the next action."""
+    if pending is None:
+        return
+    with timed(state.timing, "cards"):
+        contacts = cards.finish(state, page, pending.read)
+    state.page_has_contacts = bool(contacts or pending.channels)
+    coverage.note_total(state, pending.read.text, len(contacts))
     with timed(state.timing, "bind"):
         bindings = wb.bindings(findings.probes(contacts)) if state.job_mode and contacts else []
     with timed(state.timing, "record"):
-        context = PageContext(tuple(sections), lang)
-        found, keys = findings.build_findings(state, source, contacts, bindings, channels,
-                                              context)
-        _record(state, source, found, list(zip(keys, contacts, strict=True)))
+        context = PageContext(tuple(pending.sections), pending.lang)
+        found, keys = findings.build_findings(state, pending.source, contacts, bindings,
+                                              pending.channels, context)
+        _record(state, pending.source, found, list(zip(keys, contacts, strict=True)))
+    state.progress += sum(len(entity.fields) for entity in found.entities)
+    state.loops[pending.key] = (0, state.progress)
 
 
 def _record(

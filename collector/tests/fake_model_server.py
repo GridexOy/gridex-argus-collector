@@ -5,7 +5,8 @@ on 127.0.0.1; `policy(system, user) -> str` decides the reply content. Every
 request body is kept in `requests` so tests can inspect prompts. A user
 message given as parts (text + `image_url`) reaches the policy as its text
 with `[image]` per picture; the reply names the requested model; a model in
-`missing` answers 404 like Ollama for a model that is not pulled.
+`missing` answers 404 like Ollama for a model that is not pulled; an answer
+longer than `max_tokens` (4 characters a token) is cut there, like a real model.
 """
 
 from __future__ import annotations
@@ -80,6 +81,8 @@ class FakeModelServer:
                 system = next((m["content"] for m in messages if m["role"] == "system"), "")
                 user = text_of(next((m["content"] for m in messages if m["role"] == "user"), ""))
                 content = owner.policy(system, user)
+                limit = int(body.get("max_tokens") or 0) * 4
+                content = content[:limit] if limit and len(content) > limit else content
                 self._send(200, completion(requested, content, len(user) // 4))
 
         return Handler

@@ -14,6 +14,7 @@ from collections.abc import Callable
 
 from argus_collector.extraction import jsonld_people as jsonld
 from argus_collector.extraction import repository, roles, sections, service
+from argus_collector.extraction import text_cards as text_rules
 from argus_collector.extraction.roles import ChannelRole
 from argus_collector.extraction.sections import OfficeLines, Section
 from argus_collector.extraction.service import (
@@ -43,6 +44,7 @@ __all__ = [
     "panel_sections",
     "region_resolver",
     "section_at",
+    "text_cards",
     "verify_card",
 ]
 
@@ -99,6 +101,11 @@ def has_contact_signals(text: str, channels: list[Channel]) -> bool:
 def jsonld_people(html: str) -> list[PersonCard]:
     """schema.org `Person` items of the page's JSON-LD (unverified, like model cards)."""
     return jsonld.people(repository.raw_finds(html).jsonld)
+
+
+def text_cards(text: str, channels: list[Channel]) -> list[PersonCard]:
+    """Cards read by rule: a name line with a phone / email of the page below it."""
+    return text_rules.text_cards(text, channels)
 
 
 def card_from_json(data: object) -> PersonCard | None:

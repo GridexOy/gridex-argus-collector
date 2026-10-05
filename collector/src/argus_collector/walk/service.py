@@ -29,6 +29,7 @@ STEP_CLICK = "click"
 STEP_SCROLL = "scroll"
 STEP_ATTENTION = "attention"  # a bot check did not clear: detail = url
 STEP_CONSENT = "consent"  # a cookie banner was answered: detail = `kind: button text`
+STEP_LOOP = "loop"  # a page state repeated 3 times without progress: finish_branch
 
 ACTION_NAVIGATE = "navigate"
 ACTION_CLICK = "click"

@@ -125,5 +125,23 @@
       "en"
     ],
     "project_id": "fixture-expo-2027"
+  },
+  {
+    "company_id": "ellego",
+    "company_name": "Ellego Powertec Oy",
+    "seed_urls": [
+      "http://ellego.localhost:8765/"
+    ],
+    "approved_hosts": [
+      "ellego.localhost"
+    ],
+    "priority_countries": [
+      "FI"
+    ],
+    "priority_languages": [
+      "fi",
+      "en"
+    ],
+    "project_id": "fixture-expo-2027"
   }
 ]
