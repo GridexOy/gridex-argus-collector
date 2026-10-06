@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # Ordered list of (version, sql) applied once each; never edit an applied entry.
 MIGRATIONS: list[tuple[int, str]] = [
@@ -154,6 +154,18 @@ MIGRATIONS: list[tuple[int, str]] = [
         ALTER TABLE outbox ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0;
         ALTER TABLE outbox ADD COLUMN replaced_type TEXT NOT NULL DEFAULT '';
         ALTER TABLE outbox ADD COLUMN replaced_event_id TEXT NOT NULL DEFAULT '';
+        """,
+    ),
+    (
+        4,  # 0.4.8.8: the token of a run that is no longer its job's current run
+        """
+        CREATE TABLE run_tokens (
+            run_id TEXT PRIMARY KEY,
+            job_id TEXT NOT NULL,
+            lease_token TEXT NOT NULL,
+            drain_only INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL
+        );
         """,
     ),
 ]

@@ -17,8 +17,8 @@ from typing import cast
 from argus_collector.api_client import contract as api
 from argus_collector.delivery import contract as delivery
 from argus_collector.runtime import contract as runtime
+from argus_collector.scheduler import old_runs, service
 from argus_collector.scheduler import repository as repo
-from argus_collector.scheduler import service
 from argus_collector.storage import contract as storage
 
 RESUME = "resume"
@@ -57,6 +57,7 @@ def store_claimed(conn: sqlite3.Connection, claimed: api.ClaimedJob) -> str:
             repo.update_job_tx(conn, job.job_id, definition_json=definition, drain_only=0,
                                state=state, **_lease_fields(lease))
             return "renewed"
+        old_runs.keep_tx(conn, row)  # its outbox still goes out (owner 06.10.2026)
         repo.update_job_tx(
             conn, job.job_id, definition_json=definition, run_id=lease.run_id, drain_only=0,
             state=service.QUEUED, stage=service.STAGE_QUEUED, started=0, finished=0,

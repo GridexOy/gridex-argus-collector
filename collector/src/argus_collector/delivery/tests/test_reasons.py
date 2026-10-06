@@ -96,9 +96,9 @@ def test_request_errors_carry_words_and_request_id(home: Path, tmp_path: Path) -
         deliverer._api_error(proxy_page, "j1", "r1", "t")
     assert deliverer.server_error == 502, "the panel shows Palvelinvirhe: 502"
     body = api.Error("invalid_input", "observations[0].quote", False, "req-7")
-    code = deliverer._api_error(api.ApiError(422, body, None, ""), "j1", "r1", "t")
-    assert code == "invalid_input"
-    bare = deliverer._api_error(api.ApiError(422, None, None, "nope"), "j1", "r1", "t")
+    kind, code = deliverer._api_error(api.ApiError(422, body, None, ""), "j1", "r1", "t")
+    assert (kind, code) == ("permanent", "invalid_input")
+    _, bare = deliverer._api_error(api.ApiError(422, None, None, "nope"), "j1", "r1", "t")
     assert bare == "http_422", "a 4xx without an error body keeps its status"
     log = journal(home)
     assert "job j1: HTTP 502 http_502 (server error 502)" in log

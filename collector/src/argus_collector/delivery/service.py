@@ -30,6 +30,7 @@ ERROR_CONFLICT = "conflict"  # 409 idempotency_conflict
 ERROR_PERMANENT = "permanent"  # 4xx the same request will never pass
 ERROR_RETRY = "retry"  # 5xx or retryable=true
 LEASE_CODES = ("lease_expired", "lease_mismatch", "job_cancelled")
+FILE_CODES = ("payload_too_large", "evidence_hash_mismatch")  # the snapshot itself is refused
 REASONS = {  # what an ARGUS code means, for the journal (the panel's words are in fi.json)
     "person_without_name": "a person event without the person's name",  # rules of 3.1.0
     "no_channel": "nothing to record: no channel and no person",

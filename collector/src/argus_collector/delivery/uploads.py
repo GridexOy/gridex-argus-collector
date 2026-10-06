@@ -14,6 +14,7 @@ from collections.abc import Callable
 from argus_collector.api_client import contract as api
 from argus_collector.delivery import repository as repo
 from argus_collector.delivery import service
+from argus_collector.delivery.holds import Holds
 from argus_collector.delivery.hooks import ApiTarget, DeliveryHooks, Failed
 from argus_collector.delivery.transport import Transport
 from argus_collector.evidence import contract as evidence
@@ -28,10 +29,13 @@ class Lanes:
     hooks: DeliveryHooks
     transport: Transport
     server_error: int
+    upload_holds: Holds
 
-    def _api_error(self, exc: api.ApiError, job_id: str, run_id: str, token: str) -> str:
-        """Code of an error that rejects the request; raises Failed for the classes that
-        stop this pass. The journal gets the words and ARGUS's request_id."""
+    def _api_error(self, exc: api.ApiError, job_id: str, run_id: str,
+                   token: str) -> tuple[str, str]:
+        """(class, code) of an error the pass goes on after (a 4xx, a 409 lease or
+        conflict); raises Failed for the classes that stop this pass (no answer, 5xx,
+        401/403, 429). The journal gets the words and ARGUS's request_id."""
         body = exc.error
         code = body.code if body else service.status_code(exc.status) if exc.status else ""
         kind = service.classify(exc.status, code, body.retryable if body else False)
@@ -42,15 +46,15 @@ class Lanes:
         self.server_error = exc.status if exc.status >= 500 else self.server_error
         if kind == service.ERROR_LEASE:
             self.hooks.lease_problem(job_id, run_id, code, token)
-        if kind in (service.ERROR_PERMANENT, service.ERROR_CONFLICT):
-            return code or kind
+        if kind in (service.ERROR_LEASE, service.ERROR_PERMANENT, service.ERROR_CONFLICT):
+            return kind, code or kind
         raise Failed(kind, exc.retry_after)
 
     def _uploads(self, conn: sqlite3.Connection, target: ApiTarget) -> None:
         for row in repo.pending_uploads(conn, UPLOADS_PER_TICK):
             job_id, run_id, evidence_id = row["job_id"], row["run_id"], row["evidence_id"]
             token = self.hooks.token_for(conn, job_id, run_id)
-            if token is None:
+            if token is None or self.upload_holds.held(run_id):
                 continue
             snap = evidence.load_snapshot(conn, row["local_evidence_id"])
             if snap is None:
@@ -64,9 +68,13 @@ class Lanes:
                     file_content_type=HTML_MIME, proxy_mode=target.api_mode,
                 )
             except api.ApiError as exc:
-                code = self._api_error(exc, job_id, run_id, token)
-                self._reject_upload(conn, job_id, evidence_id, code)
+                kind, code = self._api_error(exc, job_id, run_id, token)
+                if kind == service.ERROR_LEASE or code not in service.FILE_CODES:
+                    self.upload_holds.hold(run_id, kind, exc.retry_after)  # stays pending
+                    continue
+                self._reject_upload(conn, job_id, evidence_id, code)  # the file itself
                 continue
+            self.upload_holds.release(run_id)
             self.transport.answered()
             repo.mark_upload(conn, evidence_id, resp.status.value, "")
             runtime.journal("delivery", f"job {job_id}: evidence {len(snap.html)} B uploaded"

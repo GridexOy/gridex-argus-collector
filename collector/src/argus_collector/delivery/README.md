@@ -32,3 +32,8 @@ item is one line with the company, `event <event_id> seq <n>` or `evidence <id>`
 the code and its words; a 5xx shows `Palvelinvirhe: <status>` until a pass gets through.
 `results.py` writes one events answer back; `repository.py` owns `outbox` and
 `evidence_uploads`; `service.py` is pure.
+
+0.4.8.8 (owner 06.10.2026): nothing leaves the outbox but accepted / duplicate. A
+request refused as a whole (4xx, 409 lease) holds its run (`holds.py`, backoff; the
+other runs go on); a snapshot is refused for good only for the file itself; a pass
+that raises is journaled and retried, a lane that ended is started again.

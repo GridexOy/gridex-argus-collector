@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -26,14 +27,18 @@ def current_version(conn: sqlite3.Connection) -> int:
     return int(value or 0)
 
 
+MIGRATING = threading.Lock()  # 0.4.8.8: two delivery threads opened a new schema at once
+
+
 def migrate(conn: sqlite3.Connection, migrations: list[tuple[int, str]]) -> None:
-    applied = current_version(conn)
-    for version, sql in migrations:
-        if version <= applied:
-            continue
-        with conn:
-            conn.executescript(sql)
-            conn.execute("INSERT INTO schema_version (version) VALUES (?)", (version,))
+    with MIGRATING:
+        applied = current_version(conn)
+        for version, sql in migrations:
+            if version <= applied:
+                continue
+            with conn:
+                conn.executescript(sql)
+                conn.execute("INSERT INTO schema_version (version) VALUES (?)", (version,))
 
 
 def table_names(conn: sqlite3.Connection) -> list[str]:

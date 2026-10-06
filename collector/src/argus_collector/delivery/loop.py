@@ -19,9 +19,11 @@ from pathlib import Path
 from argus_collector.api_client import contract as api
 from argus_collector.delivery import repository as repo
 from argus_collector.delivery import results, retry, service
+from argus_collector.delivery.holds import Holds
 from argus_collector.delivery.hooks import ApiTarget, DeliveryHooks, Failed
 from argus_collector.delivery.transport import Transport
 from argus_collector.delivery.uploads import Lane, Lanes
+from argus_collector.runtime import contract as runtime
 from argus_collector.storage import contract as storage
 
 TICK_S = 0.5
@@ -45,6 +47,7 @@ class Deliverer(Lanes):
         self._stop, self._wake, self._flush = threading.Event(), threading.Event(), False
         self._threads: list[threading.Thread] = []
         self._failing: tuple[Lane, ...] = ()  # the lanes whose error the panel shows
+        self.event_holds, self.upload_holds = Holds(), Holds()  # runs refused as a whole
         self.transport = Transport()  # the one state of Lahetys, from heartbeat and delivery
 
     @property
@@ -63,13 +66,15 @@ class Deliverer(Lanes):
             self.on_change()
 
     def start(self) -> None:
-        if any(t.is_alive() for t in self._threads):
-            return
+        """Both lanes running; a lane that ended is started again (the other keeps going)."""
         self._stop.clear()
         lanes = ((self._events, EVENTS_TICK_S, "delivery"), (self._uploads, TICK_S, "evidence"))
-        self._threads = [threading.Thread(target=self._loop, args=(lane, tick), name=name,
-                                          daemon=True) for lane, tick, name in lanes]
-        for thread in self._threads:
+        alive = [t for t in self._threads if t.is_alive()]
+        names = {t.name for t in alive}
+        fresh = [threading.Thread(target=self._loop, args=(lane, tick), name=name, daemon=True)
+                 for lane, tick, name in lanes if name not in names]
+        self._threads = alive + fresh
+        for thread in fresh:
             thread.start()
 
     def stop(self) -> None:
@@ -82,13 +87,18 @@ class Deliverer(Lanes):
         self._wake.set()
 
     def _loop(self, lane: Lane, tick_s: float) -> None:
-        conn = storage.connect(self.db_path)
-        try:
-            while not self._stop.is_set():
+        conn: sqlite3.Connection | None = None
+        while not self._stop.is_set():
+            try:
+                conn = conn or storage.connect(self.db_path)
                 delay = self.tick(conn, (lane,), tick_s)
-                self._wake.wait(delay)
-                self._wake.clear()
-        finally:
+            except Exception as exc:  # noqa: BLE001 - the thread never dies (06.10.2026)
+                runtime.journal("delivery", f"pass failed, the outbox waits:"
+                                f" {type(exc).__name__}: {str(exc)[:200]}")
+                delay = service.MAX_BACKOFF_S
+            self._wake.wait(delay)
+            self._wake.clear()
+        if conn is not None:
             conn.close()
 
     def tick(self, conn: sqlite3.Connection, lanes: tuple[Lane, ...] = (),
@@ -106,6 +116,8 @@ class Deliverer(Lanes):
             else:
                 if self._failing in ((), run) or not lanes:  # only the failing lane clears it
                     self.error, self.failures, self.server_error, self._failing = "", 0, 0, ()
+        if self.event_holds.refused() or self.upload_holds.refused():
+            self.error = service.ERROR_PERMANENT  # Lähetys epäonnistui while a run waits
         self.pending = repo.totals(conn)[0]
         self.transport.note(self.state)
         self.on_change()
@@ -122,7 +134,7 @@ class Deliverer(Lanes):
         flush, self._flush = self._flush, False
         for job_id, run_id in repo.pending_runs(conn):
             token = self.hooks.token_for(conn, job_id, run_id)
-            if token is None:
+            if token is None or self.event_holds.held(run_id):
                 continue
             rows = {r["event_id"]: r for r in repo.pending_events(conn, run_id, service.MAX_BATCH)}
             pending = [service.pending_from_row(dict(r)) for r in rows.values()]
@@ -145,12 +157,16 @@ class Deliverer(Lanes):
                     timeout_s=service.API_TIMEOUT_S,
                 )
             except api.ApiError as exc:
-                code = self._api_error(exc, job_id, run_id, token)
-                first = rows[chunk[0].event_id]
+                kind, code = self._api_error(exc, job_id, run_id, token)
+                if kind != service.ERROR_CONFLICT:  # the request refused: the run waits
+                    self.event_holds.hold(run_id, kind, exc.retry_after)
+                    continue
+                first = rows[chunk[0].event_id]  # ARGUS keeps another event under this id
                 repo.mark_events(conn, [(chunk[0].event_id, "rejected", code, None, None)])
                 self.hooks.rejected(conn, job_id, str(first["type"]), code,
                                     f"event {first['event_id']} seq {first['seq']}")
                 continue
+            self.event_holds.release(run_id)
             self.transport.answered()
             results.apply(conn, self.hooks, job_id, rows, resp, service.elapsed_ms(started))
 
