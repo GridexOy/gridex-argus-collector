@@ -26,14 +26,15 @@ backoff with jitter (`offline` only with the heartbeat, `transport.py`); 401/403
 `lease_expired` / `lease_mismatch` / `job_cancelled` -> the scheduler
 reconciles (resume or drain-only token) and the next pass retries; 429 ->
 `Retry-After`. Nothing is deleted; delivery keeps going after Pysayta / STOP.
-Journal (0.4.8.1): a request error is `HTTP <status> <code> (<words>) request_id=<id>`
-(ARGUS's detail is not written: it may quote a contact value); every rejected
-item is one line with the company, `event <event_id> seq <n>` or `evidence <id>`,
-the code and its words; a 5xx shows `Palvelinvirhe: <status>` until a pass gets through.
-`results.py` writes one events answer back; `repository.py` owns `outbox` and
-`evidence_uploads`; `service.py` is pure.
-
+Journal: a request error is `HTTP <status> <code> (<words>) request_id=<id>` (no
+ARGUS detail: it may quote a contact value); every rejected item is one line with
+company, id, seq, code and words. `results.py` writes one answer back; `repository.py`
+owns `outbox` and `evidence_uploads`; `service.py` is pure.
 0.4.8.8 (owner 06.10.2026): nothing leaves the outbox but accepted / duplicate. A
 request refused as a whole (4xx, 409 lease) holds its run (`holds.py`, backoff; the
 other runs go on); a snapshot is refused for good only for the file itself; a pass
 that raises is journaled and retried, a lane that ended is started again.
+0.4.8.9: a final refusal whose seq ARGUS did not take (any code) gives the seq to a
+filler (`source.blocked` with a page URL of the run, else a copy of its last
+`job.progress`); `evidence_pending` is `waiting` until the run's snapshots are up,
+then the event is sent again for ARGUS's verdict; a pass that moved nothing backs off.

@@ -136,37 +136,51 @@ class Deliverer(Lanes):
             token = self.hooks.token_for(conn, job_id, run_id)
             if token is None or self.event_holds.held(run_id):
                 continue
-            rows = {r["event_id"]: r for r in repo.pending_events(conn, run_id, service.MAX_BATCH)}
-            pending = [service.pending_from_row(dict(r)) for r in rows.values()]
-            wanted = sorted({e for p in pending for e in p.evidence_ids})
-            uploads = repo.upload_states(conn, wanted)
-            hold = RUN_END if repo.pending_upload_ids(conn, run_id) else ()
-            chunk = service.batch(pending, uploads, hold)
-            if not chunk and pending:
-                retry.lost(conn, self.hooks, job_id, rows[pending[0].event_id], uploads)
-            if not service.ready(chunk, datetime.now(UTC), flush):
-                continue
-            events = [api.event_from_json(json.loads(rows[p.event_id]["event_json"]))
-                      for p in chunk]
-            request = api.EventsRequest(schema_version=api.EventsRequestSchemaVersion(WIRE),
-                                        execution_token=token, events=events)
-            started = time.monotonic()
-            try:
-                resp = api.post_events(
-                    target.base_url, target.token, job_id, request, proxy_mode=target.api_mode,
-                    timeout_s=service.API_TIMEOUT_S,
-                )
-            except api.ApiError as exc:
-                kind, code = self._api_error(exc, job_id, run_id, token)
-                if kind != service.ERROR_CONFLICT:  # the request refused: the run waits
-                    self.event_holds.hold(run_id, kind, exc.retry_after)
-                    continue
-                first = rows[chunk[0].event_id]  # ARGUS keeps another event under this id
-                repo.mark_events(conn, [(chunk[0].event_id, "rejected", code, None, None)])
-                self.hooks.rejected(conn, job_id, str(first["type"]), code,
-                                    f"event {first['event_id']} seq {first['seq']}")
-                continue
+            rows, chunk = self._chunk(conn, job_id, run_id, flush)
+            if not chunk:  # nothing new: ask the verdict of events kept evidence_pending
+                rows = {r["event_id"]: r for r in repo.waiting_events(conn, run_id)}
+                chunk = list(rows)
+            if chunk:
+                self._send(conn, target, (job_id, run_id, token), rows, chunk)
+
+    def _chunk(self, conn: sqlite3.Connection, job_id: str, run_id: str, flush: bool
+               ) -> tuple[dict[str, sqlite3.Row], list[str]]:
+        """The run's next batch of new events (ids), [] while it is not ready."""
+        rows = {r["event_id"]: r for r in repo.pending_events(conn, run_id, service.MAX_BATCH)}
+        pending = [service.pending_from_row(dict(r)) for r in rows.values()]
+        wanted = sorted({e for p in pending for e in p.evidence_ids})
+        uploads = repo.upload_states(conn, wanted)
+        hold = RUN_END if repo.pending_upload_ids(conn, run_id) else ()
+        chunk = service.batch(pending, uploads, hold)
+        if not chunk and pending:
+            retry.lost(conn, self.hooks, job_id, rows[pending[0].event_id], uploads)
+        ready = service.ready(chunk, datetime.now(UTC), flush)
+        return rows, [p.event_id for p in chunk] if ready else []
+
+    def _send(self, conn: sqlite3.Connection, target: ApiTarget, ids: tuple[str, str, str],
+              rows: dict[str, sqlite3.Row], chunk: list[str]) -> None:
+        job_id, run_id, token = ids
+        events = [api.event_from_json(json.loads(rows[e]["event_json"])) for e in chunk]
+        request = api.EventsRequest(schema_version=api.EventsRequestSchemaVersion(WIRE),
+                                    execution_token=token, events=events)
+        started = time.monotonic()
+        try:
+            resp = api.post_events(target.base_url, target.token, job_id, request,
+                                   proxy_mode=target.api_mode, timeout_s=service.API_TIMEOUT_S)
+        except api.ApiError as exc:
+            kind, code = self._api_error(exc, job_id, run_id, token)
+            if kind != service.ERROR_CONFLICT:  # the request refused: the run waits
+                self.event_holds.hold(run_id, kind, exc.retry_after)
+                return
+            first = rows[chunk[0]]  # ARGUS keeps another event under this id
+            repo.mark_events(conn, [(chunk[0], "rejected", code, None, None)])
+            self.hooks.rejected(conn, job_id, str(first["type"]), code,
+                                f"event {first['event_id']} seq {first['seq']}")
+            return
+        self.transport.answered()
+        moved = results.apply(conn, self.hooks, job_id, rows, resp, service.elapsed_ms(started))
+        if moved:
             self.event_holds.release(run_id)
-            self.transport.answered()
-            results.apply(conn, self.hooks, job_id, rows, resp, service.elapsed_ms(started))
+        else:  # only sequence_gap or still evidence_pending: ask again after a backoff
+            self.event_holds.hold(run_id, service.ERROR_RETRY)
 

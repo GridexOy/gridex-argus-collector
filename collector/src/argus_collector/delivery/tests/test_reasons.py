@@ -52,13 +52,13 @@ def outbox(conn: sqlite3.Connection, seq: int, status: str = "pending", code: st
     return event_id
 
 
-def answer(*items: tuple[str, int, str, str | None]) -> api.EventsResponse:
+def answer(*items: tuple[str, int, str, str | None], last: int = 1) -> api.EventsResponse:
     return api.from_json(api.EventsResponse, {
         "results": [{"event_id": e, "seq": s, "status": st, "code": c,
                      "canonical_contact_id": None, "server_revision": 1,
                      "state_applied": st == "accepted", "channel_status": None}
                     for e, s, st, c in items],
-        "last_contiguous_seq": 1, "job_state": "running", "next_run_scheduled": False,
+        "last_contiguous_seq": last, "job_state": "running", "next_run_scheduled": False,
     })
 
 
@@ -74,9 +74,9 @@ def test_each_rejected_event_has_its_id_code_and_words(home: Path, tmp_path: Pat
         ids = [outbox(conn, seq) for seq in (1, 2, 3)]
         rows = {r["event_id"]: r for r in conn.execute("SELECT * FROM outbox")}
         hooks = Recorder()
-        resp = answer((ids[0], 1, "accepted", None),
+        resp = answer((ids[0], 1, "accepted", None),  # a refusal ARGUS records takes its seq
                       (ids[1], 2, "rejected", "evidence_hash_mismatch"),
-                      (ids[2], 3, "rejected", "sequence_gap"))
+                      (ids[2], 3, "rejected", "sequence_gap"), last=2)
         results.apply(conn, hooks, "j1", rows, resp)
         assert hooks.calls == [("j1", "contact.observed", "evidence_hash_mismatch",
                                 "event e2 seq 2")]

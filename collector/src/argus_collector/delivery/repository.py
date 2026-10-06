@@ -11,6 +11,7 @@ import sqlite3
 from datetime import UTC, datetime
 
 DONE = ("accepted", "duplicate", "rejected")
+ACKED = (*DONE, "waiting")  # seq taken by ARGUS (a waiting event awaits its verdict only)
 
 
 def now_iso() -> str:
@@ -79,11 +80,22 @@ def upload_states(conn: sqlite3.Connection, evidence_ids: list[str]) -> dict[str
 
 
 def pending_runs(conn: sqlite3.Connection) -> list[tuple[str, str]]:
+    """Runs with events to send or a verdict to ask (`waiting`: evidence_pending)."""
     rows = conn.execute(
-        "SELECT job_id, run_id, MIN(id) FROM outbox WHERE status = 'pending'"
+        "SELECT job_id, run_id, MIN(id) FROM outbox WHERE status IN ('pending', 'waiting')"
         " GROUP BY job_id, run_id ORDER BY MIN(id)"
     )
     return [(str(r[0]), str(r[1])) for r in rows]
+
+
+def waiting_events(conn: sqlite3.Connection, run_id: str, limit: int = 50) -> list[sqlite3.Row]:
+    """Events ARGUS keeps evidence_pending, once no snapshot of the run is left to upload."""
+    if pending_upload_ids(conn, run_id):
+        return []
+    return conn.execute(
+        "SELECT * FROM outbox WHERE run_id = ? AND status = 'waiting' ORDER BY seq LIMIT ?",
+        (run_id, limit),
+    ).fetchall()
 
 
 def pending_events(conn: sqlite3.Connection, run_id: str, limit: int) -> list[sqlite3.Row]:
@@ -100,7 +112,7 @@ def mark_events(
     stamp = now_iso()
     with conn:
         for event_id, status, code, canonical, channel in updates:
-            acked = stamp if status in DONE else None
+            acked = stamp if status in ACKED else None
             conn.execute(
                 "UPDATE outbox SET status = ?, code = ?, attempts = attempts + 1, sent_at = ?,"
                 " acked_at = ?, canonical_contact_id = COALESCE(?, canonical_contact_id),"
@@ -123,7 +135,8 @@ def totals(conn: sqlite3.Connection, job_id: str | None = None) -> tuple[int, in
     given up whose seq carries a stand-in (`retry.py`) counts as rejected."""
     where, args = ("WHERE job_id = ?", (job_id,)) if job_id else ("", ())
     sql = (
-        "SELECT SUM(status = 'pending'), SUM(status = 'rejected' OR lost != '') FROM ("
+        "SELECT SUM(status IN ('pending', 'waiting')), SUM(status = 'rejected' OR lost != '')"
+        " FROM ("
         f"SELECT status, replaced_type AS lost FROM outbox {where} UNION ALL"
         f" SELECT status, '' FROM evidence_uploads {where})"
     )
