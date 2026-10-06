@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from argus_collector.evidence.contract import TextSpan, find_span
 from argus_collector.extraction import repository as reader
+from argus_collector.extraction.email_pattern import is_template
 from argus_collector.extraction.sections import is_fax
 from argus_collector.normalization import contract as norm
 
@@ -116,7 +117,7 @@ def extract_channels(
         found.append(_channel(KIND_PHONE, raw, LOCATOR_TEXT, text, region=where))
     unique: dict[tuple[str, str], Channel] = {}
     for channel in found:
-        if channel is not None:
+        if channel is not None and not (channel.kind == KIND_EMAIL and is_template(channel.value)):
             unique.setdefault((channel.kind, channel.value), channel)
     return list(unique.values())
 
@@ -162,8 +163,8 @@ def _text_field(raw: str | None, text: str) -> VerifiedField | None:
 def _channel_field(
     kind: str, raw: str | None, text: str, channels: list[Channel], region: str
 ) -> VerifiedField | None:
-    if raw is None:
-        return None
+    if raw is None or (kind == KIND_EMAIL and is_template(raw)):
+        return None  # a stated pattern is never a person's address (email_pattern.py)
     span = find_span(text, raw)
     value = _normalize(kind, span.quote, region) if span else None
     if span is not None and value is not None:

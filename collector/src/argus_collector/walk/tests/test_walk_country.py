@@ -25,7 +25,7 @@ from test_site import server
 
 
 def run(srv: ThreadingHTTPServer, label: str, path: str, hosts: set[str], tmp_path: Path,
-        local: bool = False) -> tuple[contract.WalkSummary, RecordingSink]:
+        local: bool = False, goal: bool = True) -> tuple[contract.WalkSummary, RecordingSink]:
     persons = [p for name in ("ledvance", "malux") for p in gold(name)["persons"]]
     fake = FakeModelServer(RankedPolicy(persons)).start()
     sink = RecordingSink()
@@ -38,7 +38,7 @@ def run(srv: ThreadingHTTPServer, label: str, path: str, hosts: set[str], tmp_pa
         db_path=tmp_path / "collector.db", approved_hosts=frozenset(hosts),
         focus=replace(focus, local_seed=local),
         limits=contract.WalkLimits(pages=20, actions=60, seconds=900.0, states=120),
-        id_namespace="job-" + label,
+        id_namespace="job-" + label, stop_at_goal=goal,
     )
     try:
         summary = contract.run_walk(settings, lambda e: None, lambda: False, sink)
@@ -54,7 +54,7 @@ def fields(entity: contract.EntityFinding) -> dict[str, str]:
 def test_ledvance_finland_office_and_local_people(site: ThreadingHTTPServer,  # noqa: F811
                                                   tmp_path: Path) -> None:
     summary, sink = run(site, "ledvance", "", {"ledvance.localhost"}, tmp_path)
-    assert summary.end_reason == contract.END_FINISHED, summary.gaps
+    assert summary.end_reason == contract.END_GOAL, summary.gaps  # FI sales people read
     offices = [e for e in sink.entities().values() if e.entity_type == "office"]
     finland = [fields(e) for e in offices if fields(e).get("country") == "FI"]
     assert finland and finland[0]["phone"] == "+358974223300"
@@ -79,7 +79,7 @@ def test_ledvance_finland_office_and_local_people(site: ThreadingHTTPServer,  # 
 def test_malux_every_tab_finnish_first_then_sweden(site: ThreadingHTTPServer,  # noqa: F811
                                                    tmp_path: Path) -> None:
     hosts = {"malux.localhost", "malux-se.localhost"}
-    summary, sink = run(site, "malux", "fi/", hosts, tmp_path, local=True)
+    summary, sink = run(site, "malux", "fi/", hosts, tmp_path, local=True, goal=False)
     assert summary.end_reason == contract.END_FINISHED, summary.gaps
     people = [e for f in sink.findings for e in f.entities if e.entity_type == "person"]
     first_seen: list[str] = []

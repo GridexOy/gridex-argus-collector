@@ -7,7 +7,7 @@ from collections import Counter
 from argus_collector.pilot.timing import PHASES, JobTiming, decide_group
 
 PHASE_TITLES = ("Load", "Snapshot", "Extract", "Cards", "Bind", "Record", "Next step")
-RULE_READERS = ("skip", "jsonld", "cache", "none")
+RULE_READERS = ("skip", "jsonld", "rules", "cache", "none")
 
 
 def _s(ms: int) -> str:
@@ -25,13 +25,20 @@ def _name(job: JobTiming, names: dict[str, str]) -> str:
 
 
 def phases_table(jobs: list[JobTiming], names: dict[str, str]) -> list[str]:
-    head = "| Company | Pages | Wall s | " + " | ".join(PHASE_TITLES)
-    out = [head + " | All model calls s |", "|---" * (4 + len(PHASES)) + "|"]
+    """Chrome starts apart from the phases: 0 when the collection's Chrome was running."""
+    head = "| Company | Pages | Wall s | Chrome starts | Chrome s | " + " | ".join(PHASE_TITLES)
+    out = [head + " | All model calls s |", "|---" * (6 + len(PHASES)) + "|"]
     for job in jobs:
         cells = [_s(job.phases[p]) if job.states else "—" for p in PHASES]
-        out.append(f"| {_name(job, names)} | {job.pages} | {job.wall_s} | "
-                   + " | ".join(cells) + f" | {_s(job.model_total_ms)} |")
+        out.append(f"| {_name(job, names)} | {job.pages} | {job.wall_s} | {job.chrome_starts}"
+                   f" | {_s(job.chrome_ms)} | " + " | ".join(cells)
+                   + f" | {_s(job.model_total_ms)} |")
     return out
+
+
+def chrome_line(jobs: list[JobTiming]) -> str:
+    starts, ms = sum(j.chrome_starts for j in jobs), sum(j.chrome_ms for j in jobs)
+    return f"Chrome: {starts} start(s) for {len(jobs)} job(s), {_s(ms)} s."
 
 
 def _decisions(job: JobTiming) -> Counter[str]:
@@ -100,7 +107,7 @@ def shares(jobs: list[JobTiming]) -> list[str]:
 
 
 def markdown(jobs: list[JobTiming], names: dict[str, str], source: str) -> str:
-    parts = [f"# Walk timing from `{source}`", "", *shares(jobs), "",
+    parts = [f"# Walk timing from `{source}`", "", *shares(jobs), "", chrome_line(jobs), "",
              "## Phases, s", "", *phases_table(jobs, names), "",
              "## Who decided (next steps and card reads)", "", *who_table(jobs, names), "",
              "## Model calls", "", *models_table(jobs, names), "",

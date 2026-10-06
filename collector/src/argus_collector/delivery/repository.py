@@ -132,9 +132,12 @@ def totals(conn: sqlite3.Connection, job_id: str | None = None) -> tuple[int, in
 
 
 def acked_since(conn: sqlite3.Connection, since: str) -> list[tuple[str, str]]:
+    """(created, acked) of events queued and acknowledged since `since`: an event that
+    waited in the queue from before is not a send of this window (owner 06.10.2026)."""
     rows = conn.execute(
-        "SELECT created_at, acked_at FROM outbox WHERE acked_at IS NOT NULL AND acked_at >= ?",
-        (since,),
+        "SELECT created_at, acked_at FROM outbox WHERE acked_at IS NOT NULL AND acked_at >= ?"
+        " AND created_at >= ?",
+        (since, since),
     )
     return [(str(r[0]), str(r[1])) for r in rows]
 

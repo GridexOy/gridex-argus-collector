@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 COLOURS = {"ok": "#1a7f37", "warn": "#9a6700", "error": "#b42318", "info": "#57606a"}
 FG = "#1f2328"
-COLUMN_WIDTHS = (160, 160, 120, 200, 240)
+COLUMN_WIDTHS = (150, 150, 120, 290, 170)  # an address of a pattern reads `oletettu: ...`
 TABLE_ROWS = 5
 URL_WIDTH = 60
 PAD_X = 12

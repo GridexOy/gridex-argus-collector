@@ -17,6 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from argus_collector.walk import service
+from argus_collector.walk.patterns import LOCATOR_PATTERN
 from argus_collector.walk.service import WalkEvent, WalkSettings, WalkSummary
 from argus_collector.walk.sink import (
     EXTRA_FIELDS,
@@ -33,12 +34,17 @@ from argus_collector.walk.sink import (
 )
 
 __all__ = [
+    "DEFAULT_ACTION_BUDGET",
     "DEFAULT_PAGE_BUDGET",
     "END_ATTENTION",
+    "LOCATOR_PATTERN",
     "END_BUDGET",
     "END_DOMAIN",
     "END_ERROR",
     "END_FAILURES",
+    "END_GOAL",
+    "END_GOAL_PAGES",
+    "END_NO_PROGRESS",
     "END_FINISHED",
     "END_START_FAILED",
     "END_STOPPED",
@@ -65,6 +71,7 @@ __all__ = [
 ]
 
 DEFAULT_PAGE_BUDGET = service.DEFAULT_PAGE_BUDGET
+DEFAULT_ACTION_BUDGET = service.DEFAULT_ACTION_BUDGET
 END_FINISHED = service.END_FINISHED
 END_ATTENTION = service.END_ATTENTION
 END_BUDGET = service.END_BUDGET
@@ -73,6 +80,9 @@ END_ERROR = service.END_ERROR
 END_DOMAIN = service.END_DOMAIN
 END_START_FAILED = service.END_START_FAILED
 END_FAILURES = service.END_FAILURES
+END_NO_PROGRESS = service.END_NO_PROGRESS
+END_GOAL = service.END_GOAL
+END_GOAL_PAGES = service.END_GOAL_PAGES
 EVENT_CONTACT = service.EVENT_CONTACT
 EVENT_DONE = service.EVENT_DONE
 EVENT_STOPPED = service.EVENT_STOPPED

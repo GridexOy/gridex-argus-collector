@@ -54,3 +54,22 @@ def test_the_walk_writes_the_line_the_report_reads() -> None:
     line = "2026-10-05T10:00:00+00:00 browser: " + timing.line(J, "https://b.example/", page)
     job = contract.parse_timing([line])[0]
     assert (job.phases["load"], job.phases["cards"], job.reader["jsonld"]) == (5, 7, 1)
+
+
+K = "99999999-2222-3333-4444-555555555555"
+CHROME = [
+    f"2026-10-06T10:00:00+00:00 browser: job {J}: chrome start=1840 ms shared=yes",
+    f"2026-10-06T10:00:01+00:00 browser: job {J}: page https://a.example/",
+    f"2026-10-06T10:05:00+00:00 browser: job {K}: chrome start=0 ms shared=yes",
+    f"2026-10-06T10:05:01+00:00 browser: job {K}: page https://b.example/",
+]
+
+
+def test_chrome_starts_apart_from_the_phases() -> None:
+    """Owner 06.10.2026: one Chrome per collection; the start shown on its own."""
+    first, second = contract.parse_timing(CHROME)
+    assert (first.chrome_starts, first.chrome_ms) == (1, 1840)
+    assert (second.chrome_starts, second.chrome_ms) == (0, 0), "the running Chrome"
+    text = contract.timing_markdown(CHROME, {}, "collector.log")
+    assert "Chrome: 1 start(s) for 2 job(s), 1.8 s." in text
+    assert "| Company | Pages | Wall s | Chrome starts | Chrome s |" in text

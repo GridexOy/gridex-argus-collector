@@ -61,6 +61,7 @@ class WalkCheckpoint:
 
     last_url: str = ""
     visited: list[str] = field(default_factory=list)
+    redirected: list[str] = field(default_factory=list)  # links that led to a walked page
     seen_keys: list[str] = field(default_factory=list)
     frontier: dict[str, FrontierLink] = field(default_factory=dict)
     entities: dict[str, dict[str, str]] = field(default_factory=dict)
@@ -86,6 +87,7 @@ class WalkCheckpoint:
         return WalkCheckpoint(
             last_url=str(data.get("last_url", "")),
             visited=[str(v) for v in data.get("visited", [])],
+            redirected=[str(v) for v in data.get("redirected", [])],
             seen_keys=[str(v) for v in data.get("seen_keys", [])],
             frontier=frontier,
             entities={str(k): dict(v) for k, v in data.get("entities", {}).items()},

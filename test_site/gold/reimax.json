@@ -1,0 +1,158 @@
+{
+  "fixture": "reimax",
+  "host": "reimax.localhost",
+  "case": "Owner case 06.10.2026 (Reimax, 14:16): /contact/ states the address pattern in plain words ('Our e-mail addresses are the following: firstname.lastname@reimax.net') above 14 person cards with name, title and phone and no email. The rules read all 14. Expected: every person of the page gets the address the stated pattern gives the name, sent unconfirmed (ARGUS: inferred, oletettu) with the pattern line as its quote; the pattern itself is the company's email_pattern field, never an address or a channel; no model call on the page; the walk ends at the goal (sales people with a phone) on contact/.",
+  "seed": "/",
+  "pattern": {
+    "page": "contact/",
+    "value": "firstname.lastname@reimax.example",
+    "quote": "Our e-mail addresses are the following: firstname.lastname@reimax.example"
+  },
+  "company": {
+    "name": "Reimax Oy",
+    "phone": "+358207410000",
+    "email": "info@reimax.example"
+  },
+  "persons": [
+    {
+      "name": "Timo Rantala",
+      "title": "Managing Director",
+      "phone": "+358405512001",
+      "phone_text": "+358 40 551 2001",
+      "email": "timo.rantala@reimax.example",
+      "email_status": "inferred",
+      "sales": false,
+      "source_page": "contact/"
+    },
+    {
+      "name": "Jari Mäkelä",
+      "title": "Sales Director",
+      "phone": "+358405512002",
+      "phone_text": "+358 40 551 2002",
+      "email": "jari.makela@reimax.example",
+      "email_status": "inferred",
+      "sales": true,
+      "source_page": "contact/"
+    },
+    {
+      "name": "Päivi Öhman",
+      "title": "Key Account Manager",
+      "phone": "+358405512003",
+      "phone_text": "+358 40 551 2003",
+      "email": "paivi.ohman@reimax.example",
+      "email_status": "inferred",
+      "sales": true,
+      "source_page": "contact/"
+    },
+    {
+      "name": "Mikko Leinonen",
+      "title": "Export Sales Manager",
+      "phone": "+358405512004",
+      "phone_text": "+358 40 551 2004",
+      "email": "mikko.leinonen@reimax.example",
+      "email_status": "inferred",
+      "sales": true,
+      "source_page": "contact/"
+    },
+    {
+      "name": "Anna-Kaisa Lähde",
+      "title": "Marketing Manager",
+      "phone": "+358405512005",
+      "phone_text": "+358 40 551 2005",
+      "email": "anna-kaisa.lahde@reimax.example",
+      "email_status": "inferred",
+      "sales": true,
+      "source_page": "contact/"
+    },
+    {
+      "name": "Ville Hakkarainen",
+      "title": "Area Sales Manager, Northern Finland",
+      "phone": "+358405512006",
+      "phone_text": "+358 40 551 2006",
+      "email": "ville.hakkarainen@reimax.example",
+      "email_status": "inferred",
+      "sales": true,
+      "source_page": "contact/"
+    },
+    {
+      "name": "Sanna Kuusisto",
+      "title": "Sales Engineer",
+      "phone": "+358405512007",
+      "phone_text": "+358 40 551 2007",
+      "email": "sanna.kuusisto@reimax.example",
+      "email_status": "inferred",
+      "sales": true,
+      "source_page": "contact/"
+    },
+    {
+      "name": "Juha Peltonen",
+      "title": "Technical Sales",
+      "phone": "+358405512008",
+      "phone_text": "+358 40 551 2008",
+      "email": "juha.peltonen@reimax.example",
+      "email_status": "inferred",
+      "sales": true,
+      "source_page": "contact/"
+    },
+    {
+      "name": "Kari Nyström",
+      "title": "Product Manager",
+      "phone": "+358405512009",
+      "phone_text": "+358 40 551 2009",
+      "email": "kari.nystrom@reimax.example",
+      "email_status": "inferred",
+      "sales": false,
+      "source_page": "contact/"
+    },
+    {
+      "name": "Heidi Salonen",
+      "title": "Customer Service",
+      "phone": "+358405512010",
+      "phone_text": "+358 40 551 2010",
+      "email": "heidi.salonen@reimax.example",
+      "email_status": "inferred",
+      "sales": false,
+      "source_page": "contact/"
+    },
+    {
+      "name": "Pasi Korpela",
+      "title": "Service Manager",
+      "phone": "+358405512011",
+      "phone_text": "+358 40 551 2011",
+      "email": "pasi.korpela@reimax.example",
+      "email_status": "inferred",
+      "sales": false,
+      "source_page": "contact/"
+    },
+    {
+      "name": "Tero Laakso",
+      "title": "Logistics Manager",
+      "phone": "+358405512012",
+      "phone_text": "+358 40 551 2012",
+      "email": "tero.laakso@reimax.example",
+      "email_status": "inferred",
+      "sales": false,
+      "source_page": "contact/"
+    },
+    {
+      "name": "Marika Aalto",
+      "title": "Purchasing Manager",
+      "phone": "+358405512013",
+      "phone_text": "+358 40 551 2013",
+      "email": "marika.aalto@reimax.example",
+      "email_status": "inferred",
+      "sales": false,
+      "source_page": "contact/"
+    },
+    {
+      "name": "Esa Huttunen",
+      "title": "Chief Financial Officer",
+      "phone": "+358405512014",
+      "phone_text": "+358 40 551 2014",
+      "email": "esa.huttunen@reimax.example",
+      "email_status": "inferred",
+      "sales": false,
+      "source_page": "contact/"
+    }
+  ]
+}

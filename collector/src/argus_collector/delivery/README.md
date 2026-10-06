@@ -9,7 +9,7 @@ A2.4, A3.1). Entry point: `contract.py`.
 | `enqueue_evidence(conn, local_id, metadata)` | queue a snapshot upload once (`evidence_uploads`) |
 | `Deliverer` | thread: pending snapshots first (`upload_evidence`, the exact stored bytes), then per run the leading pending events in seq order that do not wait for a snapshot, <= 50 per request, sent when 50 are ready or the oldest waited 2 s |
 | `Deliverer.link(answered)` | heartbeat outcome: no answer -> `offline` also with an empty outbox; the first answer after it sends at once; 0.4.8.2 (`transport.py`): the one state of Lahetys: `offline` only when the heartbeat got no answer and delivery got none either (last request, or none answered since the heartbeat went down); a delivery request without an answer alone is a retry; each change is journaled once |
-| `stats(conn)` | Odottaa lahetysta / Lahetysvirhe / p95 of the last minute; `last_code` of the latest rejection |
+| `stats(conn)` | Odottaa lahetysta / Lahetysvirhe / p95 of the last minute (0.4.8.6: events queued and acknowledged within it; one that waited in the queue from before is not counted); `last_code` of the latest rejection |
 | `rejections(conn)`, `reason(code)` | 0.4.8.1: every rejected event / snapshot (job, id, seq, code), latest first; English words for a code (`http_<status>` for an answer without an error body) |
 | `reconcile_info(conn, run)` | last contiguous acknowledged seq, pending event and evidence ids |
 

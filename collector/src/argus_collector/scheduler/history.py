@@ -86,8 +86,10 @@ class KnownIndex:
         """The known contact an entity of this job is (person by name, else by a channel)."""
         if entity_type == "person":
             return self.by_name.get(norm(NAME, key.split("|", 1)[0]))
+        own = key.split(":", 1)[-1].split("|", 1)  # `<type>:<field>|<value>`: its channel
+        named = {own[0]: {own[1]}} if len(own) == 2 and own[0] in CHANNELS else {}
         for field in CHANNELS:
-            for value in values.get(field, set()):
+            for value in values.get(field, set()) | named.get(field, set()):
                 found = self.by_channel.get(norm(field, value))
                 if found is not None:
                     return found

@@ -1,10 +1,9 @@
 """The collector: Kaynnista / Pysayta, the collecting thread, heartbeat answers.
 
-One thread walks one job at a time (one browser page at a time, TZ_SELAIN
-8.13) and claims new jobs while there are free slots; the delivery thread
-runs independently. Pysayta and the STOP file stop walking and claiming, the
-outbox keeps going (TZ_TANDEM A3.3). After a restart the jobs, their runs,
-checkpoints and the outbox are where they were; an interrupted walk resumes.
+One thread walks one job at a time (TZ_SELAIN 8.13) in one Chrome for the whole
+collection, a fresh context per company (owner 06.10.2026), and claims new jobs;
+delivery runs on its own thread. Pysayta and STOP stop walking and claiming, the
+outbox keeps going (TZ_TANDEM A3.3); after a restart an interrupted walk resumes.
 """
 
 from __future__ import annotations
@@ -16,6 +15,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 
 from argus_collector.api_client import contract as api
+from argus_collector.browser import contract as browser
 from argus_collector.delivery import contract as delivery
 from argus_collector.runtime import contract as runtime
 from argus_collector.scheduler import leases, runner, service, views
@@ -39,6 +39,7 @@ class Collector(CollectorHooks):
         self.collecting = False
         self._wake = threading.Event()
         self._thread: threading.Thread | None = None
+        self._host = browser.BrowserHost(settings.env.headless, settings.env.profile_dir)
         self.deliverer = delivery.Deliverer(settings.env.db_path, target, self, on_change)
         with self.connect() as conn:
             for row in repo.jobs(conn, (service.RUNNING,)):
@@ -58,13 +59,15 @@ class Collector(CollectorHooks):
         self._thread.start()
         self.on_change()
 
-    def stop(self) -> None:
-        """Pysayta: the walk stops at its next step, nothing new is claimed."""
+    def stop(self, wait_s: float = 0.0) -> None:
+        """Pysayta: stop at the next step, claim nothing; `wait_s`: wait for Chrome to close."""
         if self.collecting:
             runtime.journal("http", "collecting off")
         self.collecting = False
         self._wake.set()
         self.on_change()
+        if wait_s and self._thread is not None:
+            self._thread.join(wait_s)
 
     def wake(self) -> None:
         self._wake.set()
@@ -84,8 +87,7 @@ class Collector(CollectorHooks):
         self.on_change()
 
     def heartbeat_failed(self, status: int) -> None:
-        """A heartbeat failed; status 0 (no answer) makes Lahetys `offline` only when
-        delivery got no answer either (`delivery.Transport`)."""
+        """Status 0 (no answer): Lahetys `offline` once delivery got none either."""
         self.deliverer.link(status != 0)
 
     def _stopped(self) -> bool:
@@ -97,6 +99,7 @@ class Collector(CollectorHooks):
 
     def _loop(self) -> None:
         conn = storage.connect(self.settings.env.db_path)
+        self._host = browser.BrowserHost(self.settings.env.headless, self.settings.env.profile_dir)
         last_claim = 0.0
         try:
             while not self._stopped():
@@ -115,6 +118,9 @@ class Collector(CollectorHooks):
                 self._wake.wait(self.settings.idle_wait_s)
                 self._wake.clear()
         finally:
+            self._host.close()
+            runtime.journal("browser", f"chrome closed: {self._host.starts} starts,"
+                            f" {self._host.start_ms} ms")
             conn.close()
             self.on_change()
 
@@ -171,7 +177,7 @@ class Collector(CollectorHooks):
         self.on_change()
         hooks = (self._should_stop(job_id), self.on_walk_event, lambda: self.deliverer.state)
         try:
-            state = runner.run_job(conn, row, self.settings.env, hooks,
+            state = runner.run_job(conn, row, (self.settings.env, self._host), hooks,
                                    lambda: self.interrupts.pop(job_id, None))
             runtime.journal("browser", f"job {job_id}: walk ended, job {state}")
         finally:

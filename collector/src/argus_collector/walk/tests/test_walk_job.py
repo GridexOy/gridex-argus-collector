@@ -80,7 +80,7 @@ def walk(
         approved_hosts=frozenset({host}),
         focus=discovery.make_focus(["FI"], ["fi", "en"]),
         limits=contract.WalkLimits(pages=pages, actions=40, seconds=600.0, states=60),
-        id_namespace="job-" + label,
+        id_namespace="job-" + label, stop_at_goal=False,  # the whole site (gold)
     )
     try:
         summary = contract.run_walk(settings, lambda e: None, lambda: False, sink)
@@ -113,7 +113,8 @@ def test_finnish_version_and_office_first(site: ThreadingHTTPServer, tmp_path: P
     assert footer.fields[0].binding == "caption", "Vaihde line: the company's number"
     assert "organization_channel:email|info.fi@nordtec.example" in entities
     assert summary.end_reason in (contract.END_FINISHED, contract.END_BUDGET)
-    assert {c.purpose for c in sink.calls} == {"walk.cards", "walk.action"}
+    purposes = {c.purpose for c in sink.calls}
+    assert purposes == set(), "the rules read every Nordtec card and walk on: no model call"
     assert sink.checkpoints >= len(order)
 
 

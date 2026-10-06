@@ -5,7 +5,8 @@ on 127.0.0.1; `policy(system, user) -> str` decides the reply content. Every
 request body is kept in `requests` so tests can inspect prompts. A user
 message given as parts (text + `image_url`) reaches the policy as its text
 with `[image]` per picture; the reply names the requested model; a model in
-`missing` answers 404 like Ollama for a model that is not pulled.
+`missing` answers 404 like Ollama for a model that is not pulled; an answer
+longer than `max_tokens` (4 characters a token) is cut there, like a real model.
 """
 
 from __future__ import annotations
@@ -66,23 +67,26 @@ class FakeModelServer:
 
             def do_POST(self) -> None:  # noqa: N802 - http.server API
                 length = int(self.headers.get("Content-Length", "0"))
-                body = json.loads(self.rfile.read(length).decode("utf-8"))
-                owner.requests.append(body)
-                if owner.fail_next > 0:
-                    owner.fail_next -= 1
-                    self._send(500, {"error": "simulated failure"})
-                    return
-                requested = str(body.get("model") or owner.model_id)
-                if requested in owner.missing:
-                    self._send(404, {"error": {"message": f"model '{requested}' not found"}})
-                    return
-                messages = body.get("messages", [])
-                system = next((m["content"] for m in messages if m["role"] == "system"), "")
-                user = text_of(next((m["content"] for m in messages if m["role"] == "user"), ""))
-                content = owner.policy(system, user)
-                self._send(200, completion(requested, content, len(user) // 4))
+                self._send(*owner.answer(json.loads(self.rfile.read(length).decode("utf-8"))))
 
         return Handler
+
+    def answer(self, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        """(status, payload) of one chat completion request."""
+        self.requests.append(body)
+        if self.fail_next > 0:
+            self.fail_next -= 1
+            return 500, {"error": "simulated failure"}
+        requested = str(body.get("model") or self.model_id)
+        if requested in self.missing:
+            return 404, {"error": {"message": f"model '{requested}' not found"}}
+        messages = body.get("messages", [])
+        system = next((m["content"] for m in messages if m["role"] == "system"), "")
+        user = text_of(next((m["content"] for m in messages if m["role"] == "user"), ""))
+        content = self.policy(system, user)
+        limit = int(body.get("max_tokens") or 0) * 4  # a reply longer than max_tokens is cut
+        content = content[:limit] if limit and len(content) > limit else content
+        return 200, completion(requested, content, len(user) // 4)
 
 
 def text_of(content: Any) -> str:

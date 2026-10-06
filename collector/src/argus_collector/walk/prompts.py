@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 from argus_collector.discovery.contract import Candidate
 from argus_collector.extraction.contract import Contact
@@ -41,6 +42,20 @@ ACTION_SYSTEM = (
 
 def _clip(text: str) -> str:
     return text if len(text) <= MAX_TEXT_CHARS else text[:MAX_TEXT_CHARS] + "\n[...]"
+
+
+PERSON_OBJECT_RE = re.compile(r"\{[^{}]*\"name\"[^{}]*\}")
+
+
+def salvage_people(content: str) -> dict[str, list[object]] | None:
+    """A card answer cut off by the token limit: its complete person objects."""
+    people: list[object] = []
+    for match in PERSON_OBJECT_RE.finditer(content):
+        try:
+            people.append(json.loads(match.group(0)))
+        except ValueError:
+            continue
+    return {"people": people} if people else None
 
 
 def cards_prompt(url: str, title: str, text: str) -> tuple[str, str]:

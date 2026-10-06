@@ -49,7 +49,7 @@ def test_beckhoff_worldwide_finland_then_the_finnish_people(
     site: ThreadingHTTPServer, tmp_path: Path,  # noqa: F811
 ) -> None:
     summary, sink = run(site, tmp_path)
-    assert summary.end_reason == contract.END_FINISHED, summary.gaps
+    assert summary.end_reason == contract.END_GOAL, summary.gaps  # FI sales people read
     order = page_order(sink)
     assert order[:4] == ["en-en/", "en-en/company/global-presence/", "fi-fi/",
                          "fi-fi/yhteystiedot/"], order
@@ -67,15 +67,17 @@ def test_beckhoff_worldwide_finland_then_the_finnish_people(
               and fields(e).get("country") == "DE" for f in e.fields if f.field == "phone"}
     assert "+4952460000" in german, "the open Germany tab is DE (Muut maat)"
     names = {e.entity_key for e in entities if e.entity_type == "person"}
-    assert {p["name"].casefold() for p in GOLD["persons"]} <= names
+    management = {"ari kinnunen", "katja honkanen"}  # fi-fi/yritys/johto/: CEO, CFO
+    assert {p["name"].casefold() for p in GOLD["persons"]} - management == names, (
+        "the sales people of fi-fi/yhteystiedot reach the goal: johto is not walked")
 
 
-def test_beckhoff_routing_rules_first_7b_steps_14b_cards_once(
+def test_beckhoff_rules_walk_and_read_without_a_model(
     site: ThreadingHTTPServer, tmp_path: Path,  # noqa: F811
 ) -> None:
     _, sink = run(site, tmp_path)
     calls = [(c.purpose.split(":", 1)[0], c.model) for c in sink.calls]
     cards = [model for purpose, model in calls if purpose == "walk.cards"]
     steps = [model for purpose, model in calls if purpose == "walk.action"]
-    assert cards == ["qwen2.5:14b"], "only fi-fi/yhteystiedot needs the card model"
-    assert steps and set(steps) == {"qwen2.5:7b"} and len(steps) <= 3
+    assert cards == [], "the rules read fi-fi/yhteystiedot: no card model (06.10.2026)"
+    assert steps == [], "rules walk: Global presence, Finland, Yhteystiedot, then the goal"

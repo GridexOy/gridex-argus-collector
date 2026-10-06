@@ -102,11 +102,12 @@ def make_collector(
     srv: contract_server.ContractServer,
     model_endpoint: str,
     stop_files: Callable[[], list[Path]] = lambda: [],
+    stop_at_goal: bool = False,  # the stands walk the whole fixture site
 ) -> scheduler.Collector:
     env = scheduler.WalkEnv(
         model=ModelConfig(model_endpoint, "fake-instruct"), headless=True,
         profile_dir=tmp / "profile", evidence_dir=tmp / "evidence", db_path=tmp / "collector.db",
-        stop_files=(), version="0.4.3.0",
+        stop_files=(), version="0.4.3.0", stop_at_goal=stop_at_goal,
     )
     settings = scheduler.Settings(env=env, stop_files=stop_files, claim_interval_s=0.2,
                                   idle_wait_s=0.1)

@@ -14,6 +14,7 @@ from __future__ import annotations
 import sqlite3
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -26,17 +27,36 @@ __all__ = [
     "DEFAULT_MODEL",
     "CallRecord",
     "CallListener",
+    "Detached",
     "Health",
     "ModelClient",
     "ModelConfig",
     "ModelError",
     "ModelReply",
+    "Salvage",
     "health",
     "resolve_config",
     "resolve_role",
 ]
 
 CallListener = Callable[[CallRecord], None]
+Salvage = Callable[[str], dict[str, Any] | None]
+
+
+@dataclass(frozen=True)
+class Attempt:
+    record: CallRecord
+    reply: ModelReply | None
+    error: str
+
+
+@dataclass(frozen=True)
+class Detached:
+    """A JSON call made away from the database: its attempts are logged by `record`."""
+
+    attempts: tuple[Attempt, ...]
+    parsed: dict[str, Any] | None
+    error: str
 DEFAULT_ENDPOINT = service.DEFAULT_ENDPOINT
 DEFAULT_MODEL = service.DEFAULT_MODEL
 PROVIDER = "local"
@@ -80,19 +100,63 @@ class ModelClient:
         return self._send(body, purpose)
 
     def chat_json(
-        self, system: str, user: str, purpose: str, images: tuple[bytes, ...] = ()
+        self, system: str, user: str, purpose: str, images: tuple[bytes, ...] = (),
+        salvage: Salvage | None = None,
     ) -> dict[str, Any]:
         """One chat completion in JSON mode, parsed to a dict (one retry on bad JSON);
-        `images` (PNG / JPEG bytes) go with the user message to a vision model."""
+        `images` (PNG / JPEG bytes) go with the user message to a vision model;
+        `salvage` rebuilds a cut-off answer (complete items of a list) before a retry."""
+        return self.record(self.detached_json(system, user, purpose, images, salvage))
+
+    def detached_json(
+        self, system: str, user: str, purpose: str, images: tuple[bytes, ...] = (),
+        salvage: Salvage | None = None,
+    ) -> Detached:
+        """`chat_json` without the database and the listener: safe in a worker thread
+        (0.4.8.1: the card model runs while the next step is chosen); `record` it after."""
         body = service.request_body(self.config, system, user, json_mode=True, images=images)
-        reply = self._send(body, purpose)
-        parsed = service.parse_json_reply(reply.content)
-        if parsed is None:
-            reply = self._send(body, purpose + ":retry")
+        attempts: list[Attempt] = []
+        parsed: dict[str, Any] | None = None
+        for suffix in ("", ":retry"):
+            reply = self._post(body, purpose + suffix, attempts)
+            if reply is None:
+                break
             parsed = service.parse_json_reply(reply.content)
-        if parsed is None:
-            raise ModelError(f"model {self.config.name} did not return a JSON object")
-        return parsed
+            if parsed is None and salvage is not None:
+                parsed = salvage(reply.content)
+            if parsed is not None:
+                break
+        error = attempts[-1].error or f"model {self.config.name} did not return a JSON object"
+        return Detached(tuple(attempts), parsed, "" if parsed is not None else error)
+
+    def record(self, detached: Detached) -> dict[str, Any]:
+        """Log the attempts of a detached call (model_calls, listener); its JSON or ModelError."""
+        for attempt in detached.attempts:
+            if self.conn is not None:
+                repository.log_call(self.conn, self.config, attempt.record.purpose,
+                                    attempt.reply, attempt.error)
+            self._notify(attempt.record)
+        if detached.parsed is None:
+            raise ModelError(detached.error)
+        return detached.parsed
+
+    def _post(
+        self, body: dict[str, Any], purpose: str, attempts: list[Attempt]
+    ) -> ModelReply | None:
+        started_at = datetime.now(UTC).isoformat(timespec="milliseconds")
+        started = time.monotonic()
+        try:
+            reply = repository.post_chat(self.config, body)
+        except ModelError as exc:
+            elapsed = int((time.monotonic() - started) * 1000)
+            record = CallRecord(purpose, self.config.name, started_at, elapsed, 0, 0, False,
+                                str(exc))
+            attempts.append(Attempt(record, None, str(exc)))
+            return None
+        attempts.append(Attempt(CallRecord(
+            purpose, reply.model or self.config.name, started_at, reply.elapsed_ms,
+            reply.prompt_tokens, reply.completion_tokens, True), reply, ""))
+        return reply
 
     def _send(self, body: dict[str, Any], purpose: str) -> ModelReply:
         started_at = datetime.now(UTC).isoformat(timespec="milliseconds")

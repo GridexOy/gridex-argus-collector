@@ -34,6 +34,7 @@ LEGAL_WORDS = frozenset({"oy", "oyj", "ab", "gmbh", "ag", "ltd", "inc", "as", "a
 class PageContext:
     sections: tuple[extraction.Section, ...] = ()
     lang: str = ""  # `<html lang>` value as written in the snapshot
+    patterns: tuple[extraction.EmailPattern, ...] = ()  # address patterns the page states
 
 
 def lang_country(lang: str) -> str | None:

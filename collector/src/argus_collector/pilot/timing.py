@@ -2,7 +2,9 @@
 
 Pure parsing of `logs/collector-<date>.log` lines (`<ISO time> <channel>: <message>`):
 `browser: job <id>: timing` (one line per page state, 0.4.8.0: phases in
-ms, who decided the next step, who read the cards), `model:` (every model call: purpose, model,
+ms, who decided the next step, who read the cards), `browser: job <id>: chrome
+start=<ms> ms shared=yes|no` (0.4.8.6: the browser start of a walk, 0 when the
+collection's Chrome was running), `model:` (every model call: purpose, model,
 ms), `browser: job <id>: page` (pages; with logs older than 0.4.8.0 the time
 between pages is all there is), `delivery:` (events and evidence uploads,
 ms since 0.4.8.0). Nothing here reads the network or the database.
@@ -22,6 +24,7 @@ MODEL_RE = re.compile(r"^(\S+) (\S+) in=(\d+) out=(\d+) (\d+) ms ok=(\w+)")
 PAIR_RE = re.compile(r"(\w+)=(\S+)")
 EVENTS_RE = re.compile(r"^(\d+) events sent.*?(?: in (\d+) ms)?$")
 UPLOAD_RE = re.compile(r"^evidence (\d+) B uploaded in (\d+) ms")
+CHROME_RE = re.compile(r"^chrome start=(\d+) ms")
 PHASES = ("load", "snapshot", "extract", "cards", "bind", "record", "action")
 
 
@@ -44,6 +47,8 @@ class JobTiming:
     uploads: int = 0
     upload_bytes: int = 0
     upload_ms: int = 0
+    chrome_starts: int = 0  # browser starts (a walk in the running Chrome adds none)
+    chrome_ms: int = 0
 
     def seen(self, moment: datetime) -> None:
         self.first = moment if self.first is None else min(self.first, moment)
@@ -117,6 +122,9 @@ def _one(jobs: dict[str, JobTiming], line: str) -> None:
         _model(job, rest)
     elif channel == "browser" and rest.startswith("page "):
         job.pages += 1
+    elif channel == "browser" and (chrome := CHROME_RE.match(rest)) and int(chrome.group(1)):
+        job.chrome_starts += 1
+        job.chrome_ms += int(chrome.group(1))
     elif channel == "delivery":
         _delivery(job, rest)
 

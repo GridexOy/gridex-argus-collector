@@ -41,6 +41,7 @@ def run_panel() -> int:
     app.connection.start_if_saved()
     app.schedule_pump()
     root.mainloop()
+    app.collect.shutdown()
     runtime.journal("http", f"panel closed: pid {os.getpid()}")
     runtime.panel_release(lock)
     return 0

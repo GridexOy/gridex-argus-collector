@@ -1,0 +1,574 @@
+{
+  "fixture": "ellego",
+  "host": "ellego.localhost",
+  "case": "Owner case 05.10.2026 (live defect on MAIN-PC): on ellego.fi/contact the person cards (name, title, phone) are visible on the very first contact page, yet the collector walked between the page's sections in a circle and extracted nobody. The fixture reproduces two probable mechanisms. (a) A WordPress-like mega menu rendered open in the header of every page: more than 9000 characters of visible menu text (product categories, product names, services, industries, references and news, English and Finnish words, all invented) come before the first person card in document.body.innerText, so a page text clipped to its first few thousand characters holds no person at all. (b) 40 people under six h2 group headings (Sales & Marketing 8, Service 8, Spare parts 6, Project management 6, Logistics 6, Finance & Administration 6); every card has name, English title and phone, every second card also an email, so one model reply listing all of them is long. Above the cards a filter bar of plain buttons (no role=tab, no aria-selected, no aria-expanded): All, active on load and marked by a class only, and one button per group; a group button hides the other groups (hidden attribute), All shows them again. Every group is visible on load, so every card can be read without any click, and a model can click the filters in a circle. Expected: the collector reads every card on contact/ before any navigation or click and stops clicking the same filters; the five owner-named Sales & Marketing people (priority) come first. The other pages (/, products/, services/, references/, company/) carry the same header, mega menu and footer and no people; the footer holds the organization channel (switchboard and general email).",
+  "seed": "/",
+  "company": {
+    "name": "Ellego Powertec Oy",
+    "address_lines": [
+      "Testitie 3",
+      "01720 Vantaa"
+    ],
+    "footer": "Ellego Powertec Oy, Testitie 3, 01720 Vantaa, puh. 010 000 1000, info@ellego.example",
+    "organization_channels": [
+      {
+        "kind": "phone",
+        "value": "+358100001000",
+        "text": "010 000 1000",
+        "page": "/"
+      },
+      {
+        "kind": "email",
+        "value": "info@ellego.example",
+        "text": "info@ellego.example",
+        "page": "/"
+      }
+    ],
+    "on_every_page": true
+  },
+  "pages": [
+    "/",
+    "products/",
+    "services/",
+    "references/",
+    "company/",
+    "contact/"
+  ],
+  "priority_pages": [
+    "contact/"
+  ],
+  "menu": {
+    "nav": [
+      "Home",
+      "Products",
+      "Services",
+      "References",
+      "Company",
+      "Contact"
+    ],
+    "min_chars_before_first_card": 9000,
+    "first_card": "Mika Mäenpää"
+  },
+  "filters": {
+    "page": "contact/",
+    "labels": [
+      "All",
+      "Sales & Marketing",
+      "Service",
+      "Spare parts",
+      "Project management",
+      "Logistics",
+      "Finance & Administration"
+    ],
+    "active_on_load": "All",
+    "kind": "plain <button type=button>, no role, no aria-selected, no aria-expanded"
+  },
+  "groups": [
+    {
+      "heading": "Sales & Marketing",
+      "count": 8
+    },
+    {
+      "heading": "Service",
+      "count": 8
+    },
+    {
+      "heading": "Spare parts",
+      "count": 6
+    },
+    {
+      "heading": "Project management",
+      "count": 6
+    },
+    {
+      "heading": "Logistics",
+      "count": 6
+    },
+    {
+      "heading": "Finance & Administration",
+      "count": 6
+    }
+  ],
+  "persons": [
+    {
+      "name": "Mika Mäenpää",
+      "title": "Sales Director",
+      "email": "mika.maenpaa@ellego.example",
+      "phone": "+358407211575",
+      "phone_text": "+358 40 721 1575",
+      "department": "Sales & Marketing",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": true,
+      "jsonld": false
+    },
+    {
+      "name": "Konstantin Enckell",
+      "title": "Key Account Manager",
+      "email": null,
+      "phone": "+358407637940",
+      "phone_text": "+358 40 763 7940",
+      "department": "Sales & Marketing",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": true,
+      "jsonld": false
+    },
+    {
+      "name": "Janne Niemi",
+      "title": "Sales Manager, Generator Sets",
+      "email": "janne.niemi@ellego.example",
+      "phone": "+358407506995",
+      "phone_text": "+358 40 750 6995",
+      "department": "Sales & Marketing",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": true,
+      "jsonld": false
+    },
+    {
+      "name": "Otto Vainio",
+      "title": "Sales Engineer",
+      "email": null,
+      "phone": "+358407582752",
+      "phone_text": "+358 40 758 2752",
+      "department": "Sales & Marketing",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": true,
+      "jsonld": false
+    },
+    {
+      "name": "Susanna Huovila",
+      "title": "Marketing Manager",
+      "email": "susanna.huovila@ellego.example",
+      "phone": "+358407974066",
+      "phone_text": "+358 40 797 4066",
+      "department": "Sales & Marketing",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": true,
+      "jsonld": false
+    },
+    {
+      "name": "Heikki Lahtinen",
+      "title": "Key Account Manager, Rental",
+      "email": null,
+      "phone": "+358407656469",
+      "phone_text": "+358 40 765 6469",
+      "department": "Sales & Marketing",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Satu Rantanen",
+      "title": "Marketing Coordinator",
+      "email": "satu.rantanen@ellego.example",
+      "phone": "+358407484363",
+      "phone_text": "+358 40 748 4363",
+      "department": "Sales & Marketing",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Mikko Peltola",
+      "title": "Area Sales Manager, Northern Finland",
+      "email": null,
+      "phone": "+358407235740",
+      "phone_text": "+358 40 723 5740",
+      "department": "Sales & Marketing",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Juha Koskinen",
+      "title": "Service Manager",
+      "email": "juha.koskinen@ellego.example",
+      "phone": "+358407484518",
+      "phone_text": "+358 40 748 4518",
+      "department": "Service",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Pekka Laaksonen",
+      "title": "Service Coordinator",
+      "email": null,
+      "phone": "+358407959413",
+      "phone_text": "+358 40 795 9413",
+      "department": "Service",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Tuomas Hirvonen",
+      "title": "Field Service Engineer",
+      "email": "tuomas.hirvonen@ellego.example",
+      "phone": "+358407811380",
+      "phone_text": "+358 40 781 1380",
+      "department": "Service",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Sami Lehtola",
+      "title": "Field Service Technician",
+      "email": null,
+      "phone": "+358407318447",
+      "phone_text": "+358 40 731 8447",
+      "department": "Service",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Ari Mustakallio",
+      "title": "Commissioning Engineer",
+      "email": "ari.mustakallio@ellego.example",
+      "phone": "+358407976594",
+      "phone_text": "+358 40 797 6594",
+      "department": "Service",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Jari Salmela",
+      "title": "Service Technician, Hydraulics",
+      "email": null,
+      "phone": "+358407147564",
+      "phone_text": "+358 40 714 7564",
+      "department": "Service",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Kalle Nurminen",
+      "title": "Workshop Foreman",
+      "email": "kalle.nurminen@ellego.example",
+      "phone": "+358407305400",
+      "phone_text": "+358 40 730 5400",
+      "department": "Service",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Henna Vuorela",
+      "title": "Service Sales Coordinator",
+      "email": null,
+      "phone": "+358407673434",
+      "phone_text": "+358 40 767 3434",
+      "department": "Service",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Marko Hiltunen",
+      "title": "Spare Parts Manager",
+      "email": "marko.hiltunen@ellego.example",
+      "phone": "+358407258227",
+      "phone_text": "+358 40 725 8227",
+      "department": "Spare parts",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Teemu Kärkkäinen",
+      "title": "Spare Parts Sales",
+      "email": null,
+      "phone": "+358407119978",
+      "phone_text": "+358 40 711 9978",
+      "department": "Spare parts",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Anne Saarinen",
+      "title": "Spare Parts Coordinator",
+      "email": "anne.saarinen@ellego.example",
+      "phone": "+358407891497",
+      "phone_text": "+358 40 789 1497",
+      "department": "Spare parts",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Petri Lindholm",
+      "title": "Warranty Specialist",
+      "email": null,
+      "phone": "+358407795682",
+      "phone_text": "+358 40 779 5682",
+      "department": "Spare parts",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Jussi Rautio",
+      "title": "Parts Specialist, Engines",
+      "email": "jussi.rautio@ellego.example",
+      "phone": "+358407603627",
+      "phone_text": "+358 40 760 3627",
+      "department": "Spare parts",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Leena Kivelä",
+      "title": "Customer Service Specialist",
+      "email": null,
+      "phone": "+358407373895",
+      "phone_text": "+358 40 737 3895",
+      "department": "Spare parts",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Timo Ahola",
+      "title": "Project Director",
+      "email": "timo.ahola@ellego.example",
+      "phone": "+358407466760",
+      "phone_text": "+358 40 746 6760",
+      "department": "Project management",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Esa Mattila",
+      "title": "Project Manager",
+      "email": null,
+      "phone": "+358407116543",
+      "phone_text": "+358 40 711 6543",
+      "department": "Project management",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Riikka Pulkkinen",
+      "title": "Project Manager",
+      "email": "riikka.pulkkinen@ellego.example",
+      "phone": "+358407518124",
+      "phone_text": "+358 40 751 8124",
+      "department": "Project management",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Matti Honkala",
+      "title": "Project Engineer",
+      "email": null,
+      "phone": "+358407203276",
+      "phone_text": "+358 40 720 3276",
+      "department": "Project management",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Ville Sorsa",
+      "title": "Electrical Design Engineer",
+      "email": "ville.sorsa@ellego.example",
+      "phone": "+358407474704",
+      "phone_text": "+358 40 747 4704",
+      "department": "Project management",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Kirsi Lampinen",
+      "title": "Project Coordinator",
+      "email": null,
+      "phone": "+358407169534",
+      "phone_text": "+358 40 716 9534",
+      "department": "Project management",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Antti Heikkilä",
+      "title": "Logistics Manager",
+      "email": "antti.heikkila@ellego.example",
+      "phone": "+358407239072",
+      "phone_text": "+358 40 723 9072",
+      "department": "Logistics",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Jouni Seppälä",
+      "title": "Warehouse Supervisor",
+      "email": null,
+      "phone": "+358407904854",
+      "phone_text": "+358 40 790 4854",
+      "department": "Logistics",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Tiina Kallio",
+      "title": "Purchasing Manager",
+      "email": "tiina.kallio@ellego.example",
+      "phone": "+358407429743",
+      "phone_text": "+358 40 742 9743",
+      "department": "Logistics",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Lauri Mäkelä",
+      "title": "Shipping Coordinator",
+      "email": null,
+      "phone": "+358407428626",
+      "phone_text": "+358 40 742 8626",
+      "department": "Logistics",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Harri Ojala",
+      "title": "Warehouse Operator",
+      "email": "harri.ojala@ellego.example",
+      "phone": "+358407862760",
+      "phone_text": "+358 40 786 2760",
+      "department": "Logistics",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Minna Toivola",
+      "title": "Purchasing Assistant",
+      "email": null,
+      "phone": "+358407672761",
+      "phone_text": "+358 40 767 2761",
+      "department": "Logistics",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Päivi Laine",
+      "title": "Chief Financial Officer",
+      "email": "paivi.laine@ellego.example",
+      "phone": "+358407881288",
+      "phone_text": "+358 40 788 1288",
+      "department": "Finance & Administration",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Sari Hyvärinen",
+      "title": "Financial Controller",
+      "email": null,
+      "phone": "+358407267951",
+      "phone_text": "+358 40 726 7951",
+      "department": "Finance & Administration",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Hannu Väisänen",
+      "title": "Administration Manager",
+      "email": "hannu.vaisanen@ellego.example",
+      "phone": "+358407329913",
+      "phone_text": "+358 40 732 9913",
+      "department": "Finance & Administration",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Eeva Kokkonen",
+      "title": "Accountant",
+      "email": null,
+      "phone": "+358407413430",
+      "phone_text": "+358 40 741 3430",
+      "department": "Finance & Administration",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Jaana Lehto",
+      "title": "HR Manager",
+      "email": "jaana.lehto@ellego.example",
+      "phone": "+358407266216",
+      "phone_text": "+358 40 726 6216",
+      "department": "Finance & Administration",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    },
+    {
+      "name": "Marja Hakala",
+      "title": "Office Assistant",
+      "email": null,
+      "phone": "+358407378512",
+      "phone_text": "+358 40 737 8512",
+      "department": "Finance & Administration",
+      "country": "FI",
+      "source_page": "contact/",
+      "priority": false,
+      "jsonld": false
+    }
+  ]
+}

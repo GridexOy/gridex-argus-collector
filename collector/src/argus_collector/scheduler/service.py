@@ -9,6 +9,9 @@ from argus_collector.walk.contract import (
     END_DOMAIN,
     END_FAILURES,
     END_FINISHED,
+    END_GOAL,
+    END_GOAL_PAGES,
+    END_NO_PROGRESS,
     END_START_FAILED,
     WalkLimits,
 )
@@ -70,8 +73,10 @@ def outcome(end_reason: str, found: bool, cancelled: bool) -> tuple[str, str]:
     """(run_result_status, completion_reason) of a walk that ended (TZ_SELAIN 8.10)."""
     if cancelled:
         return CANCELLED, "manual_cancel"
-    if end_reason == END_FINISHED:
+    if end_reason in (END_FINISHED, END_NO_PROGRESS):  # no_progress: the gap says why
         return COMPLETED, "frontier_exhausted" if found else "no_contacts_in_checked_scope"
+    if end_reason in (END_GOAL, END_GOAL_PAGES):  # contract 1.1 has no `goal_reached`
+        return COMPLETED, "frontier_exhausted"
     if end_reason == END_BUDGET:
         return PARTIAL, "budget_reached"
     if end_reason == END_DOMAIN:

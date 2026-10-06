@@ -53,6 +53,8 @@ class WalkController:
             navigation=models.resolve_role(cfg.model_endpoint, cfg.model_navigation),
             vision=models.resolve_role(cfg.model_endpoint, cfg.model_vision),
             page_budget=cfg.walk_page_budget,
+            action_budget=cfg.walk_action_budget,
+            stop_at_goal=cfg.walk_stop_at_goal,
             headless=False,
             stop_files=tuple(runtime.stop_files()) or (runtime.repo_root() / "STOP",),
         )
@@ -96,7 +98,7 @@ class WalkController:
             self.pages = event.page_no
         if event.kind == "contact":
             self.contacts += 1
-            view.collect.add_contact(walk_lines.contact_row(event))
+            view.collect.add_contact(walk_lines.contact_row(event, msgs))
             view.collect.set_found(msgs.t("collecting.found", n=self.contacts))
             return
         line = walk_lines.walk_event_line(msgs, event)
@@ -105,7 +107,8 @@ class WalkController:
 
     def _finished(self, summary: walk.WalkSummary) -> None:
         ended = not summary.stopped and not summary.error
-        if ended and summary.end_reason != walk.END_ATTENTION:
+        if ended and summary.end_reason not in (walk.END_ATTENTION, walk.END_GOAL,
+                                                walk.END_GOAL_PAGES):  # the goal line stays
             text, level = walk_lines.done_line(self.host.msgs, summary.pages, summary.contacts)
             self.host.view.collect.set_status(text, level)
         self.thread = None

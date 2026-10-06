@@ -3,8 +3,11 @@
 Routing (owner 05.10.2026): a structure rule or a link rule needs no model;
 then the menu cache; a page without DOM text goes to the vision model with
 its screenshot; else the navigation model (7b) chooses, the card model when
-the navigation model fails. The finish guard and the page budget hold for
-every answer.
+the navigation model fails. On a page whose people the rules read no model is
+asked: without a rule link the best-ranked link is next (owner 06.10.2026:
+the model reads, rules walk; the goal rule ends the walk). A page read before
+is never the target, through a redirect neither; an unvisited link is no
+reason not to finish. The page budget holds for every answer.
 """
 
 from __future__ import annotations
@@ -17,7 +20,7 @@ from argus_collector.models import contract as models
 from argus_collector.walk import page as page_step
 from argus_collector.walk import prompts, rules, service, structure, vision
 from argus_collector.walk.service import Action
-from argus_collector.walk.state import WalkState
+from argus_collector.walk.state import MAX_STALLED, WalkState
 
 
 def end_budget(state: WalkState) -> None:
@@ -26,12 +29,25 @@ def end_budget(state: WalkState) -> None:
     state.gap_unwalked("budget_reached", "the run budget was used up before this link")
 
 
-def _guard_finish(state: WalkState, candidates: list[discovery.Candidate]) -> Action:
-    """In job mode the model may not finish while a strong contact link is unvisited."""
-    for cand in candidates:
-        if cand.kind == "link" and discovery.strong_link(cand.text, cand.href, state.focus):
-            return Action(service.ACTION_NAVIGATE, cand, source="guard")
-    return Action(service.ACTION_FINISH, source="finish")
+def end_stalled(state: WalkState, url: str) -> None:
+    """MAX_STALLED actions without a new page state (a redirect loop, Kontaktit 05.10.2026):
+    the walk ends; the links left are gaps `no_progress`, not resumable - the same site would
+    loop again in the next run."""
+    state.end_reason = service.END_NO_PROGRESS
+    detail = f"{MAX_STALLED} actions in a row without a new page state"
+    state.add_gap(url, "no_progress", detail, False)
+    state.gap_unwalked("no_progress", detail, resumable=False)
+
+
+def _unread(state: WalkState, action: Action) -> Action:
+    """A navigation to a page read before (or to a link that led to one) finishes."""
+    cand = action.candidate
+    if action.kind != service.ACTION_NAVIGATE or cand is None:
+        return action
+    if discovery.normalize_url(cand.href) in state.walked():
+        state.step(service.STEP_LOOP, f"{cand.href}: read before", cand.href)
+        return Action(service.ACTION_FINISH, source="read_before")
+    return action
 
 
 def _ask(state: WalkState, system: str, user: str,
@@ -68,20 +84,22 @@ def _model_action(
 
 def decide(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState,
            text: str) -> Action:
-    built = structure.structural_action(state, page)
+    finished = discovery.normalize_url(page.url) in state.finished_urls  # finish_branch
+    built = None if finished else structure.structural_action(state, page)
     if built is not None:
         return replace(built, source="structure")
     candidates = page_step.ranked(state, page)
     if not candidates:
-        return Action(service.ACTION_FINISH, source="finish")
+        return Action(service.ACTION_FINISH, source="finish_branch" if finished else "finish")
     key = rules.menu_key(state, page.candidates)
     action = rules.rule_action(state, page, candidates) or rules.cached_action(
         state, key, candidates)
+    if action is None and discovery.normalize_url(page.url) in state.ruled_urls:
+        action = replace(prompts.fallback_action(candidates), source="rules")
     if action is None:
         action = _model_action(state, wb, page, text, candidates)
         rules.remember(state, key, action)
-    if action.kind == service.ACTION_FINISH and state.job_mode:
-        action = _guard_finish(state, candidates)
+    action = _unread(state, action)
     pages_left = state.settings.run_limits().pages - state.cp.pages
     if action.kind == service.ACTION_NAVIGATE and pages_left <= 0:
         end_budget(state)
