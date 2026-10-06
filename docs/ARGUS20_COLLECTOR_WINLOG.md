@@ -219,6 +219,26 @@ Gap за сутки: `no_progress` 27, `timeout` 16, `domain_ownership_unresolve
    - строка «Vieras verkkotunnus …» в Keruu.
 8. **Pysäytä закрывает Chrome сбора.** Процессов `chrome.exe` до и после.
 
+9. **Потеря событий при 500/502 (дефект владельца 06.10, 15:05–15:10 UTC): Tele-Tukku seq 28–34, Sonepar seq 61–101 не дошли до ARGUS, сборщик их больше не шлёт.** Нужны две вещи, без значений контактов. Положить в `docs/timing/outbox-loss-2026-10-06.md`.
+   - **Строки outbox** (`%LOCALAPPDATA%\Gridex\ArgusCollector\state\collector.db`, только чтение):
+     ```sql
+     SELECT j.company_name, j.job_id, j.state, j.run_id AS current_run, j.drain_only,
+            o.run_id, o.seq, o.type, o.status, o.code, o.retry_code, o.attempts, o.created_at, o.acked_at
+     FROM outbox o JOIN jobs j ON j.job_id = o.job_id
+     WHERE (j.company_name LIKE 'Tele-Tukku%' AND o.seq BETWEEN 26 AND 36)
+        OR (j.company_name LIKE 'Sonepar%' AND o.seq BETWEEN 59 AND 103)
+     ORDER BY j.company_name, o.run_id, o.seq;
+     ```
+     И `SELECT run_id, status, code, count(*) FROM evidence_uploads WHERE job_id IN (<эти job_id>) GROUP BY 1, 2, 3`.
+   - **Журнал** `logs\collector-2026-10-06.log` за 15:00–15:30 UTC: строки с этими `job_id`, а также все строки `claim:`, `reconcile`, `heartbeat:`, `lease`, `sequence_gap`, `rejected`.
+   - Отдельно: есть ли после 15:10 вообще строки `delivery: job …: N events sent` — по любому заданию.
+
+   Что это различит:
+   - строки `pending` с `run_id` ≠ `current_run` при строке журнала `claim: job … new_run` — ARGUS выдал задание с новым run, события старого run сборщик молча пропускает (токен только у текущего run);
+   - одна строка `rejected` с кодом `http_4xx` / `not_found` на первом seq, дальше `pending` + `sequence_gap` — запрос целиком отклонён 4xx в окне деплоя, первое событие отброшено;
+   - `pending` у текущего run и ни одной строки `delivery:` после 15:10 — упал поток доставки;
+   - `accepted` — сборщик получил подтверждение, искать надо на стороне ARGUS.
+
 ## Файлы
 
 | Файл | Что внутри |
