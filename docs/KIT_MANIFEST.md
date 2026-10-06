@@ -34,11 +34,25 @@
 | Документ | Версия / правка |
 |---|---|
 | ARGUS20_TZ_SELAIN.md | v3.0, правка 03, 03.10.2026 |
-| ARGUS20_COLLECTOR_OPENAPI.json | 3.0.0, OpenAPI 3.1.0, wire schema 1.1, base path `/api/collector` |
+| ARGUS20_COLLECTOR_OPENAPI.json | 3.1.0 (перевыпуск 06.10.2026, см. ниже), OpenAPI 3.1.0, wire schema 1.1 и 1.2, base path `/api/collector`; до него 3.0.0, wire 1.1 |
 | ARGUS20_RULES / WAYS / ARCHITECTURE / NON_GOALS / SCREENS / BLOCKS | правка 03, 03.10.2026 |
 | ARGUS20_TZ_BLOCK0.md | v1.4, 19.09.2026 |
 | ARGUS20_VISION.md | правка 02, 17.09.2026 |
 | ARGUS20_ASSETS.md | архивация 17.09.2026 (ТЗ ARGUS20-ARCHIVIST v1.1) |
+
+## Перевыпуски
+
+### 06.10.2026 — контракт 3.1.0 (wire 1.2), по заданию владельца (cv0.4.8.7)
+
+Источник: `GridexOy/gridex-argus20`, коммит `004fcbd3e78dd6cb84974e46b837c3c3bc5a00d0`. Копии побайтно равны файлам этого коммита.
+
+| Файл | Происхождение | sha256 |
+|---|---|---|
+| `docs/ARGUS20_COLLECTOR_OPENAPI.json` | копия ARGUS, info.version 3.1.0 (заменяет 3.0.0) | `1b19b5c43ad8e9c4a4a9ed190423422f4148165e2307487da359be64530cefc6` |
+| `docs/CONTRACT_3.1.md` | копия ARGUS, новый | `e4ba8b5cb91e2af3816ccf3e4c2dd31cf7dc1b3e2a7231b06a383e888e344a4e` |
+| `docs/collector_contract/events.response.v1_2.json` | копия ARGUS, новый | `2f0a3733cb2b78b12042330b32f6e8c961dea071cfa0eb3401ecc0e3cbf03477` |
+
+Строка `docs/ARGUS20_COLLECTOR_OPENAPI.json` в «Составе» выше — хэш сборки 03.10.2026 (3.0.0), оставлена как история.
 
 ## Проверки при сборке
 

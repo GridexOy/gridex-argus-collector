@@ -1,0 +1,14 @@
+{
+  "fixture": "elkris",
+  "host": "elkris.localhost",
+  "case": "Owner 06.10.2026 (Elkris/Reimax, K7): an event page on another domain lists people; a person and a channel come only from pages of the company's domain, the event page is a source only",
+  "seed": "/",
+  "foreign_host": "industryx.localhost",
+  "foreign_page": "puhujat/",
+  "company": {"name": "Elkris Oy", "phone": "+358207420000", "email": "info@elkris.example"},
+  "persons": [],
+  "foreign_persons": [
+    {"name": "Ilmari Testinen", "phone": "+358405519001", "email": "ilmari.testinen@industryx.example"},
+    {"name": "Kaisa Esimerkki", "phone": "+358405519002", "email": "kaisa.esimerkki@industryx.example"}
+  ]
+}

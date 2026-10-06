@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "argus-collector"
-version = "0.4.8.6"
+version = "0.4.8.7"
 description = "ARGUS 2.0 local contact collector (Selain) for Windows"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -102,7 +102,7 @@ forbidden_modules = [
   "argus_collector.discovery.repository",
   "argus_collector.discovery.focus",
   "argus_collector.discovery.countries",
-  "argus_collector.discovery.country_names",
+  "argus_collector.discovery.country_names", "argus_collector.discovery.versions",
   "argus_collector.models.service",
   "argus_collector.models.repository",
   "argus_collector.evidence.service",
@@ -135,6 +135,7 @@ forbidden_modules = [
   "argus_collector.walk.goal",
   "argus_collector.walk.patterns",
   "argus_collector.walk.ending",
+  "argus_collector.walk.scope", "argus_collector.walk.country",
   "argus_collector.scheduler.collector",
   "argus_collector.scheduler.events",
   "argus_collector.scheduler.finish",
@@ -151,7 +152,7 @@ forbidden_modules = [
   "argus_collector.pilot.repository",
   "argus_collector.pilot.render",
   "argus_collector.delivery.hooks",
-  "argus_collector.delivery.loop",
+  "argus_collector.delivery.loop", "argus_collector.delivery.uploads",
   "argus_collector.delivery.repository",
   "argus_collector.delivery.service",
   "argus_collector.api_client.service",
@@ -159,25 +160,13 @@ forbidden_modules = [
   "argus_collector.api_client.multipart",
   "argus_collector.api_client.codec",
   "argus_collector.api_client.wire",
-  "argus_collector.api_client.types_1",
-  "argus_collector.api_client.types_2",
-  "argus_collector.api_client.types_3",
-  "argus_collector.api_client.types_4",
-  "argus_collector.api_client.types_5",
-  "argus_collector.api_client.types_6",
-  "argus_collector.api_client.serialization_1",
-  "argus_collector.api_client.serialization_2",
-  "argus_collector.api_client.serialization_3",
-  "argus_collector.api_client.serialization_4",
-  "argus_collector.api_client.serialization_5",
-  "argus_collector.api_client.serialization_6",
-  "argus_collector.api_client.serialization_7",
-  "argus_collector.api_client.serialization_8",
-  "argus_collector.api_client.serialization_9",
-  "argus_collector.api_client.serialization_10",
-  "argus_collector.api_client.serialization_11",
-  "argus_collector.api_client.serialization_12",
-  "argus_collector.api_client.serialization_13",
+  "argus_collector.api_client.types_1", "argus_collector.api_client.types_2", "argus_collector.api_client.types_3", "argus_collector.api_client.types_4",
+  "argus_collector.api_client.types_5", "argus_collector.api_client.types_6", "argus_collector.api_client.types_7",
+  "argus_collector.api_client.serialization_1", "argus_collector.api_client.serialization_2", "argus_collector.api_client.serialization_3",
+  "argus_collector.api_client.serialization_4", "argus_collector.api_client.serialization_5", "argus_collector.api_client.serialization_6",
+  "argus_collector.api_client.serialization_7", "argus_collector.api_client.serialization_8", "argus_collector.api_client.serialization_9",
+  "argus_collector.api_client.serialization_10", "argus_collector.api_client.serialization_11", "argus_collector.api_client.serialization_12",
+  "argus_collector.api_client.serialization_13", "argus_collector.api_client.serialization_14",
   "argus_collector.worker_auth.service",
   "argus_collector.worker_auth.repository",
 ]

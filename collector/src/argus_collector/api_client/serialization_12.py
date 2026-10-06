@@ -9,192 +9,118 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from argus_collector.api_client.serialization_5 import (
-    job_started_event_from_json,
-    job_started_event_to_json,
-    source_discovered_event_from_json,
-    source_discovered_event_to_json,
-)
-from argus_collector.api_client.serialization_6 import (
-    source_blocked_event_from_json,
-    source_blocked_event_to_json,
-    source_processed_event_from_json,
-    source_processed_event_to_json,
-)
-from argus_collector.api_client.serialization_8 import (
-    contact_enriched_event_from_json,
-    contact_enriched_event_to_json,
-    contact_merge_proposed_event_from_json,
-    contact_merge_proposed_event_to_json,
-    contact_observed_event_from_json,
-    contact_observed_event_to_json,
-)
-from argus_collector.api_client.serialization_9 import (
-    job_needs_attention_event_from_json,
-    job_needs_attention_event_to_json,
-    job_progress_event_from_json,
-    job_progress_event_to_json,
-)
-from argus_collector.api_client.serialization_10 import (
-    job_finished_event_from_json,
-    job_finished_event_to_json,
-)
-from argus_collector.api_client.serialization_11 import (
-    contact_freshness_event_from_json,
-    contact_freshness_event_to_json,
-    model_called_event_from_json,
-    model_called_event_to_json,
-    route_recorded_event_from_json,
-    route_recorded_event_to_json,
-    route_verified_event_from_json,
-    route_verified_event_to_json,
-)
-from argus_collector.api_client.types_2 import ChannelStatus
-from argus_collector.api_client.types_3 import (
-    JobStartedEvent,
-    SourceBlockedEvent,
-    SourceDiscoveredEvent,
-    SourceProcessedEvent,
-)
-from argus_collector.api_client.types_4 import (
-    ContactEnrichedEvent,
-    ContactMerge_ProposedEvent,
-    ContactObservedEvent,
-    JobProgressEvent,
-)
-from argus_collector.api_client.types_5 import (
-    ContactFreshnessEvent,
-    JobFinishedEvent,
-    JobNeeds_AttentionEvent,
-)
+from argus_collector.api_client.serialization_10 import model_usage_from_json, model_usage_to_json
 from argus_collector.api_client.types_6 import (
-    Event,
-    EventResult,
-    EventResultStatus,
-    EventsRequest,
-    EventsResponse,
-    JobState,
     ModelCalledEvent,
-    RouteRecordedEvent,
+    ModelCalledEventSchemaVersion,
+    ModelCalledPayload,
     RouteVerifiedEvent,
+    RouteVerifiedEventSchemaVersion,
+    RouteVerifiedPayload,
+    RouteVerifiedPayloadResult,
 )
-from argus_collector.api_client.wire import const, enum_value, or_none
-
-_EVENT_TO_JSON: dict[type[Any], Callable[[Any], dict[str, Any]]] = {
-    JobStartedEvent: job_started_event_to_json,
-    SourceDiscoveredEvent: source_discovered_event_to_json,
-    SourceProcessedEvent: source_processed_event_to_json,
-    SourceBlockedEvent: source_blocked_event_to_json,
-    ContactObservedEvent: contact_observed_event_to_json,
-    ContactEnrichedEvent: contact_enriched_event_to_json,
-    ContactMerge_ProposedEvent: contact_merge_proposed_event_to_json,
-    JobProgressEvent: job_progress_event_to_json,
-    JobNeeds_AttentionEvent: job_needs_attention_event_to_json,
-    JobFinishedEvent: job_finished_event_to_json,
-    ContactFreshnessEvent: contact_freshness_event_to_json,
-    RouteRecordedEvent: route_recorded_event_to_json,
-    RouteVerifiedEvent: route_verified_event_to_json,
-    ModelCalledEvent: model_called_event_to_json,
-}
-_EVENT_FROM_JSON: dict[object, Callable[[dict[str, Any]], Event]] = {
-    "job.started": job_started_event_from_json,
-    "source.discovered": source_discovered_event_from_json,
-    "source.processed": source_processed_event_from_json,
-    "source.blocked": source_blocked_event_from_json,
-    "contact.observed": contact_observed_event_from_json,
-    "contact.enriched": contact_enriched_event_from_json,
-    "contact.merge_proposed": contact_merge_proposed_event_from_json,
-    "job.progress": job_progress_event_from_json,
-    "job.needs_attention": job_needs_attention_event_from_json,
-    "job.finished": job_finished_event_from_json,
-    "contact.freshness": contact_freshness_event_from_json,
-    "route.recorded": route_recorded_event_from_json,
-    "route.verified": route_verified_event_from_json,
-    "model.called": model_called_event_from_json,
-}
+from argus_collector.api_client.wire import const, opt, or_none
 
 
-def event_to_json(value: Event) -> dict[str, Any]:
-    dump = _EVENT_TO_JSON.get(type(value))
-    if dump is None:
-        raise TypeError(f"Event: not a variant: {type(value).__name__}")
-    return dump(value)
-
-
-def event_from_json(data: dict[str, Any]) -> Event:
-    parse = _EVENT_FROM_JSON.get(data.get("type"))
-    if parse is None:
-        raise ValueError(f"Event: unknown type {data.get('type')!r}")
-    return parse(data)
-
-
-def events_request_to_json(value: EventsRequest) -> dict[str, Any]:
+def route_verified_payload_to_json(value: RouteVerifiedPayload) -> dict[str, Any]:
     return {
-        "execution_token": value.execution_token,
-        "events": [event_to_json(v) for v in value.events],
-        "schema_version": value.schema_version,
+        "route_id": value.route_id,
+        "result": value.result.value,
+        "record_count": value.record_count,
+        "evidence_ids": list(value.evidence_ids),
+        "detail": value.detail,
     }
 
 
-def events_request_from_json(data: dict[str, Any]) -> EventsRequest:
-    return EventsRequest(
-        execution_token=str(data["execution_token"]),
-        events=[event_from_json(v) for v in data["events"]],
-        schema_version=const(data, "schema_version", "1.1"),
+def route_verified_payload_from_json(data: dict[str, Any]) -> RouteVerifiedPayload:
+    return RouteVerifiedPayload(
+        route_id=str(data["route_id"]),
+        result=RouteVerifiedPayloadResult(data["result"]),
+        record_count=or_none(data["record_count"], int),
+        evidence_ids=[str(v) for v in data["evidence_ids"]],
+        detail=str(data["detail"]),
     )
 
 
-def event_result_to_json(value: EventResult) -> dict[str, Any]:
-    return {
+def route_verified_event_to_json(value: RouteVerifiedEvent) -> dict[str, Any]:
+    out: dict[str, Any] = {
         "event_id": value.event_id,
+        "job_id": value.job_id,
+        "run_id": value.run_id,
         "seq": value.seq,
-        "status": value.status.value,
-        "code": value.code,
-        "canonical_contact_id": value.canonical_contact_id,
-        "server_revision": value.server_revision,
-        "state_applied": value.state_applied,
-        "channel_status": or_none(value.channel_status, enum_value),
+        "occurred_at": value.occurred_at,
+        "payload": route_verified_payload_to_json(value.payload),
+        "type": value.type,
     }
+    if value.schema_version is not None:
+        out["schema_version"] = value.schema_version.value
+    return out
 
 
-def event_result_from_json(data: dict[str, Any]) -> EventResult:
-    return EventResult(
+def route_verified_event_from_json(data: dict[str, Any]) -> RouteVerifiedEvent:
+    return RouteVerifiedEvent(
         event_id=str(data["event_id"]),
+        job_id=str(data["job_id"]),
+        run_id=str(data["run_id"]),
         seq=int(data["seq"]),
-        status=EventResultStatus(data["status"]),
-        code=or_none(data["code"], str),
-        canonical_contact_id=or_none(data["canonical_contact_id"], str),
-        server_revision=int(data["server_revision"]),
-        state_applied=bool(data["state_applied"]),
-        channel_status=or_none(data["channel_status"], ChannelStatus),
+        occurred_at=str(data["occurred_at"]),
+        payload=route_verified_payload_from_json(data["payload"]),
+        schema_version=opt(data, "schema_version", RouteVerifiedEventSchemaVersion, None),
+        type=const(data, "type", "route.verified"),
     )
 
 
-def events_response_to_json(value: EventsResponse) -> dict[str, Any]:
+def model_called_payload_to_json(value: ModelCalledPayload) -> dict[str, Any]:
     return {
-        "results": [event_result_to_json(v) for v in value.results],
-        "last_contiguous_seq": value.last_contiguous_seq,
-        "job_state": value.job_state.value,
-        "next_run_scheduled": value.next_run_scheduled,
+        "usage": model_usage_to_json(value.usage),
+        "source_ids": list(value.source_ids),
     }
 
 
-def events_response_from_json(data: dict[str, Any]) -> EventsResponse:
-    return EventsResponse(
-        results=[event_result_from_json(v) for v in data["results"]],
-        last_contiguous_seq=int(data["last_contiguous_seq"]),
-        job_state=JobState(data["job_state"]),
-        next_run_scheduled=bool(data["next_run_scheduled"]),
+def model_called_payload_from_json(data: dict[str, Any]) -> ModelCalledPayload:
+    return ModelCalledPayload(
+        usage=model_usage_from_json(data["usage"]),
+        source_ids=[str(v) for v in data["source_ids"]],
+    )
+
+
+def model_called_event_to_json(value: ModelCalledEvent) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "event_id": value.event_id,
+        "job_id": value.job_id,
+        "run_id": value.run_id,
+        "seq": value.seq,
+        "occurred_at": value.occurred_at,
+        "payload": model_called_payload_to_json(value.payload),
+        "type": value.type,
+    }
+    if value.schema_version is not None:
+        out["schema_version"] = value.schema_version.value
+    return out
+
+
+def model_called_event_from_json(data: dict[str, Any]) -> ModelCalledEvent:
+    return ModelCalledEvent(
+        event_id=str(data["event_id"]),
+        job_id=str(data["job_id"]),
+        run_id=str(data["run_id"]),
+        seq=int(data["seq"]),
+        occurred_at=str(data["occurred_at"]),
+        payload=model_called_payload_from_json(data["payload"]),
+        schema_version=opt(data, "schema_version", ModelCalledEventSchemaVersion, None),
+        type=const(data, "type", "model.called"),
     )
 
 
 TO_JSON: dict[type[Any], Callable[[Any], dict[str, Any]]] = {
-    EventsRequest: events_request_to_json,
-    EventResult: event_result_to_json,
-    EventsResponse: events_response_to_json,
+    RouteVerifiedPayload: route_verified_payload_to_json,
+    RouteVerifiedEvent: route_verified_event_to_json,
+    ModelCalledPayload: model_called_payload_to_json,
+    ModelCalledEvent: model_called_event_to_json,
 }
 FROM_JSON: dict[type[Any], Callable[[dict[str, Any]], Any]] = {
-    EventsRequest: events_request_from_json,
-    EventResult: event_result_from_json,
-    EventsResponse: events_response_from_json,
+    RouteVerifiedPayload: route_verified_payload_from_json,
+    RouteVerifiedEvent: route_verified_event_from_json,
+    ModelCalledPayload: model_called_payload_from_json,
+    ModelCalledEvent: model_called_event_from_json,
 }

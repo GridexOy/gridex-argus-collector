@@ -13,6 +13,8 @@ from datetime import datetime
 MAX_BATCH = 50  # events per request (TZ_SELAIN 8.13)
 MAX_WAIT_S = 2.0  # a micro-batch leaves at 50 events or after 2 s
 MAX_BACKOFF_S = 30.0
+API_TIMEOUT_S = 30.0  # claim, events, reconcile as heartbeat and uploads (WINLOG 06.10: 10 s)
+CLOSING = ("source.processed", "source.blocked")  # a page's last event (a run end: flush)
 
 STATE_ONLINE = "online"
 STATE_OFFLINE = "offline"
@@ -29,6 +31,13 @@ ERROR_PERMANENT = "permanent"  # 4xx the same request will never pass
 ERROR_RETRY = "retry"  # 5xx or retryable=true
 LEASE_CODES = ("lease_expired", "lease_mismatch", "job_cancelled")
 REASONS = {  # what an ARGUS code means, for the journal (the panel's words are in fi.json)
+    "person_without_name": "a person event without the person's name",  # rules of 3.1.0
+    "no_channel": "nothing to record: no channel and no person",
+    "channel_value_unreadable": "the channel value cannot be read",
+    "snapshot_missing": "the snapshot is missing in ARGUS",
+    "quote_not_found": "the quote is not in the snapshot",
+    "value_not_in_quote": "the value is not in its quote",
+    "job_mismatch": "the event names another job",
     "host_not_approved": "the host is not approved for this job",
     "evidence_missing": "the snapshot is missing in ARGUS",
     "evidence_hash_mismatch": "the quote is not in the snapshot",
@@ -54,23 +63,35 @@ class Pending:
     seq: int
     created_at: str
     evidence_ids: tuple[str, ...]
+    type: str = ""
+    retry_code: str = ""  # `evidence_missing`: refused once, waits for its snapshot
 
 
 def pending_from_row(row: dict[str, object]) -> Pending:
     evidence = json.loads(str(row["evidence_ids_json"]))
     return Pending(
-        str(row["event_id"]), int(str(row["seq"])), str(row["created_at"]), tuple(evidence)
+        str(row["event_id"]), int(str(row["seq"])), str(row["created_at"]), tuple(evidence),
+        str(row.get("type") or ""), str(row.get("retry_code") or ""),
     )
 
 
-def batch(rows: Sequence[Pending], uploads: dict[str, str]) -> list[Pending]:
-    """Leading pending events in seq order whose evidence is not waiting for upload.
+def batch(rows: Sequence[Pending], uploads: dict[str, str],
+          hold: tuple[str, ...] = ()) -> list[Pending]:
+    """Leading pending events in seq order; they do not wait for the snapshot lane.
 
-    An observation never leaves before its snapshot (TZ_TANDEM A2.3): the batch
-    stops at the first event whose evidence is still pending."""
+    Contract 3.1.0 (ARGUS 0.4.24.4, WINLOG 06.10.2026): an event before its snapshot is
+    kept `evidence_pending` and applied when the snapshot arrives. Only an event ARGUS
+    refused as `evidence_missing` waits for its snapshot uploaded again (`retry.py`), and
+    an event of a type in `hold` waits (the run's end while its snapshots upload: its
+    freshness checks name observations ARGUS applies only on the upload)."""
     out: list[Pending] = []
     for row in rows[:MAX_BATCH]:
-        if any(uploads.get(e, "pending") == "pending" for e in row.evidence_ids):
+        states = [uploads.get(e, "pending") for e in row.evidence_ids]
+        if "rejected" in states:  # the snapshot never reaches ARGUS: `retry.lost`
+            break
+        if row.retry_code == "evidence_missing" and "pending" in states:
+            break
+        if row.type in hold:
             break
         out.append(row)
     return out
@@ -81,9 +102,11 @@ def age_s(created_at: str, now: datetime) -> float:
 
 
 def ready(rows: Sequence[Pending], now: datetime, flush: bool) -> bool:
+    """50 events, 2 s, or a whole page: its closing event is written (WINLOG 06.10.2026)."""
     if not rows:
         return False
-    return flush or len(rows) >= MAX_BATCH or age_s(rows[0].created_at, now) >= MAX_WAIT_S
+    closed = rows[-1].type in CLOSING
+    return flush or closed or len(rows) >= MAX_BATCH or age_s(rows[0].created_at, now) >= MAX_WAIT_S
 
 
 def classify(status: int, code: str, retryable: bool) -> str:
@@ -145,7 +168,8 @@ def reason(code: str) -> str:
         return "no answer from ARGUS"
     if code == ERROR_AUTH:
         return "the token was rejected"
-    return REASONS.get(code, code)
+    rule = code.split("/", 1)[-1]  # `<code>/<rule>` of a 1.2 refusal: the rule says why
+    return REASONS.get(rule, REASONS.get(code, code))
 
 
 def elapsed_ms(started: float) -> int:

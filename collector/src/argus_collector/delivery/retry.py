@@ -50,6 +50,19 @@ def after_rejection(conn: sqlite3.Connection, hooks: DeliveryHooks, job_id: str,
                         f" first (was {before}), retry {count} of {MAX_RETRIES}")
 
 
+def lost(conn: sqlite3.Connection, hooks: DeliveryHooks, job_id: str, row: sqlite3.Row,
+         uploads: dict[str, str]) -> bool:
+    """An event whose snapshot upload was refused is given up before it is sent: ARGUS
+    would keep it `evidence_pending` for 24 h and then refuse it (contract 3.1.0)."""
+    ids = [str(e) for e in json.loads(row["evidence_ids_json"])]
+    gone = next((e for e in ids if uploads.get(e) == "rejected"), None)
+    if gone is None:
+        return False
+    why = "is not stored here" if not _stored(conn, gone) else "was refused"
+    give_up(conn, hooks, job_id, row, "evidence_missing", 0, f"snapshot {gone} {why}")
+    return True
+
+
 def give_up(conn: sqlite3.Connection, hooks: DeliveryHooks, job_id: str, row: sqlite3.Row,
             code: str, last_seq: int, why: str) -> None:
     """Never sent again; a stand-in takes its seq unless ARGUS already counted the seq."""

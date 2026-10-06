@@ -32,7 +32,7 @@ def test_every_event_kind_round_trips_through_plain_json(event: api.Event) -> No
     data = api.event_to_json(event)
     assert data == api.to_json(event)
     assert json.loads(json.dumps(data)) == data
-    assert data["schema_version"] == "1.1"
+    assert data.get("schema_version") in (None, "1.1", "1.2")  # optional since 3.1.0
     parsed = api.event_from_json(json.loads(json.dumps(data)))
     assert parsed == event
     assert type(parsed) is type(event)

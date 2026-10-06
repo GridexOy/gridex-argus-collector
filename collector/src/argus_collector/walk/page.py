@@ -13,6 +13,7 @@ from argus_collector.storage import contract as storage
 from argus_collector.walk import cards, coverage, findings, goal, repository, service, structure
 from argus_collector.walk.context import PageContext
 from argus_collector.walk.patterns import from_pattern, with_pattern
+from argus_collector.walk.scope import own_page
 from argus_collector.walk.service import WalkEvent
 from argus_collector.walk.sink import PageFindings, PageSource
 from argus_collector.walk.state import WalkState
@@ -130,6 +131,9 @@ def _channels(
 def _start(state: WalkState, page: browser.PageState, text: str, key: str) -> Pending:
     with timed(state.timing, "snapshot"):
         source = _store(state, page, text, key)
+    if not own_page(state, page.url):  # K7: a source only, nobody read from it
+        state.page_has_contacts = False
+        return Pending(key, source, "", [], [], cards.PendingRead(text, [], "", "", []))
     state.step(service.STEP_EXTRACTING, "", page.url)
     with timed(state.timing, "extract"):
         lang, region, sections, channels = _channels(state, page, text)

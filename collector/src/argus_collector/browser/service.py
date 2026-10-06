@@ -8,6 +8,15 @@ from pathlib import Path
 
 CHROME_CHANNEL = "chrome"
 WINDOW_SIZE = "1280,900"
+# K10 step 1 (owner 06.10.2026): the exhibition's market, whatever the language of Windows
+# (Wera and OMICRON answered Accept-Language ru with /ru/).
+# Playwright's `locale` would send a bare `fi-FI` with every navigation, so the language
+# is Chrome's (`--lang`, `--accept-lang`: navigator.language fi-FI) and the header explicit.
+LOCALE = "fi-FI"
+ACCEPT_LANGUAGE = "fi,sv;q=0.8,en;q=0.6"
+LANGUAGES = "fi-FI,fi,sv,en"
+TIMEZONE = "Europe/Helsinki"
+CONTEXT_ONLY = ("timezone_id", "extra_http_headers")  # not `browser.launch` options
 
 
 @dataclass(frozen=True)
@@ -37,7 +46,7 @@ def launch_plan(profile_dir: Path, windows: bool, headless: bool = False) -> Lau
 
     Both use a persistent profile so cookies and logins survive between runs.
     """
-    args = [f"--window-size={WINDOW_SIZE}"]
+    args = [f"--window-size={WINDOW_SIZE}", f"--lang={LOCALE}", f"--accept-lang={LANGUAGES}"]
     channel = CHROME_CHANNEL if windows else None
     return LaunchPlan(user_data_dir=profile_dir, headless=headless, channel=channel, args=args)
 
@@ -48,10 +57,16 @@ def launch_kwargs(plan: LaunchPlan) -> dict[str, object]:
         "headless": plan.headless,
         "args": list(plan.args),
         "no_viewport": True,
+        **context_kwargs(),
     }
     if plan.channel:
         kwargs["channel"] = plan.channel
     return kwargs
+
+
+def context_kwargs() -> dict[str, object]:
+    """Accept-Language and time zone of every context of the collection."""
+    return {"timezone_id": TIMEZONE, "extra_http_headers": {"Accept-Language": ACCEPT_LANGUAGE}}
 
 
 def describe_failure(plan: LaunchPlan, exc: BaseException) -> str:

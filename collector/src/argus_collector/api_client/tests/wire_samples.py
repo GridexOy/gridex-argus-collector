@@ -118,7 +118,8 @@ def job_definition() -> api.JobDefinition:
     )
     override = api.ParticipationStatus.OWNER_OVERRIDE
     return api.JobDefinition(
-        "batch-1", "job-1", "company-1", "project-1", "Example Oy", ["https://example.fi/"],
+        api.JobDefinitionSchemaVersion("1.1"), "batch-1", "job-1", "company-1", "project-1",
+        "Example Oy", ["https://example.fi/"],
         samples.scope(), policy, override, None, "owner says so", None,
     )  # fmt: skip
 

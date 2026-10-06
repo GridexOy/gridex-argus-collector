@@ -67,11 +67,15 @@ def store_claimed(conn: sqlite3.Connection, claimed: api.ClaimedJob) -> str:
 
 
 def heartbeat_fields(conn: sqlite3.Connection, collecting: bool, max_jobs: int) -> HeartbeatFields:
+    """A finished walk keeps its lease while its run has events to send (WINLOG 06.10.2026:
+    Blåkläder lost its people after seq 23 to lease_expired)."""
     active = repo.jobs(conn, service.ACTIVE)
+    unsent = delivery.unsent_runs(conn)
+    tail = [r for r in repo.jobs(conn, service.TERMINAL) if r["run_id"] in unsent]
     leases = [
         api.ActiveLease(job_id=r["job_id"], run_id=r["run_id"], execution_token=r["lease_token"],
                         lease_generation=int(r["lease_generation"]))
-        for r in active
+        for r in active + tail
         if not r["drain_only"]
     ]
     acks = [
@@ -136,7 +140,7 @@ def reconcile(
     mode = cast("api.ProxyMode", target.proxy_mode)
     try:
         resp = api.reconcile_job(target.base_url, target.token, row["job_id"], request,
-                                 proxy_mode=mode)
+                                 proxy_mode=mode, timeout_s=delivery.API_TIMEOUT_S)
     except api.ApiError as exc:
         code = exc.error.code if exc.error else ""
         runtime.journal("http", f"reconcile job {row['job_id']}: HTTP {exc.status}"

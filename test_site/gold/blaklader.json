@@ -1,0 +1,211 @@
+{
+  "fixture": "blaklader",
+  "host": "blaklader.localhost",
+  "case": "Owner 06.10.2026 (Blåkläder): the panel said Löydetty: 44 for 22 people; the names are written in the HTML in mixed case and shown in capitals by CSS text-transform only. 22 person rows reach ARGUS, every name as the HTML writes it; the 7 sales people appear again on myynti/ and are not counted twice",
+  "seed": "/",
+  "company": {
+    "name": "Blåkläder Oy",
+    "phone": "+358207430000",
+    "email": "info@blaklader.example"
+  },
+  "persons": [
+    {
+      "name": "Mikko Aaltonen",
+      "title": "Myyntijohtaja",
+      "phone": "+358405523001",
+      "phone_text": "+358 40 552 3001",
+      "email": "mikko.aaltonen@blaklader.example",
+      "sales": true,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Sari Heikkilä",
+      "title": "Key Account Manager",
+      "phone": "+358405523002",
+      "phone_text": "+358 40 552 3002",
+      "email": "sari.heikkila@blaklader.example",
+      "sales": true,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Jukka Laine",
+      "title": "Aluemyyntipäällikkö, Etelä-Suomi",
+      "phone": "+358405523003",
+      "phone_text": "+358 40 552 3003",
+      "email": "jukka.laine@blaklader.example",
+      "sales": true,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Hanna Nieminen",
+      "title": "Aluemyyntipäällikkö, Pohjois-Suomi",
+      "phone": "+358405523004",
+      "phone_text": "+358 40 552 3004",
+      "email": "hanna.nieminen@blaklader.example",
+      "sales": true,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Petri Koskinen",
+      "title": "Myyntipäällikkö, työvaatteet",
+      "phone": "+358405523005",
+      "phone_text": "+358 40 552 3005",
+      "email": "petri.koskinen@blaklader.example",
+      "sales": true,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Laura Järvinen",
+      "title": "Markkinointipäällikkö",
+      "phone": "+358405523006",
+      "phone_text": "+358 40 552 3006",
+      "email": "laura.jarvinen@blaklader.example",
+      "sales": true,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Antti Lehtonen",
+      "title": "Myyntiedustaja",
+      "phone": "+358405523007",
+      "phone_text": "+358 40 552 3007",
+      "email": "antti.lehtonen@blaklader.example",
+      "sales": true,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Tiina Saarinen",
+      "title": "Asiakaspalvelupäällikkö",
+      "phone": "+358405523008",
+      "phone_text": "+358 40 552 3008",
+      "email": "tiina.saarinen@blaklader.example",
+      "sales": false,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Markku Salminen",
+      "title": "Toimitusjohtaja",
+      "phone": "+358405523009",
+      "phone_text": "+358 40 552 3009",
+      "email": "markku.salminen@blaklader.example",
+      "sales": false,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Riikka Heinonen",
+      "title": "Talouspäällikkö",
+      "phone": "+358405523010",
+      "phone_text": "+358 40 552 3010",
+      "email": "riikka.heinonen@blaklader.example",
+      "sales": false,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Ville Niemi",
+      "title": "Logistiikkapäällikkö",
+      "phone": "+358405523011",
+      "phone_text": "+358 40 552 3011",
+      "email": "ville.niemi@blaklader.example",
+      "sales": false,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Johanna Kinnunen",
+      "title": "Ostopäällikkö",
+      "phone": "+358405523012",
+      "phone_text": "+358 40 552 3012",
+      "email": "johanna.kinnunen@blaklader.example",
+      "sales": false,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Timo Rantanen",
+      "title": "Varastopäällikkö",
+      "phone": "+358405523013",
+      "phone_text": "+358 40 552 3013",
+      "email": "timo.rantanen@blaklader.example",
+      "sales": false,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Minna Turunen",
+      "title": "Asiakaspalvelu",
+      "phone": "+358405523014",
+      "phone_text": "+358 40 552 3014",
+      "email": "minna.turunen@blaklader.example",
+      "sales": false,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Kari Lindholm",
+      "title": "Tuotepäällikkö",
+      "phone": "+358405523015",
+      "phone_text": "+358 40 552 3015",
+      "email": "kari.lindholm@blaklader.example",
+      "sales": false,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Elina Karjalainen",
+      "title": "Asiakaspalvelu",
+      "phone": "+358405523016",
+      "phone_text": "+358 40 552 3016",
+      "email": "elina.karjalainen@blaklader.example",
+      "sales": false,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Pekka Mattila",
+      "title": "Huoltopäällikkö",
+      "phone": "+358405523017",
+      "phone_text": "+358 40 552 3017",
+      "email": "pekka.mattila@blaklader.example",
+      "sales": false,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Satu Hiltunen",
+      "title": "Henkilöstöpäällikkö",
+      "phone": "+358405523018",
+      "phone_text": "+358 40 552 3018",
+      "email": "satu.hiltunen@blaklader.example",
+      "sales": false,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Juha Pitkänen",
+      "title": "IT-päällikkö",
+      "phone": "+358405523019",
+      "phone_text": "+358 40 552 3019",
+      "email": "juha.pitkanen@blaklader.example",
+      "sales": false,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Kirsi Lahtinen",
+      "title": "Laatupäällikkö",
+      "phone": "+358405523020",
+      "phone_text": "+358 40 552 3020",
+      "email": "kirsi.lahtinen@blaklader.example",
+      "sales": false,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Olli Hämäläinen",
+      "title": "Tuotannon suunnittelija",
+      "phone": "+358405523021",
+      "phone_text": "+358 40 552 3021",
+      "email": "olli.hamalainen@blaklader.example",
+      "sales": false,
+      "source_page": "yhteystiedot/"
+    },
+    {
+      "name": "Anu Räsänen",
+      "title": "Viestintäpäällikkö",
+      "phone": "+358405523022",
+      "phone_text": "+358 40 552 3022",
+      "email": "anu.rasanen@blaklader.example",
+      "sales": false,
+      "source_page": "yhteystiedot/"
+    }
+  ]
+}

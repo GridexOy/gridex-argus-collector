@@ -20,3 +20,5 @@ Entry point: `contract.py`.
 
 Callers always keep the raw quote next to the normalised value: the raw
 form is the evidence, the normalised one is the value sent to ARGUS.
+
+`phone_country(e164)` (0.4.8.7): the country of a number by its calling code.

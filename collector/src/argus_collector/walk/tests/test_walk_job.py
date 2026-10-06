@@ -101,7 +101,8 @@ def page_order(sink: RecordingSink) -> list[str]:
 def test_finnish_version_and_office_first(site: ThreadingHTTPServer, tmp_path: Path) -> None:
     summary, sink = walk(site, "nordtec", "nordtec.localhost", tmp_path)
     order = page_order(sink)
-    assert order[:3] == ["", "fi/", "fi/yhteystiedot.html"], order
+    # 0.4.8.7 (owner 06.10.2026): the switcher's `Suomi` is followed before the global home
+    assert order[:2] == ["fi/", "fi/yhteystiedot.html"], order
     assert all(order.index(p) > order.index("fi/yhteystiedot.html") for p in order if "sv/" in p)
     entities = sink.entities()
     for person in gold("nordtec")["persons"]:

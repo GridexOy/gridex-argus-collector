@@ -40,6 +40,7 @@ def is_sales(title: str) -> bool:
 class Tally:
     people: dict[str, tuple[bool, frozenset[str]]] = field(default_factory=dict)
     first_page: int | None = None  # the page count when the first person was read
+    followups: int = 0  # found contact links read after the goal (`ending.py`)
 
     @property
     def channels(self) -> int:

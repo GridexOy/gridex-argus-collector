@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from argus_collector.discovery import contract as discovery
 from argus_collector.walk.contract import (
     END_BUDGET,
     END_DOMAIN,
@@ -92,6 +93,17 @@ def frontier_status(end_reason: str, pages: int) -> str:
     if pages == 0:
         return "not_started"
     return "exhausted" if end_reason == END_FINISHED else "partial"
+
+
+OWN_BASES = ("seed", "redirect_from_seed", "owner_known_url", "business_id_match")
+
+
+def company_domains(approvals: list[tuple[str, str]], seed_host: str) -> frozenset[str]:
+    """Registrable domains people and channels may come from (K7, owner 06.10.2026): the
+    seed's and those of hosts approved as the company's own; a host approved only as
+    `linked_from_contact_section` (an event page, a directory) gives no people."""
+    own = {discovery.site_domain(host) for host, basis in approvals if basis in OWN_BASES}
+    return frozenset(own | {discovery.site_domain(seed_host)})
 
 
 def purpose(local: str) -> str:

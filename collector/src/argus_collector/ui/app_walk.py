@@ -40,6 +40,7 @@ class WalkController:
         self.thread: threading.Thread | None = None
         self.contacts = 0
         self.pages = 0
+        self.country = ""  # `Maa: FI (vaihdettu en-br → en-fi)` of the company walked now
 
     @property
     def walking(self) -> bool:
@@ -71,15 +72,24 @@ class WalkController:
             view.collect.set_status(msgs.t("collecting.browserBusy"), "error")
             return
         self.stop_event.clear()
-        self.contacts, self.pages = 0, 0
-        view.collect.clear_contacts()
-        view.collect.set_found(msgs.t("collecting.found", n=0))
+        self.reset()
         view.collect.set_status(msgs.t("collecting.status.starting", url=url), "info")
         self.thread = threading.Thread(
             target=self._run, args=(self.settings(url),), name="walk", daemon=True
         )
         self.thread.start()
         self.host.refresh()
+
+    def reset(self) -> None:
+        """An empty table and `Löydetty: 0`: per local walk, per company when collecting."""
+        self.contacts, self.pages, self.country = 0, 0, ""
+        self.host.view.collect.clear_contacts()
+        self.host.view.collect.set_found(self.found_text())
+
+    def found_text(self) -> str:
+        """`Löydetty: N yhteystietoa`, with the country line of the walk once it has one."""
+        found = self.host.msgs.t("collecting.found", n=self.contacts)
+        return f"{found} · {self.country}" if self.country else found
 
     def stop(self) -> None:
         self.stop_event.set()
@@ -96,10 +106,13 @@ class WalkController:
         msgs, view = self.host.msgs, self.host.view
         if event.kind == "page":
             self.pages = event.page_no
+        if event.kind == "step" and event.step == "country":
+            self.country = walk_lines.country_line(msgs, event.detail)
+            view.collect.set_found(self.found_text())
         if event.kind == "contact":
             self.contacts += 1
             view.collect.add_contact(walk_lines.contact_row(event, msgs))
-            view.collect.set_found(msgs.t("collecting.found", n=self.contacts))
+            view.collect.set_found(self.found_text())
             return
         line = walk_lines.walk_event_line(msgs, event)
         if line is not None:

@@ -52,3 +52,22 @@ def test_a_browser_that_died_is_started_again(site: ThreadingHTTPServer) -> None
         assert host.starts == 2
     finally:
         host.close()
+
+
+def test_every_context_speaks_finnish_on_helsinki_time(site: ThreadingHTTPServer) -> None:
+    """K10 step 1 (owner 06.10.2026): Wera and OMICRON answered the Accept-Language `ru`
+    of Windows with /ru/; the collection's Chrome is fi-FI whatever the system says."""
+    host = browser.BrowserHost(headless=True)
+    try:
+        with browser.WalkBrowser(True, host=host) as wb:
+            sent: list[str] = []
+            wb.page.on("request", lambda r: sent.append(r.headers.get("accept-language", "")))
+            wb.goto(server.base_url(site))
+            seen = wb.page.evaluate(
+                "() => [navigator.language, Intl.DateTimeFormat().resolvedOptions().timeZone]")
+            assert seen == ["fi-FI", "Europe/Helsinki"]
+            assert sent and set(sent) == {"fi,sv;q=0.8,en;q=0.6"}, "the page itself too"
+            status, final = browser.probe(wb, server.base_url(site) + "no-such-page.html")
+            assert (status, final) == (404, server.base_url(site) + "no-such-page.html")
+    finally:
+        host.close()

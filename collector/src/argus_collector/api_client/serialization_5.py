@@ -9,12 +9,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from argus_collector.api_client.types_2 import EvidenceMetadata, EvidenceMetadataSourceKind
+from argus_collector.api_client.types_2 import EvidenceMetadataSourceKind
 from argus_collector.api_client.types_3 import (
+    EvidenceMetadata,
     EvidenceResponse,
     EvidenceResponseStatus,
     JobStartedEvent,
-    SourceDiscoveredEvent,
+    JobStartedEventSchemaVersion,
     SourcePayload,
     Stage,
     StartedPayload,
@@ -103,7 +104,7 @@ def started_payload_from_json(data: dict[str, Any]) -> StartedPayload:
 
 
 def job_started_event_to_json(value: JobStartedEvent) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "event_id": value.event_id,
         "job_id": value.job_id,
         "run_id": value.run_id,
@@ -111,8 +112,10 @@ def job_started_event_to_json(value: JobStartedEvent) -> dict[str, Any]:
         "occurred_at": value.occurred_at,
         "payload": started_payload_to_json(value.payload),
         "type": value.type,
-        "schema_version": value.schema_version,
     }
+    if value.schema_version is not None:
+        out["schema_version"] = value.schema_version.value
+    return out
 
 
 def job_started_event_from_json(data: dict[str, Any]) -> JobStartedEvent:
@@ -123,8 +126,8 @@ def job_started_event_from_json(data: dict[str, Any]) -> JobStartedEvent:
         seq=int(data["seq"]),
         occurred_at=str(data["occurred_at"]),
         payload=started_payload_from_json(data["payload"]),
+        schema_version=opt(data, "schema_version", JobStartedEventSchemaVersion, None),
         type=const(data, "type", "job.started"),
-        schema_version=const(data, "schema_version", "1.1"),
     )
 
 
@@ -152,39 +155,12 @@ def source_payload_from_json(data: dict[str, Any]) -> SourcePayload:
     )
 
 
-def source_discovered_event_to_json(value: SourceDiscoveredEvent) -> dict[str, Any]:
-    return {
-        "event_id": value.event_id,
-        "job_id": value.job_id,
-        "run_id": value.run_id,
-        "seq": value.seq,
-        "occurred_at": value.occurred_at,
-        "payload": source_payload_to_json(value.payload),
-        "type": value.type,
-        "schema_version": value.schema_version,
-    }
-
-
-def source_discovered_event_from_json(data: dict[str, Any]) -> SourceDiscoveredEvent:
-    return SourceDiscoveredEvent(
-        event_id=str(data["event_id"]),
-        job_id=str(data["job_id"]),
-        run_id=str(data["run_id"]),
-        seq=int(data["seq"]),
-        occurred_at=str(data["occurred_at"]),
-        payload=source_payload_from_json(data["payload"]),
-        type=const(data, "type", "source.discovered"),
-        schema_version=const(data, "schema_version", "1.1"),
-    )
-
-
 TO_JSON: dict[type[Any], Callable[[Any], dict[str, Any]]] = {
     EvidenceMetadata: evidence_metadata_to_json,
     EvidenceResponse: evidence_response_to_json,
     StartedPayload: started_payload_to_json,
     JobStartedEvent: job_started_event_to_json,
     SourcePayload: source_payload_to_json,
-    SourceDiscoveredEvent: source_discovered_event_to_json,
 }
 FROM_JSON: dict[type[Any], Callable[[dict[str, Any]], Any]] = {
     EvidenceMetadata: evidence_metadata_from_json,
@@ -192,5 +168,4 @@ FROM_JSON: dict[type[Any], Callable[[dict[str, Any]], Any]] = {
     StartedPayload: started_payload_from_json,
     JobStartedEvent: job_started_event_from_json,
     SourcePayload: source_payload_from_json,
-    SourceDiscoveredEvent: source_discovered_event_from_json,
 }

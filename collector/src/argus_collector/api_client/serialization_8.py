@@ -10,25 +10,52 @@ from collections.abc import Callable
 from typing import Any
 
 from argus_collector.api_client.serialization_7 import (
-    contact_payload_from_json,
-    contact_payload_to_json,
+    field_audit_from_json,
+    field_audit_to_json,
+    observation_from_json,
+    observation_to_json,
+)
+from argus_collector.api_client.types_3 import (
+    ContactObservedEventSchemaVersion,
+    ContactPayloadEntityType,
+    ContactPayloadRelationship,
 )
 from argus_collector.api_client.types_4 import (
     ContactEnrichedEvent,
+    ContactEnrichedEventSchemaVersion,
     ContactMerge_ProposedEvent,
+    ContactMerge_ProposedEventSchemaVersion,
     ContactObservedEvent,
-    Counts,
-    Coverage,
-    CoverageBasis,
-    CoverageConfirmation,
-    CoverageFrontierStatus,
+    ContactPayload,
     MergePayload,
 )
-from argus_collector.api_client.wire import const, or_none
+from argus_collector.api_client.wire import const, opt
+
+
+def contact_payload_to_json(value: ContactPayload) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "entity_id": value.entity_id,
+        "entity_type": value.entity_type.value,
+        "observations": [observation_to_json(v) for v in value.observations],
+        "field_audit": field_audit_to_json(value.field_audit),
+    }
+    if value.relationship is not None:
+        out["relationship"] = value.relationship.value
+    return out
+
+
+def contact_payload_from_json(data: dict[str, Any]) -> ContactPayload:
+    return ContactPayload(
+        entity_id=str(data["entity_id"]),
+        entity_type=ContactPayloadEntityType(data["entity_type"]),
+        observations=[observation_from_json(v) for v in data["observations"]],
+        field_audit=field_audit_from_json(data["field_audit"]),
+        relationship=opt(data, "relationship", ContactPayloadRelationship, None),
+    )
 
 
 def contact_observed_event_to_json(value: ContactObservedEvent) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "event_id": value.event_id,
         "job_id": value.job_id,
         "run_id": value.run_id,
@@ -36,8 +63,10 @@ def contact_observed_event_to_json(value: ContactObservedEvent) -> dict[str, Any
         "occurred_at": value.occurred_at,
         "payload": contact_payload_to_json(value.payload),
         "type": value.type,
-        "schema_version": value.schema_version,
     }
+    if value.schema_version is not None:
+        out["schema_version"] = value.schema_version.value
+    return out
 
 
 def contact_observed_event_from_json(data: dict[str, Any]) -> ContactObservedEvent:
@@ -48,13 +77,13 @@ def contact_observed_event_from_json(data: dict[str, Any]) -> ContactObservedEve
         seq=int(data["seq"]),
         occurred_at=str(data["occurred_at"]),
         payload=contact_payload_from_json(data["payload"]),
+        schema_version=opt(data, "schema_version", ContactObservedEventSchemaVersion, None),
         type=const(data, "type", "contact.observed"),
-        schema_version=const(data, "schema_version", "1.1"),
     )
 
 
 def contact_enriched_event_to_json(value: ContactEnrichedEvent) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "event_id": value.event_id,
         "job_id": value.job_id,
         "run_id": value.run_id,
@@ -62,8 +91,10 @@ def contact_enriched_event_to_json(value: ContactEnrichedEvent) -> dict[str, Any
         "occurred_at": value.occurred_at,
         "payload": contact_payload_to_json(value.payload),
         "type": value.type,
-        "schema_version": value.schema_version,
     }
+    if value.schema_version is not None:
+        out["schema_version"] = value.schema_version.value
+    return out
 
 
 def contact_enriched_event_from_json(data: dict[str, Any]) -> ContactEnrichedEvent:
@@ -74,8 +105,8 @@ def contact_enriched_event_from_json(data: dict[str, Any]) -> ContactEnrichedEve
         seq=int(data["seq"]),
         occurred_at=str(data["occurred_at"]),
         payload=contact_payload_from_json(data["payload"]),
+        schema_version=opt(data, "schema_version", ContactEnrichedEventSchemaVersion, None),
         type=const(data, "type", "contact.enriched"),
-        schema_version=const(data, "schema_version", "1.1"),
     )
 
 
@@ -96,7 +127,7 @@ def merge_payload_from_json(data: dict[str, Any]) -> MergePayload:
 
 
 def contact_merge_proposed_event_to_json(value: ContactMerge_ProposedEvent) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "event_id": value.event_id,
         "job_id": value.job_id,
         "run_id": value.run_id,
@@ -104,8 +135,10 @@ def contact_merge_proposed_event_to_json(value: ContactMerge_ProposedEvent) -> d
         "occurred_at": value.occurred_at,
         "payload": merge_payload_to_json(value.payload),
         "type": value.type,
-        "schema_version": value.schema_version,
     }
+    if value.schema_version is not None:
+        out["schema_version"] = value.schema_version.value
+    return out
 
 
 def contact_merge_proposed_event_from_json(data: dict[str, Any]) -> ContactMerge_ProposedEvent:
@@ -116,80 +149,22 @@ def contact_merge_proposed_event_from_json(data: dict[str, Any]) -> ContactMerge
         seq=int(data["seq"]),
         occurred_at=str(data["occurred_at"]),
         payload=merge_payload_from_json(data["payload"]),
+        schema_version=opt(data, "schema_version", ContactMerge_ProposedEventSchemaVersion, None),
         type=const(data, "type", "contact.merge_proposed"),
-        schema_version=const(data, "schema_version", "1.1"),
-    )
-
-
-def counts_to_json(value: Counts) -> dict[str, Any]:
-    return {
-        "persons": value.persons,
-        "organization_channels": value.organization_channels,
-        "other_entities": value.other_entities,
-        "observations": value.observations,
-        "pages_processed": value.pages_processed,
-        "browser_actions": value.browser_actions,
-        "evidence_count": value.evidence_count,
-        "gaps": value.gaps,
-        "outbox_pending": value.outbox_pending,
-        "states_processed": value.states_processed,
-    }
-
-
-def counts_from_json(data: dict[str, Any]) -> Counts:
-    return Counts(
-        persons=int(data["persons"]),
-        organization_channels=int(data["organization_channels"]),
-        other_entities=int(data["other_entities"]),
-        observations=int(data["observations"]),
-        pages_processed=int(data["pages_processed"]),
-        browser_actions=int(data["browser_actions"]),
-        evidence_count=int(data["evidence_count"]),
-        gaps=int(data["gaps"]),
-        outbox_pending=int(data["outbox_pending"]),
-        states_processed=int(data["states_processed"]),
-    )
-
-
-def coverage_to_json(value: Coverage) -> dict[str, Any]:
-    return {
-        "frontier_status": value.frontier_status.value,
-        "confirmation": value.confirmation.value,
-        "basis": value.basis.value,
-        "scope_description": value.scope_description,
-        "expected_count": value.expected_count,
-        "found_count": value.found_count,
-        "gap_count": value.gap_count,
-        "evidence_ids": list(value.evidence_ids),
-    }
-
-
-def coverage_from_json(data: dict[str, Any]) -> Coverage:
-    return Coverage(
-        frontier_status=CoverageFrontierStatus(data["frontier_status"]),
-        confirmation=CoverageConfirmation(data["confirmation"]),
-        basis=CoverageBasis(data["basis"]),
-        scope_description=str(data["scope_description"]),
-        expected_count=or_none(data["expected_count"], int),
-        found_count=int(data["found_count"]),
-        gap_count=int(data["gap_count"]),
-        evidence_ids=[str(v) for v in data["evidence_ids"]],
     )
 
 
 TO_JSON: dict[type[Any], Callable[[Any], dict[str, Any]]] = {
+    ContactPayload: contact_payload_to_json,
     ContactObservedEvent: contact_observed_event_to_json,
     ContactEnrichedEvent: contact_enriched_event_to_json,
     MergePayload: merge_payload_to_json,
     ContactMerge_ProposedEvent: contact_merge_proposed_event_to_json,
-    Counts: counts_to_json,
-    Coverage: coverage_to_json,
 }
 FROM_JSON: dict[type[Any], Callable[[dict[str, Any]], Any]] = {
+    ContactPayload: contact_payload_from_json,
     ContactObservedEvent: contact_observed_event_from_json,
     ContactEnrichedEvent: contact_enriched_event_from_json,
     MergePayload: merge_payload_from_json,
     ContactMerge_ProposedEvent: contact_merge_proposed_event_from_json,
-    Counts: counts_from_json,
-    Coverage: coverage_from_json,
 }

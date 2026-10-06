@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-from contract_server import multipart
+from contract_server import multipart, pending
 from contract_server.context import Request, Stand, validated
 from contract_server.errors import ApiError, conflict, invalid
 from contract_server.htmltext import derive_text
@@ -116,4 +116,6 @@ def handle(stand: Stand, req: Request) -> tuple[int, Json]:
         return replay(known, metadata)
     check_size(metadata, data)
     check_hashes(metadata, data)
-    return 201, response(store(stand, metadata, data), "accepted")
+    record = store(stand, metadata, data)
+    pending.release(stand, record["evidence_id"])
+    return 201, response(record, "accepted")

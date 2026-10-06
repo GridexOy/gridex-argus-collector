@@ -69,6 +69,15 @@ def normalize_phone(raw: str, region: str = DEFAULT_REGION) -> str | None:
     return "+" + national
 
 
+def phone_country(e164: str) -> str | None:
+    """Country of an E.164 number by its calling code (`+358...` FI); None: not known."""
+    if not e164.startswith("+"):
+        return None
+    digits = e164[1:]
+    codes = sorted(tables.REGION_CODES.items(), key=lambda item: -len(item[1]))
+    return next((region for region, code in codes if digits.startswith(code)), None)
+
+
 def decode_cfemail(encoded: str) -> str | None:
     try:
         data = bytes.fromhex(encoded.strip())

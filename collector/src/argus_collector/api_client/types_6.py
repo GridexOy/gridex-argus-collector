@@ -8,28 +8,101 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import TypeAlias
 
-from argus_collector.api_client.types_2 import ChannelStatus, Lease
-from argus_collector.api_client.types_3 import (
-    JobStartedEvent,
-    SourceBlockedEvent,
-    SourceDiscoveredEvent,
-    SourceProcessedEvent,
-)
-from argus_collector.api_client.types_4 import (
-    ContactEnrichedEvent,
-    ContactMerge_ProposedEvent,
-    ContactObservedEvent,
-    JobProgressEvent,
-)
+from argus_collector.api_client.types_1 import Scope
+from argus_collector.api_client.types_2 import Checkpoint, Route
+from argus_collector.api_client.types_4 import Counts
 from argus_collector.api_client.types_5 import (
-    ContactFreshnessEvent,
-    JobFinishedEvent,
-    JobNeeds_AttentionEvent,
+    BudgetState,
+    Coverage,
+    FinishedPayloadCompletionReason,
+    FinishedPayloadFreshnessSummary,
+    FinishedPayloadRunResultStatus,
+    Gap,
+    JobFinishedEventSchemaVersion,
     ModelUsage,
-    RouteRecordedPayload,
 )
+
+
+@dataclass(frozen=True)
+class FinishedPayload:
+    run_result_status: FinishedPayloadRunResultStatus
+    completion_reason: FinishedPayloadCompletionReason
+    scope: Scope
+    counts: Counts
+    coverage: Coverage
+    checkpoint: Checkpoint
+    gaps: list[Gap]
+    last_content_seq: int
+    active_seconds: float
+    wall_seconds: float
+    models: list[ModelUsage]
+    freshness_summary: FinishedPayloadFreshnessSummary
+    continuation_requested: bool
+    budget: BudgetState
+
+
+@dataclass(frozen=True)
+class JobFinishedEvent:
+    event_id: str
+    job_id: str
+    run_id: str
+    seq: int
+    occurred_at: str
+    payload: FinishedPayload
+    schema_version: JobFinishedEventSchemaVersion | None = None
+    type: str = "job.finished"
+
+
+class ContactFreshnessEventSchemaVersion(StrEnum):
+    _1_1 = "1.1"
+    _1_2 = "1.2"
+
+
+class FreshnessCheckStatus(StrEnum):
+    RECONFIRMED = "reconfirmed"
+    CHANGED = "changed"
+    NOT_SEEN_IN_CHECKED_SCOPE = "not_seen_in_checked_scope"
+    NOT_CHECKED = "not_checked"
+
+
+@dataclass(frozen=True)
+class FreshnessCheck:
+    canonical_contact_id: str
+    field: str
+    status: FreshnessCheckStatus
+    scope_description: str
+    evidence_ids: list[str]
+    checked_at: str
+    observation_id: str | None
+
+
+@dataclass(frozen=True)
+class FreshnessPayload:
+    checks: list[FreshnessCheck]
+
+
+@dataclass(frozen=True)
+class ContactFreshnessEvent:
+    event_id: str
+    job_id: str
+    run_id: str
+    seq: int
+    occurred_at: str
+    payload: FreshnessPayload
+    schema_version: ContactFreshnessEventSchemaVersion | None = None
+    type: str = "contact.freshness"
+
+
+class RouteRecordedEventSchemaVersion(StrEnum):
+    _1_1 = "1.1"
+    _1_2 = "1.2"
+
+
+@dataclass(frozen=True)
+class RouteRecordedPayload:
+    route: Route
+    evidence_ids: list[str]
 
 
 @dataclass(frozen=True)
@@ -40,8 +113,13 @@ class RouteRecordedEvent:
     seq: int
     occurred_at: str
     payload: RouteRecordedPayload
+    schema_version: RouteRecordedEventSchemaVersion | None = None
     type: str = "route.recorded"
-    schema_version: str = "1.1"
+
+
+class RouteVerifiedEventSchemaVersion(StrEnum):
+    _1_1 = "1.1"
+    _1_2 = "1.2"
 
 
 class RouteVerifiedPayloadResult(StrEnum):
@@ -67,8 +145,13 @@ class RouteVerifiedEvent:
     seq: int
     occurred_at: str
     payload: RouteVerifiedPayload
+    schema_version: RouteVerifiedEventSchemaVersion | None = None
     type: str = "route.verified"
-    schema_version: str = "1.1"
+
+
+class ModelCalledEventSchemaVersion(StrEnum):
+    _1_1 = "1.1"
+    _1_2 = "1.2"
 
 
 @dataclass(frozen=True)
@@ -85,93 +168,5 @@ class ModelCalledEvent:
     seq: int
     occurred_at: str
     payload: ModelCalledPayload
+    schema_version: ModelCalledEventSchemaVersion | None = None
     type: str = "model.called"
-    schema_version: str = "1.1"
-
-
-Event: TypeAlias = (
-    JobStartedEvent
-    | SourceDiscoveredEvent
-    | SourceProcessedEvent
-    | SourceBlockedEvent
-    | ContactObservedEvent
-    | ContactEnrichedEvent
-    | ContactMerge_ProposedEvent
-    | JobProgressEvent
-    | JobNeeds_AttentionEvent
-    | JobFinishedEvent
-    | ContactFreshnessEvent
-    | RouteRecordedEvent
-    | RouteVerifiedEvent
-    | ModelCalledEvent
-)
-
-
-@dataclass(frozen=True)
-class EventsRequest:
-    execution_token: str
-    events: list[Event]
-    schema_version: str = "1.1"
-
-
-class EventResultStatus(StrEnum):
-    ACCEPTED = "accepted"
-    DUPLICATE = "duplicate"
-    REJECTED = "rejected"
-
-
-@dataclass(frozen=True)
-class EventResult:
-    event_id: str
-    seq: int
-    status: EventResultStatus
-    code: str | None
-    canonical_contact_id: str | None
-    server_revision: int
-    state_applied: bool
-    channel_status: ChannelStatus | None
-
-
-class JobState(StrEnum):
-    QUEUED = "queued"
-    LEASED = "leased"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    PARTIAL = "partial"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-    PAUSED = "paused"
-    NEEDS_ATTENTION = "needs_attention"
-
-
-@dataclass(frozen=True)
-class EventsResponse:
-    results: list[EventResult]
-    last_contiguous_seq: int
-    job_state: JobState
-    next_run_scheduled: bool
-
-
-@dataclass(frozen=True)
-class ReconcileRequest:
-    worker_id: str
-    run_id: str
-    last_acknowledged_seq: int
-    pending_event_ids: list[str]
-    pending_evidence_ids: list[str]
-
-
-class ReconcileResponseMode(StrEnum):
-    RESUME = "resume"
-    DRAIN_ONLY = "drain_only"
-
-
-@dataclass(frozen=True)
-class ReconcileResponse:
-    mode: ReconcileResponseMode
-    lease: Lease
-    accepted_event_ids: list[str]
-    accepted_evidence_ids: list[str]
-    missing_evidence_ids: list[str]
-    last_contiguous_seq: int
-    job_state: JobState

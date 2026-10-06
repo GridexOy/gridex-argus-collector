@@ -12,7 +12,7 @@ canonical contact (`identity.py`) by their change_kind (`history.py`).
 
 from __future__ import annotations
 
-from contract_server import history, identity
+from contract_server import history, identity, pending
 from contract_server.channels import channel_status, is_channel, strongest
 from contract_server.event_context import Batch, Outcome, rejected
 from contract_server.htmltext import quote_found
@@ -114,11 +114,32 @@ def record_contact(batch: Batch, event: Json) -> tuple[str, str | None]:
     return contact["canonical_contact_id"], strongest(statuses)
 
 
+def _nameless(payload: Json) -> Outcome | None:
+    """contact.enriched of a person needs its full_name (contract 3.1.0, person_without_name;
+    the stand checks enriched events only, as in the Beckhoff / BCC refusals)."""
+    observations = payload["observations"]
+    named = any(o["field"] in ("full_name", "name") and identity.observed_value(o)
+                for o in observations)
+    if payload["entity_type"] != "person" or named:
+        return None
+    first = observations[0]
+    detail = (f"observation {first['observation_id']} ({first['field']}): a person observation"
+              " without full_name in this event; enrichment needs the person's name")
+    return rejected("invalid_input", detail, rule="person_without_name",
+                    observation=(first["observation_id"], first["field"]))
+
+
 def apply(batch: Batch, event: Json) -> Outcome:
     payload = event["payload"]
     missing = _missing_evidence(batch, payload)
+    if missing and all(eid not in batch.state["evidence"] for eid in missing):
+        return pending.wait(batch, event, missing)  # 0.4.24.4: applied on the upload
     if missing:
-        return rejected("evidence_missing", f"not uploaded: {', '.join(missing)}", record=False)
+        return rejected("evidence_missing", f"not uploaded: {', '.join(missing)}", record=False,
+                        rule="snapshot_missing")
+    nameless = _nameless(payload) if event["type"] == "contact.enriched" else None
+    if nameless is not None:
+        return nameless
     for observation in payload["observations"]:
         problem = extra_error(observation)
         if problem is not None:
@@ -126,7 +147,8 @@ def apply(batch: Batch, event: Json) -> Outcome:
     for observation in payload["observations"]:
         if not quote_matches(batch, observation):
             detail = f"quote of {observation['observation_id']} not found in its evidence"
-            return rejected("evidence_hash_mismatch", detail)
+            return rejected("evidence_hash_mismatch", detail, rule="quote_not_found",
+                            observation=(observation["observation_id"], observation["field"]))
     for observation in payload["observations"]:
         if is_channel(observation["field"]) and not host_approved(batch, observation):
             detail = f"{observation['observation_id']}: evidence host is not approved"

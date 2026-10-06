@@ -9,9 +9,67 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from argus_collector.api_client.types_1 import Scope
-from argus_collector.api_client.types_2 import Checkpoint, Route
-from argus_collector.api_client.types_4 import Counts, Coverage
+from argus_collector.api_client.types_3 import Stage
+from argus_collector.api_client.types_4 import (
+    Counts,
+    CoverageConfirmation,
+    CoverageFrontierStatus,
+    JobProgressEventSchemaVersion,
+)
+
+
+class CoverageBasis(StrEnum):
+    UNKNOWN = "unknown"
+    FRONTIER_EXHAUSTED = "frontier_exhausted"
+    CATALOG_TOTAL = "catalog_total"
+    ENUMERATED_CATALOG = "enumerated_catalog"
+    MANUAL_REFERENCE = "manual_reference"
+
+
+@dataclass(frozen=True)
+class Coverage:
+    frontier_status: CoverageFrontierStatus
+    confirmation: CoverageConfirmation
+    basis: CoverageBasis
+    scope_description: str
+    expected_count: int | None
+    found_count: int
+    gap_count: int
+    evidence_ids: list[str]
+
+
+class TransportState(StrEnum):
+    ONLINE = "online"
+    OFFLINE = "offline"
+    SYNCING = "syncing"
+    SYNCED = "synced"
+    DELIVERY_ERROR = "delivery_error"
+
+
+@dataclass(frozen=True)
+class ProgressPayload:
+    stage: Stage
+    counts: Counts
+    coverage: Coverage
+    active_seconds: float
+    transport_state: TransportState
+
+
+@dataclass(frozen=True)
+class JobProgressEvent:
+    event_id: str
+    job_id: str
+    run_id: str
+    seq: int
+    occurred_at: str
+    payload: ProgressPayload
+    schema_version: JobProgressEventSchemaVersion | None = None
+    type: str = "job.progress"
+
+
+class JobNeeds_AttentionEventSchemaVersion(StrEnum):
+    _1_1 = "1.1"
+    _1_2 = "1.2"
 
 
 class GapReason(StrEnum):
@@ -56,8 +114,13 @@ class JobNeeds_AttentionEvent:
     seq: int
     occurred_at: str
     payload: AttentionPayload
+    schema_version: JobNeeds_AttentionEventSchemaVersion | None = None
     type: str = "job.needs_attention"
-    schema_version: str = "1.1"
+
+
+class JobFinishedEventSchemaVersion(StrEnum):
+    _1_1 = "1.1"
+    _1_2 = "1.2"
 
 
 class FinishedPayloadRunResultStatus(StrEnum):
@@ -116,74 +179,3 @@ class BudgetState:
     campaign_browser_actions: int
     campaign_cloud_eur: float
     runs_used: int
-
-
-@dataclass(frozen=True)
-class FinishedPayload:
-    run_result_status: FinishedPayloadRunResultStatus
-    completion_reason: FinishedPayloadCompletionReason
-    scope: Scope
-    counts: Counts
-    coverage: Coverage
-    checkpoint: Checkpoint
-    gaps: list[Gap]
-    last_content_seq: int
-    active_seconds: float
-    wall_seconds: float
-    models: list[ModelUsage]
-    freshness_summary: FinishedPayloadFreshnessSummary
-    continuation_requested: bool
-    budget: BudgetState
-
-
-@dataclass(frozen=True)
-class JobFinishedEvent:
-    event_id: str
-    job_id: str
-    run_id: str
-    seq: int
-    occurred_at: str
-    payload: FinishedPayload
-    type: str = "job.finished"
-    schema_version: str = "1.1"
-
-
-class FreshnessCheckStatus(StrEnum):
-    RECONFIRMED = "reconfirmed"
-    CHANGED = "changed"
-    NOT_SEEN_IN_CHECKED_SCOPE = "not_seen_in_checked_scope"
-    NOT_CHECKED = "not_checked"
-
-
-@dataclass(frozen=True)
-class FreshnessCheck:
-    canonical_contact_id: str
-    field: str
-    status: FreshnessCheckStatus
-    scope_description: str
-    evidence_ids: list[str]
-    checked_at: str
-    observation_id: str | None
-
-
-@dataclass(frozen=True)
-class FreshnessPayload:
-    checks: list[FreshnessCheck]
-
-
-@dataclass(frozen=True)
-class ContactFreshnessEvent:
-    event_id: str
-    job_id: str
-    run_id: str
-    seq: int
-    occurred_at: str
-    payload: FreshnessPayload
-    type: str = "contact.freshness"
-    schema_version: str = "1.1"
-
-
-@dataclass(frozen=True)
-class RouteRecordedPayload:
-    route: Route
-    evidence_ids: list[str]

@@ -8,7 +8,29 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import TypeAlias
+
+from argus_collector.api_client.types_2 import EvidenceMetadataSourceKind
+
+
+@dataclass(frozen=True)
+class EvidenceMetadata:
+    evidence_id: str
+    job_id: str
+    run_id: str
+    company_id: str
+    source_url: str
+    final_url: str
+    source_kind: EvidenceMetadataSourceKind
+    mime_type: str
+    fetched_at: str
+    sha256: str
+    byte_length: int
+    capture_truncated: bool
+    redacted: bool
+    extractor_version: str
+    canonical_text_sha256: str | None = None
+    canonical_text: str | None = None
+    document_date: str | None = None
 
 
 class EvidenceResponseStatus(StrEnum):
@@ -22,6 +44,16 @@ class EvidenceResponse:
     snapshot_id: str | None
     status: EvidenceResponseStatus
     sha256: str
+
+
+class EventsRequestSchemaVersion(StrEnum):
+    _1_1 = "1.1"
+    _1_2 = "1.2"
+
+
+class JobStartedEventSchemaVersion(StrEnum):
+    _1_1 = "1.1"
+    _1_2 = "1.2"
 
 
 class Stage(StrEnum):
@@ -45,8 +77,13 @@ class JobStartedEvent:
     seq: int
     occurred_at: str
     payload: StartedPayload
+    schema_version: JobStartedEventSchemaVersion | None = None
     type: str = "job.started"
-    schema_version: str = "1.1"
+
+
+class SourceDiscoveredEventSchemaVersion(StrEnum):
+    _1_1 = "1.1"
+    _1_2 = "1.2"
 
 
 @dataclass(frozen=True)
@@ -68,8 +105,13 @@ class SourceDiscoveredEvent:
     seq: int
     occurred_at: str
     payload: SourcePayload
+    schema_version: SourceDiscoveredEventSchemaVersion | None = None
     type: str = "source.discovered"
-    schema_version: str = "1.1"
+
+
+class SourceProcessedEventSchemaVersion(StrEnum):
+    _1_1 = "1.1"
+    _1_2 = "1.2"
 
 
 @dataclass(frozen=True)
@@ -80,8 +122,13 @@ class SourceProcessedEvent:
     seq: int
     occurred_at: str
     payload: SourcePayload
+    schema_version: SourceProcessedEventSchemaVersion | None = None
     type: str = "source.processed"
-    schema_version: str = "1.1"
+
+
+class SourceBlockedEventSchemaVersion(StrEnum):
+    _1_1 = "1.1"
+    _1_2 = "1.2"
 
 
 @dataclass(frozen=True)
@@ -92,8 +139,13 @@ class SourceBlockedEvent:
     seq: int
     occurred_at: str
     payload: SourcePayload
+    schema_version: SourceBlockedEventSchemaVersion | None = None
     type: str = "source.blocked"
-    schema_version: str = "1.1"
+
+
+class ContactObservedEventSchemaVersion(StrEnum):
+    _1_1 = "1.1"
+    _1_2 = "1.2"
 
 
 class ContactPayloadEntityType(StrEnum):
@@ -142,44 +194,3 @@ class LocatorDocument:
     row: int | None = None
     cell: str | None = None
     kind: str = "document"
-
-
-@dataclass(frozen=True)
-class LocatorBbox:
-    page: int
-    x: float
-    y: float
-    width: float
-    height: float
-    kind: str = "bbox"
-
-
-@dataclass(frozen=True)
-class LocatorDom:
-    value: str
-    text_sha256: str
-    kind: str = "dom"
-
-
-Locator: TypeAlias = (
-    LocatorTextSpan
-    | LocatorJsonPointer
-    | LocatorDocument
-    | LocatorBbox
-    | LocatorDom
-)
-
-
-class ObservationChangeKind(StrEnum):
-    NEW = "new"
-    RECONFIRMED = "reconfirmed"
-    CHANGED = "changed"
-
-
-class Binding(StrEnum):
-    CARD = "card"
-    TABLE_ROW = "table_row"
-    JSON_OBJECT = "json_object"
-    CAPTION = "caption"
-    PROXIMITY_ONLY = "proximity_only"
-    NONE = "none"

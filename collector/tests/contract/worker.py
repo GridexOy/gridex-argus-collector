@@ -86,7 +86,8 @@ def started(claimed: api.ClaimedJob, seq: int) -> api.JobStartedEvent:
 def post(
     argus: Argus, claimed: api.ClaimedJob, events: list[Any], token: str = ""
 ) -> api.EventsResponse:
-    request = api.EventsRequest(execution_token=token or claimed.lease.execution_token,
+    request = api.EventsRequest(schema_version=api.EventsRequestSchemaVersion("1.2"),
+                                execution_token=token or claimed.lease.execution_token,
                                 events=events)
     return api.post_events(argus.base_url, argus.token, claimed.job.job_id, request,
                            proxy_mode=_mode(argus))

@@ -14,7 +14,7 @@ from pathlib import Path
 
 from playwright.sync_api import Error as ActionError
 
-from argus_collector.browser import repository, service
+from argus_collector.browser import page_tools, repository, service
 from argus_collector.browser.binding import PersonBinding, PersonProbe, ProbeValue
 from argus_collector.browser.host import BrowserHost
 from argus_collector.browser.repository import BrowserLaunchError
@@ -37,6 +37,7 @@ __all__ = [
     "launcher_env",
     "open_work_browser",
     "plan_for_this_machine",
+    "probe",
 ]
 
 LAUNCHER_MODULE = "argus_collector.browser"
@@ -82,3 +83,9 @@ def launcher_env() -> dict[str, str]:
     existing = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = source if not existing else source + os.pathsep + existing
     return env
+
+
+def probe(wb: WalkBrowser, url: str) -> tuple[int, str]:
+    """(status, final URL) of a URL the walk may go to, asked without leaving the page."""
+    return page_tools.probe(wb.page, url)
+

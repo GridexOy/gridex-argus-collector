@@ -55,7 +55,7 @@ def test_claim_response_wire_example_survives_a_parse_and_a_dump() -> None:
 
 def test_a_missing_const_takes_the_const_value() -> None:
     data = api.to_json(samples.job_started())
-    del data["schema_version"]
+    data.pop("schema_version", None)  # optional since contract 3.1.0
     assert api.event_from_json(data) == samples.job_started()
     audit = api.from_json(api.FieldAudit, {"evidence_id": "evd-1", "items": []})
     assert audit.dropped_contact_fields == 0
@@ -82,9 +82,11 @@ def test_a_variant_codec_rejects_another_variants_discriminator() -> None:
 
 
 def test_const_fields_are_always_written() -> None:
-    request = api.EventsRequest(execution_token="exec-1", events=[samples.job_started()])
+    """Contract 3.1.0: the request names its schema (1.1 or 1.2); an event may leave it out."""
+    request = api.EventsRequest(schema_version=api.EventsRequestSchemaVersion("1.2"),
+                                execution_token="exec-1", events=[samples.job_started()])
     data = api.to_json(request)
-    assert data["schema_version"] == "1.1"
+    assert data["schema_version"] == "1.2"
     assert data["events"][0]["type"] == "job.started"
     pointer = api.to_json(api.LocatorJsonPointer(value="/x"))
     assert pointer == {"value": "/x", "kind": "json_pointer"}

@@ -1,5 +1,99 @@
 # ARGUS20_COLLECTOR_CHANGELOG
 
+## 0.4.8.7 — 2026-10-06
+
+**Правка 7 шага 7 (`stage-5/step-7-schema12`), одной сдачей: схема 1.2, дочитывание после цели, страновая версия сайта (K10 шаг 1), K7, Blåkläder, доставка по WINLOG.** Контракт — перевыпуск 3.1.0 (wire 1.2) из `gridex-argus20` (commit `004fcbd`): `ARGUS20_COLLECTOR_OPENAPI.json`, `CONTRACT_3.1.md`, `collector_contract/events.response.v1_2.json`; клиент API сгенерирован заново.
+
+**Что сделано.**
+1. **Схема 1.2.** В heartbeat `schema_versions: ["1.1", "1.2"]`, события уходят с `schema_version: "1.2"`. Отказ ARGUS несёт `detail {rule, observation_id, field, message}`: код в outbox хранится как `<код>/<правило>` (`invalid_input/person_without_name`). В Jono («Hylätty N: henkilöltä puuttuu nimi») и Lähetys причина показывается словами правила. В журнале — наблюдение, поле и сообщение ARGUS. Семь правил переведены (`delivery.rule.*` в `fi.json`). По `CONTRACT_3.1` (Beckhoff / BCC): каждое событие о человеке несёт его имя. `contact.enriched` без `full_name` больше не уходит: имя добавляется отдельным наблюдением с той же цитатой.
+2. **Дочитывание после цели.** Цель достигнута, а на странице уже найдены ссылки team / henkilöstö / yhteystiedot / contact / staff / ansprechpartner / medarbetare. Они читаются, не более 2 (`ending.FOLLOWUPS`), затем «Tavoite saavutettu». Стенд `fixture_oy`: цель на `contact.html`, затем `team.html` — 5 человек вместо 3.
+3. **Страна версии сайта = страна выставки** (Carlo Gavazzi ушёл на `/en-br/`).
+   - **K10, шаг 1** (уточнение владельца: Wera и OMICRON ушли на `/ru/` из-за Accept-Language ru из Windows). Chrome сбора и рабочий профиль всегда идут как fi-FI, независимо от языка системы:
+     - `--lang=fi-FI`, `--accept-lang=fi-FI,fi,sv,en`, поэтому `navigator.language` = fi-FI;
+     - заголовок `Accept-Language: fi,sv;q=0.8,en;q=0.6` на каждом запросе, включая саму страницу;
+     - `timezone Europe/Helsinki`.
+     Опция Playwright `locale` не используется: она отправляет при навигации голое `fi-FI`, это поймал тест на живом сервере. Редирект по IP — шаг 2 K10, не в этой версии.
+   - **Версия сайта.** Если первая страница обхода — версия другой страны (`/en-br/`, `lang=ru`) или глобальная, но называющая финскую, обход до чтения идёт на финскую. Порядок:
+     1. `hreflang` (сначала `xx-FI`, потом `fi`);
+     2. переключатель страны или языка (`Suomi`, `Finland`, `/en-fi/`);
+     3. тот же путь под `/fi/`, `/en-fi/`, `/fi-fi/` — только на сайте с локалями в пути;
+     4. страница Finland / Suomi / Nordic;
+     5. иначе, если сайт чужой версии, — глобальная версия (`x-default`, `en`, `/en/`).
+   - Кандидата сначала спрашиваем (статус и редиректы, не уходя со страницы). Кандидат, который возвращает туда, откуда пришли (редирект по IP), или ведёт в другую страну, пропускается.
+   - Строка в Keruu:
+     - «Maa: FI (vaihdettu en-br → en-fi)»;
+     - «Maa: FI — maaversiota ei löytynyt, globaali sivusto (vaihdettu … → …)»;
+     - «Maa: FI — maaversiota ei löytynyt, jatketaan sivustolla en-br».
+   - **Страна человека:** заголовок его раздела → код телефона (`+358` → FI, цитата — сам телефон) → `<html lang>`. Раньше человек на `/en-br/` получал BR по `lang`.
+4. **K7: люди и каналы — только со страниц домена компании** (Professor Roope Raisamo с `industryx.dimecc.com`).
+   - Домены компании берутся из сида и одобренных хостов с основанием `seed`, `redirect_from_seed`, `owner_known_url`, `business_id_match`; поддомены входят.
+   - Страница хоста, одобренного только как `linked_from_contact_section` (мероприятие, каталог), сохраняется как источник (подтверждение участия). Ни людей, ни каналов, ни шаблона почты с неё не берётся, модель на ней не вызывается.
+   - В Keruu один раз на хост: «Vieras verkkotunnus …: vain lähteeksi, henkilöitä ja kanavia ei lueta».
+5. **Blåkläder («Löydetty: 44» при 22 людях).**
+   - Счётчик «Löydetty» и таблица Keruu при сборе считались за всю сессию. Теперь у каждой компании своя таблица и свой счёт.
+   - Имена на сайте написаны обычным регистром, а капсом их показывает CSS `text-transform`, и `innerText` возвращал капс. Текст страницы и вкладок теперь читается с выключенным `text-transform`: имя и цитата — как в HTML.
+   - На стенде `blaklader` без этого правила не читали ни одного из 22 (имена капсом для них не имена), с ним — 22 строки в ARGUS, ни одной дважды, хотя 7 продажников повторяются на `myynti/`.
+   - Хвост Blåkläder после seq 23 терялся по `lease_expired` — это п. 6б.
+6. **Доставка (WINLOG MAIN-PC 06.10 17:20).**
+   - **а)** События идут своим потоком и не ждут очереди снимков (3–5 с на снимок у ARGUS). Пакет страницы уходит, как только записано её закрывающее событие (`source.processed`), опрос раз в 0,2 с; снимки грузятся своим потоком.
+     - Контракт 3.1.0 (ARGUS 0.4.24.4): событие раньше своего снимка ARGUS принимает как `accepted` + `evidence_pending` и применяет при загрузке.
+     - Событие, которому ARGUS ответил `evidence_missing`, по-прежнему ждёт свой снимок (до 3 повторов).
+     - Конец прогона (`contact.freshness`, `job.finished`) ждёт, пока загрузятся все снимки прогона: проверка свежести называет наблюдения, которые ARGUS записывает только при загрузке снимка. Иначе проверка отклоняется `invalid_input` («observation is not sent in run»). Это поймал `test_collector_history`.
+     - Событие, чей снимок здесь потерян или отклонён, отдаётся сразу: `Hylätty: todiste puuttuu`, его seq занимает `source.blocked`. Иначе ARGUS держал бы его 24 часа в ожидании, а панель показывала бы «принято».
+   - **б)** Задание с законченным обходом остаётся в heartbeat, пока у его прогона есть недоставленные события: аренда продлевается, пока хвост не ушёл.
+   - **в)** `CLICK_TIMEOUT_MS` 10 с → 3 с: отсутствующий или перекрытый элемент стоит 3 с, не 10.
+   - **г)** (WINLOG 17:27, вопрос MAIN-PC 4) `claim_jobs`, `post_events`, `reconcile_job` ждут ответа 30 с, как heartbeat и загрузка снимка (`delivery.API_TIMEOUT_S`). Было 10 с: 73 из 106 claim за час без ответа при зелёной связи.
+   - **д)** (вопрос MAIN-PC 5) Провал claim виден в Jono и при непустой очереди: красная строка «Uusien tehtävien haku epäonnistui — alla viimeksi haetut» над таблицей, до первого успешного claim.
+
+**Модули.**
+- Новые: `walk/scope.py`, `walk/country.py`, `discovery/versions.py`, `delivery/uploads.py`; `contract_server/pending.py`.
+- Изменены:
+  - `api_client` (сгенерирован заново);
+  - `delivery` (loop, results, retry, service, contract);
+  - `scheduler` (leases, runner, service);
+  - `walk` (ending, entities, findings, goal, runner, page, context, state, service);
+  - `discovery` (service, contract);
+  - `browser` (service, host, session, scripts, page_tools, contract);
+  - `normalization` (`phone_country`);
+  - `ui` (heartbeat_call, queue_lines, walk_lines, app_walk, app_collect);
+  - `collector/messages/fi.json`, `pyproject.toml` (import-linter).
+- Стенд ARGUS:
+  - схема 1.2 и `detail`;
+  - правило `person_without_name` для `contact.enriched`;
+  - `evidence_pending` и применение при загрузке (`contract_server/pending.py`).
+- Стенды сайтов: `elkris` + `industryx` (K7), `blaklader`, `gavazzi` — с gold.
+
+**Тесты.**
+- Новые:
+  - `walk/tests/test_walk_k7.py`, `test_walk_country.py`;
+  - `discovery/tests/test_versions.py`;
+  - `scheduler/tests/test_company_domains.py`, `test_lease_tail.py`, `test_collector_blaklader.py`;
+  - `ui/tests/test_found_per_company.py`, `test_refusal_detail.py`;
+  - `collector/tests/contract/test_event_lane.py`;
+  - `delivery/tests/test_batch.py` (что уходит в следующем запросе);
+  - `scheduler/tests/test_timeouts.py`, в `ui/tests/test_queue_lines.py` — провал claim над непустой очередью;
+  - в `browser/tests/test_host.py`: fi-FI, Helsinki, Accept-Language, probe.
+- Обновлены:
+  - схема 1.2 в тестах клиента и стенда;
+  - `evidence_pending` вместо `evidence_missing` для события раньше снимка;
+  - цель + дочитывание: панель ждёт «Tavoite saavutettu: 5 henkilöä, 10 kanavaa».
+- Проверено, что новые тесты ловят дефект: без продления аренды `test_lease_tail` падает, без снятия `text-transform` `test_collector_blaklader` получает 0 людей из 22.
+
+**Не проверено на Windows** (контейнер Linux):
+- закрытие Chrome при Pysäytä (общий Chrome на весь сбор проверен MAIN-PC 06.10: WINLOG, 1 запуск на 27 заданий);
+- `--lang` / `--accept-lang` в установленном Chrome (`channel=chrome`, видимое окно): `navigator.language` и `Intl` на Windows с русской системой;
+- heartbeat 1.2 и `detail` против прод-ARGUS;
+- `evidence_pending` прод-ARGUS (0.4.24.4);
+- `fetch`-проверка кандидатов версии через Hiddify.
+
+**Решения (поправь, если не так).**
+0. Предложения MAIN-PC 4 и 5 (WINLOG 17:27: таймаут 30 с для claim / events / reconcile, провал claim при непустой очереди) взяты в эту правку без отдельного «ок»: обе маленькие и прямо мешают сбору.
+1. `Intl` (формат дат) остаётся языком системы: Playwright `locale` ломает Accept-Language навигации. Сайты выбирают версию по заголовку и `navigator.language`, оба — fi-FI.
+2. Угаданные URL (`/fi/`, `/en-fi/`, `/fi-fi/`) пробуются только у сайта, где версия уже в пути (`/en-br/`), и только если первая страница — чужая версия. Глобальная страница без локали в пути (Reimax, Ellego) не трогается; глобальная `/en-en/` (Beckhoff) переходит, только если сама называет финскую версию.
+3. Страна человека по адресу не читается: у карточки человека нет поля адреса. Страна — по разделу, телефону, `lang`. Офис получает страну по разделу, как и раньше.
+4. K7 считает своими только основания `seed`, `redirect_from_seed`, `owner_known_url`, `business_id_match`; `linked_from_contact_section` и неизвестные — чужие.
+5. Как Carlo Gavazzi попал на `/en-br/`: в WINLOG нет строк журнала этого задания. Вопрос — MAIN-PC (раздел «Вопросы облака»). Если сид отдаёт `/en-br/` по IP, это шаг 2 K10; переход на финскую версию из п. 3 работает и тогда, если сайт не возвращает обратно по IP.
+
 ## 0.4.8.6 — 2026-10-06
 
 **Правка 6 шага 7 (`stage-5/step-7-ellego`): Ellego, петли Kontaktit, общий Chrome, правило цели, Reimax, p95.** Контракт 1.1 не менялся.

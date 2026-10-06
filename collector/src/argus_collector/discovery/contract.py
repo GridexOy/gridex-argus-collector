@@ -7,7 +7,7 @@ javascript, no documents (M2), contact-word ranking of links, page keys.
 
 from __future__ import annotations
 
-from argus_collector.discovery import countries, service
+from argus_collector.discovery import countries, service, versions
 from argus_collector.discovery import focus as focus_rules
 from argus_collector.discovery.focus import Focus
 from argus_collector.discovery.service import (
@@ -152,6 +152,26 @@ def locale_segment(href: str) -> str:
     return countries.locale_segment(href)
 
 
+def page_country(url: str, html_lang: str) -> str | None:
+    """Country version a page is (URL, else `<html lang>`); None: a global version."""
+    return versions.page_country(url, html_lang)
+
+
+def version_label(url: str) -> str:
+    """`en-br` of `/en-br/...`, else the host: how the panel names a site version."""
+    return versions.label(url)
+
+
+def version_candidates(url: str, html: str, links: list[Candidate], country: str,
+                       languages: list[str], foreign: bool) -> tuple[list[tuple[str, bool]],
+                                                                      list[str]]:
+    """((URL, it must be `country`'s version) in the owner's order: hreflang, switcher,
+    then for a `foreign` version `/fi/` `/en-fi/` `/fi-fi/` and a Finland / Nordic page;
+    the global version's URLs)."""
+    return (versions.candidates(url, html, links, country, languages, foreign),
+            versions.global_version(html, url, url))
+
+
 def department_rank(label: str) -> int:
     """Order of department tabs: 0 sales/marketing, 1 other units, 2 support functions."""
     return countries.department_rank(label)
@@ -160,6 +180,11 @@ def department_rank(label: str) -> int:
 def host_of(url: str) -> str:
     """Host compared with approved_hosts: lower case, `www.` stripped, no port."""
     return service.host_of(url)
+
+
+def site_domain(host: str) -> str:
+    """Registrable domain of a host: the company's subdomains share it (K7, 0.4.8.7)."""
+    return service.site_domain(host)
 
 
 def page_key(url: str, text_sha256: str) -> str:

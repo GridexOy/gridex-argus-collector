@@ -76,9 +76,9 @@ def test_panel_drives_a_real_walk_with_the_fake_model(
         pump_until_done(app, root)
         assert not app.walk.walking
         status = app.view.collect.status_label.cget("text")
-        assert status == "Tavoite saavutettu: 3 henkilöä, 6 kanavaa", (
-            "contact.html: three sales people with a phone and an email each end the walk")
-        assert app.view.collect.row_count() == 3
+        assert status == "Tavoite saavutettu: 5 henkilöä, 10 kanavaa", (
+            "contact.html reaches the goal, the found team link is still read (0.4.8.7)")
+        assert app.view.collect.row_count() == 5
         table = app.view.collect.table
         first = table.item(table.get_children()[0], "values")
         assert first[0] and first[-1].startswith("http://127.0.0.1:")

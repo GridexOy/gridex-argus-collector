@@ -10,38 +10,70 @@ from collections.abc import Callable
 from typing import Any
 
 from argus_collector.api_client.serialization_6 import (
-    locator_bbox_from_json,
-    locator_bbox_to_json,
     locator_document_from_json,
     locator_document_to_json,
-    locator_dom_from_json,
-    locator_dom_to_json,
     locator_json_pointer_from_json,
     locator_json_pointer_to_json,
     locator_text_span_from_json,
     locator_text_span_to_json,
 )
 from argus_collector.api_client.types_3 import (
-    Binding,
-    ContactPayloadEntityType,
-    ContactPayloadRelationship,
-    Locator,
-    LocatorBbox,
     LocatorDocument,
-    LocatorDom,
     LocatorJsonPointer,
     LocatorTextSpan,
-    ObservationChangeKind,
     ObservationExtractionStatus,
 )
 from argus_collector.api_client.types_4 import (
-    ContactPayload,
+    Binding,
     FieldAudit,
     FieldAuditItem,
     FieldAuditItemDisposition,
+    Locator,
+    LocatorBbox,
+    LocatorDom,
     Observation,
+    ObservationChangeKind,
 )
 from argus_collector.api_client.wire import const, nullable, opt
+
+
+def locator_bbox_to_json(value: LocatorBbox) -> dict[str, Any]:
+    return {
+        "page": value.page,
+        "x": value.x,
+        "y": value.y,
+        "width": value.width,
+        "height": value.height,
+        "kind": value.kind,
+    }
+
+
+def locator_bbox_from_json(data: dict[str, Any]) -> LocatorBbox:
+    return LocatorBbox(
+        page=int(data["page"]),
+        x=float(data["x"]),
+        y=float(data["y"]),
+        width=float(data["width"]),
+        height=float(data["height"]),
+        kind=const(data, "kind", "bbox"),
+    )
+
+
+def locator_dom_to_json(value: LocatorDom) -> dict[str, Any]:
+    return {
+        "value": value.value,
+        "text_sha256": value.text_sha256,
+        "kind": value.kind,
+    }
+
+
+def locator_dom_from_json(data: dict[str, Any]) -> LocatorDom:
+    return LocatorDom(
+        value=str(data["value"]),
+        text_sha256=str(data["text_sha256"]),
+        kind=const(data, "kind", "dom"),
+    )
+
 
 _LOCATOR_TO_JSON: dict[type[Any], Callable[[Any], dict[str, Any]]] = {
     LocatorTextSpan: locator_text_span_to_json,
@@ -150,37 +182,17 @@ def field_audit_from_json(data: dict[str, Any]) -> FieldAudit:
     )
 
 
-def contact_payload_to_json(value: ContactPayload) -> dict[str, Any]:
-    out: dict[str, Any] = {
-        "entity_id": value.entity_id,
-        "entity_type": value.entity_type.value,
-        "observations": [observation_to_json(v) for v in value.observations],
-        "field_audit": field_audit_to_json(value.field_audit),
-    }
-    if value.relationship is not None:
-        out["relationship"] = value.relationship.value
-    return out
-
-
-def contact_payload_from_json(data: dict[str, Any]) -> ContactPayload:
-    return ContactPayload(
-        entity_id=str(data["entity_id"]),
-        entity_type=ContactPayloadEntityType(data["entity_type"]),
-        observations=[observation_from_json(v) for v in data["observations"]],
-        field_audit=field_audit_from_json(data["field_audit"]),
-        relationship=opt(data, "relationship", ContactPayloadRelationship, None),
-    )
-
-
 TO_JSON: dict[type[Any], Callable[[Any], dict[str, Any]]] = {
+    LocatorBbox: locator_bbox_to_json,
+    LocatorDom: locator_dom_to_json,
     Observation: observation_to_json,
     FieldAuditItem: field_audit_item_to_json,
     FieldAudit: field_audit_to_json,
-    ContactPayload: contact_payload_to_json,
 }
 FROM_JSON: dict[type[Any], Callable[[dict[str, Any]], Any]] = {
+    LocatorBbox: locator_bbox_from_json,
+    LocatorDom: locator_dom_from_json,
     Observation: observation_from_json,
     FieldAuditItem: field_audit_item_from_json,
     FieldAudit: field_audit_from_json,
-    ContactPayload: contact_payload_from_json,
 }

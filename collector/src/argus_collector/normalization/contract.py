@@ -50,6 +50,11 @@ def normalize_phone(raw: str, region: str = DEFAULT_REGION) -> str | None:
     return service.normalize_phone(raw, region)
 
 
+def phone_country(e164: str) -> str | None:
+    """Country of a normalised phone by its calling code (`+358...` FI), None: unknown."""
+    return service.phone_country(e164)
+
+
 def decode_cfemail(encoded: str) -> str | None:
     """Decode a Cloudflare `data-cfemail` hex string to the address."""
     return service.decode_cfemail(encoded)
