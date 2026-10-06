@@ -1,6 +1,8 @@
 """Playwright page session of a walk (the second file that imports Playwright).
 
-`WalkBrowser` keeps one persistent-profile context and one tab. Every
+`WalkBrowser` keeps one context and one tab: a new context of the collection's
+Chrome (`host.py`, clean cookies, closed after the walk) or the work-browser
+profile's own Chrome (the panel's local test, a resume after a bot check). Every
 observation returns a `PageState` (url, title, html, visible text, numbered
 candidates). Links are acted on by navigation (same approved hosts only,
 decided by the caller), buttons by clicking the numbered element.
@@ -13,7 +15,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from types import TracebackType
 
-from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
+from playwright.sync_api import BrowserContext, Page, Playwright
 
 from argus_collector.browser import page_tools as tools
 from argus_collector.browser.binding import (
@@ -23,8 +25,8 @@ from argus_collector.browser.binding import (
     parse_result,
     probe_payload,
 )
+from argus_collector.browser.host import BrowserHost, open_context
 from argus_collector.browser.scripts import HIDDEN_LINKS_JS, TAB_PANELS_JS
-from argus_collector.browser.service import launch_kwargs
 from argus_collector.discovery.contract import Candidate
 from argus_collector.runtime import contract as runtime
 
@@ -54,21 +56,20 @@ class PageState:
 class WalkBrowser:
     """Context manager: `with WalkBrowser(headless, profile_dir) as wb: wb.goto(url)`."""
 
-    def __init__(self, headless: bool, profile_dir: Path | None = None) -> None:
+    def __init__(self, headless: bool, profile_dir: Path | None = None,
+                 host: BrowserHost | None = None, profile: bool = False) -> None:
         self.headless = headless
         self.profile_dir = profile_dir or runtime.browser_profile_dir()
+        self.host, self.profile = host, profile  # profile: the work-browser profile
+        self.start_ms = 0  # Chrome start for this walk (0: the collection's Chrome ran)
         self._pw: Playwright | None = None
         self._context: BrowserContext | None = None
         self._page: Page | None = None
         self._consented: set[str] = set()
 
     def __enter__(self) -> WalkBrowser:
-        from argus_collector.browser import contract  # noqa: PLC0415 - avoid import cycle
-
-        plan = contract.plan_for_this_machine(headless=self.headless, profile_dir=self.profile_dir)
-        plan.user_data_dir.mkdir(parents=True, exist_ok=True)
-        self._pw = sync_playwright().start()
-        self._context = self._pw.chromium.launch_persistent_context(**launch_kwargs(plan))  # type: ignore[arg-type]
+        self._pw, self._context, self.start_ms = open_context(
+            self.host, self.profile, self.headless, self.profile_dir)
         self._page = self._context.pages[0] if self._context.pages else self._context.new_page()
         self._page.set_default_navigation_timeout(NAVIGATION_TIMEOUT_MS)
         return self

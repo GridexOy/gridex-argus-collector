@@ -13,12 +13,12 @@ import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
 
 from argus_collector.api_client import contract as api
 from argus_collector.delivery import repository as repo
 from argus_collector.delivery import results, service
 from argus_collector.delivery.hooks import ApiTarget, DeliveryHooks, Failed
+from argus_collector.delivery.transport import Transport
 from argus_collector.evidence import contract as evidence
 from argus_collector.runtime import contract as runtime
 from argus_collector.storage import contract as storage
@@ -39,25 +39,24 @@ class Deliverer:
         self.db_path, self.target, self.hooks = db_path, target, hooks
         self.on_change = on_change or (lambda: None)
         self.error, self.failures, self.connected, self.pending = "", 0, False, 0
-        self.link_down = False  # the last heartbeat got no answer at all
         self.server_error = 0  # the HTTP status of the last 5xx answer until a pass succeeds
         self._stop, self._wake, self._flush = threading.Event(), threading.Event(), False
         self._thread: threading.Thread | None = None
+        self.transport = Transport()  # the one state of Lahetys, from heartbeat and delivery
 
     @property
     def state(self) -> str:
-        connected = self.connected and not self.link_down
-        return service.transport_state(self.error, self.pending, connected)
+        return service.transport_state(self.error, self.pending, self.connected,
+                                       self.transport.silent)
 
     def link(self, answered: bool) -> None:
         """Heartbeat outcome: no answer is `offline` also with an empty outbox; the
         first answer after an outage sends what is pending now, not after the backoff."""
-        before, self.link_down = self.state, not answered
+        self.transport.heartbeat(answered)
         if answered and self.error == service.ERROR_OFFLINE:
             self.failures = 0
             self.flush()
-        if self.state != before:
-            runtime.journal("delivery", f"transport {before} -> {self.state} (heartbeat)")
+        if self.transport.note(self.state, " (heartbeat)"):
             self.on_change()
 
     def start(self) -> None:
@@ -88,27 +87,24 @@ class Deliverer:
 
     def tick(self, conn: sqlite3.Connection) -> float:
         """One pass; returns the delay before the next one."""
-        before, target = self.state, self.target()
-        delay = TICK_S
-        if target is None:
-            self.connected = False
-        else:
+        target, delay = self.target(), TICK_S
+        self.connected = target is not None  # paired
+        if target is not None:
             try:
                 self._uploads(conn, target)
                 self._events(conn, target)
-                self.error, self.failures, self.connected, self.server_error = "", 0, True, 0
+                self.error, self.failures, self.server_error = "", 0, 0
             except Failed as failed:
                 delay = self._failed(failed)
         self.pending = repo.totals(conn)[0]
-        if self.state != before:
-            runtime.journal("delivery", f"transport {before} -> {self.state}")
+        self.transport.note(self.state)
         self.on_change()
         return delay
 
     def _failed(self, failed: Failed) -> float:
         if failed.error == service.ERROR_LEASE:
             return TICK_S
-        self.error, self.connected = failed.error, failed.error != service.ERROR_OFFLINE
+        self.error = failed.error
         self.failures += 1
         return service.backoff_s(self.failures, failed.retry_after)
 
@@ -121,7 +117,7 @@ class Deliverer:
         rid = f" request_id={body.request_id}" if body and body.request_id else ""
         runtime.journal("delivery", f"job {job_id}: HTTP {exc.status} {code or kind}"
                         f" ({service.reason(code or kind)}){rid}")
-        self.link_down = self.link_down and exc.status == 0
+        self.transport.answered() if exc.status else self.transport.no_answer()
         self.server_error = exc.status if exc.status >= 500 else self.server_error
         if kind == service.ERROR_LEASE:
             self.hooks.lease_problem(job_id, run_id, code, token)
@@ -144,16 +140,16 @@ class Deliverer:
             try:
                 resp = api.upload_evidence(
                     target.base_url, target.token, job_id, token, metadata, snap.html,
-                    file_content_type=HTML_MIME, proxy_mode=_mode(target),
+                    file_content_type=HTML_MIME, proxy_mode=target.api_mode,
                 )
             except api.ApiError as exc:
                 code = self._api_error(exc, job_id, run_id, token)
                 self._reject_upload(conn, job_id, evidence_id, code)
                 continue
-            self.link_down = False
+            self.transport.answered()
             repo.mark_upload(conn, evidence_id, resp.status.value, "")
             runtime.journal("delivery", f"job {job_id}: evidence {len(snap.html)} B uploaded"
-                            f" in {_ms(started)} ms")
+                            f" in {service.elapsed_ms(started)} ms")
 
     def _reject_upload(
         self, conn: sqlite3.Connection, job_id: str, evidence_id: str, code: str
@@ -179,7 +175,7 @@ class Deliverer:
             started = time.monotonic()
             try:
                 resp = api.post_events(
-                    target.base_url, target.token, job_id, request, proxy_mode=_mode(target)
+                    target.base_url, target.token, job_id, request, proxy_mode=target.api_mode
                 )
             except api.ApiError as exc:
                 code = self._api_error(exc, job_id, run_id, token)
@@ -188,13 +184,6 @@ class Deliverer:
                 self.hooks.rejected(conn, job_id, str(first["type"]), code,
                                     f"event {first['event_id']} seq {first['seq']}")
                 continue
-            self.link_down = False
-            results.apply(conn, self.hooks, job_id, rows, resp, _ms(started))
+            self.transport.answered()
+            results.apply(conn, self.hooks, job_id, rows, resp, service.elapsed_ms(started))
 
-
-def _ms(started: float) -> int:
-    return int((time.monotonic() - started) * 1000)
-
-
-def _mode(target: ApiTarget) -> api.ProxyMode:
-    return cast("api.ProxyMode", target.proxy_mode)

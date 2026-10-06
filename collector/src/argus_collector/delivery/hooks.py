@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, cast
 
 from argus_collector.api_client import contract as api
 
@@ -15,6 +15,10 @@ class ApiTarget:
     worker_id: str
     token: str
     proxy_mode: str  # system | direct
+
+    @property
+    def api_mode(self) -> api.ProxyMode:
+        return cast("api.ProxyMode", self.proxy_mode)
 
 
 class DeliveryHooks(Protocol):

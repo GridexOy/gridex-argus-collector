@@ -117,6 +117,7 @@ def test_argus_down_and_back_delivers_everything_once(
     wait_for(lambda: local_persons(collector) >= 1)
     argus.shutdown()
     argus.server_close()
+    collector.heartbeat_failed(0)  # the panel's heartbeat gets no answer either
     wait_for(lambda: collector.deliverer.state == "offline")
     wait_for(lambda: collector.queue_view().rows[0].state in DONE, timeout_s=180)
     assert collector.delivery_view().pending > 0, "the walk went on, results wait"

@@ -55,7 +55,7 @@ P95_WINDOW_S = 60
 class DeliveryStats:
     pending: int  # events + snapshots not yet answered by ARGUS
     errors: int  # events + snapshots ARGUS rejected
-    p95_s: float | None  # delivery time of events acknowledged in the last minute
+    p95_s: float | None  # delivery time of events queued and acknowledged in the last minute
     last_code: str = ""  # code of the latest rejection (words: `reason`, fi.json)
 
 

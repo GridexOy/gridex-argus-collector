@@ -53,8 +53,10 @@ def _failed(state: WalkState, action: Action, page: browser.PageState, exc: Exce
 def perform_safely(
     state: WalkState, wb: browser.WalkBrowser, page: browser.PageState, action: Action
 ) -> browser.PageState | None:
-    """A failed action is a gap and the walk goes on; three in a row end it."""
+    """A failed action is a gap and the walk goes on; three in a row end it. A button
+    pressed is not offered again in the same page state (Kontaktit 05.10.2026)."""
     state.cp.actions += 1
+    state.stalled += 1  # back to 0 when the next page state is new (page.observe)
     try:
         new_page = _perform(state, wb, page, action)
     except browser.ActionError as exc:
@@ -69,6 +71,10 @@ def perform_safely(
             state.end_reason = service.END_FAILURES
             return None
     state.failures_in_row = 0
+    if action.kind == service.ACTION_NAVIGATE and action.candidate is not None:
+        state.arrived(action.candidate.href, new_page.url)
+    elif action.kind == service.ACTION_CLICK and action.candidate is not None:
+        state.clicked.setdefault(state.current_key, set()).add(action.candidate.selector)
     if discovery.host_of(new_page.url) in state.hosts:
         return new_page
     state.add_gap(new_page.url, DOMAIN_GAP, f"an action on {page.url} left the approved hosts",

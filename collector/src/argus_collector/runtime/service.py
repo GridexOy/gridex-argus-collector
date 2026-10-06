@@ -27,6 +27,8 @@ class Config:
     model_navigation: str = "qwen2.5:7b"  # next steps; "" -> the card model
     model_vision: str = "qwen2.5-vl:7b"  # screenshots; "" -> no vision model
     walk_page_budget: int = 15
+    walk_action_budget: int = 60  # browser actions of a walk from the panel (0.4.8.6)
+    walk_stop_at_goal: bool = True  # end a walk once its goal is reached (owner 06.10.2026)
     test_site_port: int = 8765
     network_proxy: str = "system"
     source: str = "defaults"
@@ -108,6 +110,13 @@ def _positive_int(section: dict[str, object], key: str, default: int, limit: int
     return value
 
 
+def _flag(section: dict[str, object], key: str, default: bool) -> bool:
+    value = section.get(key, default)
+    if not isinstance(value, bool):
+        raise ValueError(f"{key} must be true or false, got {value!r}")
+    return value
+
+
 def _proxy_mode(section: dict[str, object], default: str) -> str:
     value = str(section.get("proxy", default) or default)
     if value not in ("system", "direct"):
@@ -130,6 +139,9 @@ def config_from_mapping(data: dict[str, object], source: str) -> Config:
         model_navigation=str(model.get("navigation", defaults.model_navigation) or ""),
         model_vision=str(model.get("vision", defaults.model_vision) or ""),
         walk_page_budget=_positive_int(walk, "page_budget", defaults.walk_page_budget, 1000),
+        walk_action_budget=_positive_int(walk, "action_budget", defaults.walk_action_budget,
+                                         10000),
+        walk_stop_at_goal=_flag(walk, "stop_at_goal", defaults.walk_stop_at_goal),
         test_site_port=_positive_int(site, "port", defaults.test_site_port, 65536),
         network_proxy=_proxy_mode(network, defaults.network_proxy),
         source=source,

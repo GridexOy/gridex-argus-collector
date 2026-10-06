@@ -23,6 +23,8 @@ from argus_collector.ui.repository import Messages
 from argus_collector.ui.view import PanelView
 from argus_collector.walk import contract as walk
 
+CLOSE_WAIT_S = 10.0  # the panel closes: the collecting thread closes Chrome first
+
 
 class WalkHost(Protocol):
     @property
@@ -65,6 +67,7 @@ class CollectController:
             version=runtime.current_version_status().file_version,
             navigation=models.resolve_role(cfg.model_endpoint, cfg.model_navigation),
             vision=models.resolve_role(cfg.model_endpoint, cfg.model_vision),
+            stop_at_goal=cfg.walk_stop_at_goal,
         )
         settings = scheduler.Settings(env=env, stop_files=runtime.stop_files,
                                       browser_free=lambda: not host.work_browser_running())
@@ -97,7 +100,7 @@ class CollectController:
         self.host.walk.on_event(event)
         if event.kind == walk.EVENT_CONTACT:
             self._job_contacts += 1
-        elif event.kind == walk.EVENT_DONE:
+        elif event.kind == walk.EVENT_DONE and walk_lines.goal_line(self.host.msgs, event) is None:
             text, level = walk_lines.done_line(self.host.msgs, event.page_no, self._job_contacts)
             self.host.view.collect.set_status(text, level)
         if event.kind in (walk.EVENT_DONE, walk.EVENT_STOPPED, walk.EVENT_ERROR):
@@ -113,6 +116,10 @@ class CollectController:
             return
         self.collector.start()
         self.host.refresh()
+
+    def shutdown(self) -> None:
+        """The panel closes: collecting stops and its Chrome closes before the process ends."""
+        self.collector.stop(wait_s=CLOSE_WAIT_S)
 
     def stop(self) -> None:
         """Pysayta: stop collecting and the local test walk; the outbox keeps sending."""

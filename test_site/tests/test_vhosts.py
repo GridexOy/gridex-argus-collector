@@ -87,6 +87,7 @@ def test_companies_json_matches_the_default_port() -> None:
     ids = [c["company_id"] for c in on_disk]
     assert ids == [
         "fixture_oy", "nordtec", "vogel", "katsa", "ledvance", "malux", "beckhoff", "ellego",
+        "reimax",
     ]  # fmt: skip
     for company in on_disk:
         assert company["priority_countries"] == ["FI"]

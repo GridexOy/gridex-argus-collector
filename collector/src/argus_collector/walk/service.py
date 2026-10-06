@@ -6,12 +6,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from argus_collector.browser.contract import BrowserHost
 from argus_collector.discovery.contract import Candidate, Focus
 from argus_collector.extraction.contract import Contact
 from argus_collector.models.contract import ModelConfig
 from argus_collector.walk.sink import WalkCheckpoint, WalkGap, WalkLimits
 
 DEFAULT_PAGE_BUDGET = 15
+DEFAULT_ACTION_BUDGET = 60  # browser actions of a walk from the panel (Kontaktit 05.10.2026)
 UNLIMITED = 10**9
 
 EVENT_PAGE = "page"  # a page was loaded: url, page_no, budget
@@ -30,6 +32,8 @@ STEP_SCROLL = "scroll"
 STEP_ATTENTION = "attention"  # a bot check did not clear: detail = url
 STEP_CONSENT = "consent"  # a cookie banner was answered: detail = `kind: button text`
 STEP_LOOP = "loop"  # a page state repeated 3 times without progress: finish_branch
+STEP_GOAL = "goal"  # the goal is reached: people, channels (owner 06.10.2026)
+STEP_GOAL_PAGES = "goal_pages"  # 2 more pages read after the first people, no goal
 
 ACTION_NAVIGATE = "navigate"
 ACTION_CLICK = "click"
@@ -46,6 +50,9 @@ END_DOMAIN = "domain_unresolved"  # the seed landed on a host outside approved_h
 END_START_FAILED = "start_failed"  # the start page did not load
 END_FAILURES = "action_failures"  # too many failed actions in a row
 END_ATTENTION = "attention"  # a bot check did not clear: the owner solves it (8.5)
+END_NO_PROGRESS = "no_progress"  # MAX_STALLED actions without a new page state (0.4.8.6)
+END_GOAL = "goal"  # a sales / marketing person with a channel: completed (06.10.2026)
+END_GOAL_PAGES = "goal_pages"  # people read, 2 more pages without the goal: completed
 
 
 @dataclass(frozen=True)
@@ -58,6 +65,7 @@ class WalkSettings:
     start_url: str
     model: ModelConfig
     page_budget: int = DEFAULT_PAGE_BUDGET
+    action_budget: int = DEFAULT_ACTION_BUDGET  # a walk from the panel (job runs: `limits`)
     headless: bool = False
     profile_dir: Path | None = None
     evidence_dir: Path | None = None
@@ -71,11 +79,13 @@ class WalkSettings:
     region_fallback: str = "FI"
     navigation: ModelConfig | None = None
     vision: ModelConfig | None = None
+    stop_at_goal: bool = True  # the goal rule (`goal.py`); off: walk until nothing is left
+    browser_host: BrowserHost | None = None  # the collection's Chrome; None: own (profile)
 
     def run_limits(self) -> WalkLimits:
         if self.limits is not None:
             return self.limits
-        return WalkLimits(self.page_budget, UNLIMITED, float(UNLIMITED), UNLIMITED)
+        return WalkLimits(self.page_budget, self.action_budget, float(UNLIMITED), UNLIMITED)
 
 
 @dataclass(frozen=True)
@@ -89,6 +99,8 @@ class WalkEvent:
     contact: Contact | None = None
     evidence_id: str = ""
     error: str = ""
+    people: int = 0  # STEP_GOAL / EVENT_DONE of a goal end: people and their channels
+    channels: int = 0
 
 
 @dataclass(frozen=True)

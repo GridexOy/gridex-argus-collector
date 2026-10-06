@@ -1,20 +1,27 @@
-"""The walk loop: open, observe a page, decide, act — until finish, budget or stop."""
+"""The walk loop: open, observe a page, the goal, decide, act — until finish, budget or stop.
+
+Before every next action the tally of people read is asked first (`goal.py`,
+owner 06.10.2026): the goal reached, or 2 more pages read without it, end the
+walk completed.
+"""
 
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 
 from argus_collector.browser import contract as browser
 from argus_collector.discovery import contract as discovery
 from argus_collector.models import contract as models
 from argus_collector.storage import contract as storage
+from argus_collector.walk import ending, repository, service, timing, vision
 from argus_collector.walk import page as page_step
-from argus_collector.walk import repository, service, timing, vision
 from argus_collector.walk.actions import gap_reason, goto, perform_safely
-from argus_collector.walk.decide import decide, end_budget
-from argus_collector.walk.service import WalkEvent, WalkSettings, WalkSummary
+from argus_collector.walk.decide import decide, end_budget, end_stalled
+from argus_collector.walk.service import Action, WalkEvent, WalkSettings, WalkSummary
 from argus_collector.walk.sink import WalkCheckpoint, WalkSink
 from argus_collector.walk.state import (
+    MAX_STALLED,
     Emit,
     ShouldStop,
     StopRequested,
@@ -23,6 +30,7 @@ from argus_collector.walk.state import (
 
 DOMAIN_GAP = "domain_ownership_unresolved"
 MODEL_WORKERS = 3  # card-model windows at a time (OLLAMA_NUM_PARALLEL=3, owner 05.10.2026)
+CARDS_MAX_TOKENS = 4096  # a window of many cards is one long JSON answer (Ellego, 40 people)
 CHALLENGE_GAP = "captcha"  # a bot check that did not clear: needs_attention (8.5)
 
 __all__ = ["StopRequested", "WalkState", "run"]
@@ -33,7 +41,8 @@ def _state(
 ) -> WalkState:
     conn = storage.connect(settings.db_path)
     listener = (lambda record: sink.model_called(conn, record)) if sink is not None else None
-    client = models.ModelClient(settings.model, conn, listener)
+    cards = replace(settings.model, max_tokens=max(settings.model.max_tokens, CARDS_MAX_TOKENS))
+    client = models.ModelClient(cards, conn, listener)
     nav = settings.navigation
     nav_client = models.ModelClient(nav, conn, listener) if nav and nav != settings.model else None
     vision = settings.vision
@@ -63,6 +72,7 @@ def run(
     except Exception as exc:  # noqa: BLE001 - every walk error ends as a reported result
         first = str(exc).splitlines()[0] if str(exc) else ""
         result, error, state.end_reason = "failed", f"{type(exc).__name__}: {first}", "error"
+        timing.failed(settings.id_namespace, error)
         on_event(WalkEvent(service.EVENT_ERROR, error=error))
     finally:
         state.tick()
@@ -70,7 +80,7 @@ def run(
         repository.finish_run(state.conn, state.run_id, state.cp.pages, state.contacts, result)
         state.conn.close()
     if not stopped and not error and state.end_reason != service.END_ATTENTION:
-        on_event(WalkEvent(service.EVENT_DONE, detail=result, page_no=state.cp.pages))
+        on_event(ending.done_event(state, result))
     visited = tuple(sorted(state.cp.visited))
     return WalkSummary(
         state.cp.pages, state.contacts, stopped, error, visited, state.end_reason, state.cp
@@ -79,9 +89,11 @@ def run(
 
 def _walk(state: WalkState) -> None:
     settings = state.settings
-    with browser.WalkBrowser(settings.headless, settings.profile_dir) as wb, \
+    host, profile = settings.browser_host, _after_attention(settings)
+    with browser.WalkBrowser(settings.headless, settings.profile_dir, host, profile) as wb, \
             ThreadPoolExecutor(MODEL_WORKERS, thread_name_prefix="walk-model") as pool:
         state.pool = pool
+        timing.chrome(settings.id_namespace, wb.start_ms, host is not None and not profile)
         page = _open(state, wb)
         while page is not None:
             page = _vision_bot_check(state, wb, page)
@@ -98,9 +110,10 @@ def _walk(state: WalkState) -> None:
                 end_budget(state)
                 return
             text, pending = page_step.observe(state, wb, page)
-            with timing.timed(state.timing, "action"):
-                action = decide(state, wb, page, text)  # the card model works meanwhile
-            page_step.complete(state, wb, page, pending)  # extracted before any navigation
+            if pending is None and state.stalled >= MAX_STALLED:
+                end_stalled(state, page.url)
+                return
+            action = _next(state, wb, page, text, pending)
             state.check_stop()
             _flush_timing(state, page.url, action)
             if action.kind == service.ACTION_FINISH:
@@ -108,6 +121,30 @@ def _walk(state: WalkState) -> None:
             state.check_stop()
             with timing.timed(state.timing, "load"):
                 page = perform_safely(state, wb, page, action)
+
+
+def _after_attention(settings: WalkSettings) -> bool:
+    """A resume after a bot check the owner passed in the work browser: its cookies are in
+    the work-browser profile, so this walk opens that profile, not a clean context."""
+    resume = settings.resume
+    return resume is not None and any(g.reason == CHALLENGE_GAP for g in resume.gaps)
+
+
+def _next(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState, text: str,
+          pending: page_step.Pending | None) -> Action:
+    """The goal first; else the decided step, the page's people read before any navigation
+    (the card model works while the step is chosen)."""
+    if pending is not None and not pending.read.calls:  # the rules read it: nothing to wait
+        page_step.complete(state, wb, page, pending)
+        pending = None
+    if ending.reached(state, page.url):
+        return Action(service.ACTION_FINISH, source="goal")
+    with timing.timed(state.timing, "action"):
+        action = decide(state, wb, page, text)
+    page_step.complete(state, wb, page, pending)
+    if ending.reached(state, page.url):
+        return Action(service.ACTION_FINISH, source="goal")
+    return action
 
 
 def _vision_bot_check(

@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from argus_collector.api_client import contract as api
+from argus_collector.browser import contract as browser
 from argus_collector.delivery import contract as delivery
 from argus_collector.discovery import contract as discovery
 from argus_collector.models.contract import ModelConfig
@@ -37,6 +38,7 @@ class WalkEnv:
     version: str
     navigation: ModelConfig | None = None  # next steps (7b); None: `model`
     vision: ModelConfig | None = None  # screenshots (VL); None: never
+    stop_at_goal: bool = True  # config `walk.stop_at_goal` (goal rule, 06.10.2026)
 
 
 def claimed_job(row: sqlite3.Row) -> api.ClaimedJob:
@@ -81,7 +83,8 @@ def resume_checkpoint(
 
 
 def walk_settings(
-    env: WalkEnv, claimed: api.ClaimedJob, resume: walk.WalkCheckpoint | None
+    env: WalkEnv, claimed: api.ClaimedJob, resume: walk.WalkCheckpoint | None,
+    host: browser.BrowserHost | None = None,
 ) -> walk.WalkSettings:
     job = claimed.job
     scope = job.scope
@@ -98,7 +101,8 @@ def walk_settings(
         limits=service.run_limits(api.to_json(job.policy), consumed(claimed)),
         resume=resume, id_namespace=job.job_id,
         region_fallback=countries[0].upper() if countries else DEFAULT_REGION,
-        navigation=env.navigation, vision=env.vision,
+        navigation=env.navigation, vision=env.vision, stop_at_goal=env.stop_at_goal,
+        browser_host=host,
     )
 
 
@@ -121,13 +125,8 @@ def begin(conn: sqlite3.Connection, row: sqlite3.Row, version: str) -> None:
                            stage=service.STAGE_BROWSER, started=1)
 
 
-def finish_run(
-    conn: sqlite3.Connection,
-    row: sqlite3.Row,
-    env: WalkEnv,
-    checkpoint: walk.WalkCheckpoint,
-    ending: tuple[str, bool],
-) -> str:
+def finish_run(conn: sqlite3.Connection, row: sqlite3.Row, env: WalkEnv,
+               checkpoint: walk.WalkCheckpoint, ending: tuple[str, bool]) -> str:
     """Enqueue job.finished once per run; ending = (walk end reason, cancelled)."""
     current = repo.job(conn, row["job_id"])
     if current is None or current["finished"]:
@@ -158,9 +157,8 @@ def needs_attention(
     conn: sqlite3.Connection, row: sqlite3.Row, env: WalkEnv, checkpoint: walk.WalkCheckpoint
 ) -> str:
     """job.needs_attention once; the run stays open until the owner presses Jatka."""
-    facts = JobSink(context(row, claimed_job(row), env), lambda: "synced").facts(
-        checkpoint, walk.END_ATTENTION
-    )
+    sink = JobSink(context(row, claimed_job(row), env), lambda: "synced")
+    facts = sink.facts(checkpoint, walk.END_ATTENTION)
     with storage.transaction(conn):
         payload = finish.attention(conn, facts)
         make = events.envelope(api.JobNeeds_AttentionEvent, row["job_id"], row["run_id"], payload)
@@ -174,16 +172,17 @@ def needs_attention(
 def run_job(
     conn: sqlite3.Connection,
     row: sqlite3.Row,
-    env: WalkEnv,
+    machine: tuple[WalkEnv, browser.BrowserHost | None],
     hooks: tuple[Callable[[], bool], Callable[[walk.WalkEvent], None], Callable[[], str]],
     interrupt_of: Callable[[], str | None],
 ) -> str:
-    """Walk the job; returns its new local state. hooks = (should_stop, on_event, transport)."""
-    should_stop, on_event, transport = hooks
+    """Walk the job: its new local state. machine = (env, Chrome), hooks = (should_stop,
+    on_event, transport)."""
+    (env, host), (should_stop, on_event, transport) = machine, hooks
     claimed = claimed_job(row)
     begin(conn, row, env.version)
     sink = JobSink(context(row, claimed, env), transport)
-    settings = walk_settings(env, claimed, resume_checkpoint(conn, row, claimed))
+    settings = walk_settings(env, claimed, resume_checkpoint(conn, row, claimed), host)
     summary = walk.run_walk(settings, on_event, should_stop, sink)
     reason = interrupt_of() or (service.STOP_COLLECTING if summary.stopped else None)
     if reason in (service.STOP_COLLECTING, service.STOP_PAUSE, service.STOP_LEASE):
@@ -193,5 +192,5 @@ def run_job(
         return state
     if reason is None and summary.end_reason == walk.END_ATTENTION:
         return needs_attention(conn, row, env, summary.checkpoint)
-    cancelled = reason == service.STOP_CANCEL
-    return finish_run(conn, row, env, summary.checkpoint, (summary.end_reason, cancelled))
+    return finish_run(conn, row, env, summary.checkpoint,
+                      (summary.end_reason, reason == service.STOP_CANCEL))

@@ -1,59 +1,49 @@
-"""Yhteys controller: pairing key, Yhdistä and the 30 s heartbeat loop (TZ_TANDEM A1).
+"""Yhteys controller: pairing key, Yhdistä, Yhdistä uudelleen, heartbeats (TZ_TANDEM A1).
 
 Yhdistä parses the pasted `argus://pair?...` key, saves it (address and
-worker_id plain, token with DPAPI) and sends a heartbeat at once. A saved
-key connects by itself at every panel start; the loop then re-sends a
-heartbeat every 30 s and keeps trying while ARGUS cannot be reached. A
-rejected token stops the loop until a new key is pasted.
+worker_id plain, token with DPAPI) and sends a heartbeat at once; an empty
+field does nothing. A saved key connects by itself at every panel start;
+Yhdistä uudelleen sends a heartbeat with it at once, no key needed.
+Heartbeats (owner 05.10.2026, `heartbeat_loop`): every 30 s whatever the last
+answer was (a rejected token included), 30 s read time-out; a time-out shows
+`Hidas yhteys: N s` (not `Ei verkkoa`, which is for no answer at all). Lähetys
+is `Ei verkkoa` only when Yhteys is and delivery got no answer either
+(`delivery.Transport`).
 """
 
 from __future__ import annotations
 
 import functools
-import threading
-from collections.abc import Callable
+import time
 from dataclasses import replace
 from datetime import UTC, datetime
-from typing import Protocol, cast
+from typing import cast
 
 from argus_collector.api_client import contract as api
 from argus_collector.delivery import contract as delivery
-from argus_collector.diagnostics import contract as diagnostics
 from argus_collector.runtime import contract as runtime
-from argus_collector.scheduler import contract as scheduler
-from argus_collector.ui.app_collect import capabilities_of
+from argus_collector.ui import heartbeat_call, heartbeat_loop
 from argus_collector.ui.connection_lines import (
     STATE_CHECKING,
     STATE_ERROR,
     STATE_OK,
+    STATE_PANEL,
     STATE_REJECTED,
+    STATE_SLOW,
     ConnectionProps,
     ConnectionState,
     heartbeat_line,
+    timed_out,
 )
 from argus_collector.ui.connection_lines import connection_props as build_connection_props
 from argus_collector.ui.repository import Messages
 from argus_collector.worker_auth import contract as worker_auth
 
-HEARTBEAT_INTERVAL_S = 30.0
-SCHEMA_VERSIONS = ["1.1"]
-API_SUFFIX = "/api/collector"
-
-
-class Host(Protocol):
-    config: runtime.Config
-    report: diagnostics.Report | None
-
-    def post(self, action: Callable[[], None]) -> None: ...
-    def refresh(self) -> None: ...
-    def heartbeat_fields(self) -> scheduler.HeartbeatFields: ...
-    def heartbeat_answered(self, response: api.HeartbeatResponse, acks: list[str]) -> None: ...
-    def heartbeat_failed(self, status: int) -> None: ...
-    def connection_ok(self) -> None: ...
+STUCK_GRACE_S = 5.0  # an attempt longer than its time-out + this is stuck in the panel
 
 
 class ConnectionController:
-    def __init__(self, host: Host) -> None:
+    def __init__(self, host: heartbeat_call.Host) -> None:
         self.host = host
         saved = worker_auth.load_connection()
         self.state = ConnectionState(
@@ -61,9 +51,8 @@ class ConnectionController:
             worker_id=saved.worker_id if saved else "",
             token=worker_auth.mask_token(worker_auth.load_token() or ""),
         )
-        self._stop = threading.Event()
-        self._loop_thread: threading.Thread | None = None
-        self._heard = -1  # HTTP status of the last heartbeat in the journal (200 = answered)
+        self.loop = heartbeat_loop.HeartbeatLoop(self._beat)
+        self._heard = ""  # the last heartbeat answer written in the journal
 
     def props(self, msgs: Messages) -> ConnectionProps:
         return build_connection_props(msgs, self.state)
@@ -76,24 +65,35 @@ class ConnectionController:
         configured = cast("api.ProxyMode", self.host.config.network_proxy)
         return "direct" if worker_auth.is_loopback(address) else configured
 
-    def api_target(self) -> delivery.ApiTarget | None:
-        """Where delivery and claims go: the saved address, worker_id and token."""
+    def _paired(self) -> tuple[str, str, str] | None:
         state, token = self.state, worker_auth.load_token()
         if not state.address or not state.worker_id or not token:
             return None
-        base_url = state.address.rstrip("/") + API_SUFFIX
-        return delivery.ApiTarget(base_url, state.worker_id, token, self.proxy_mode(state.address))
+        return state.address, state.worker_id, token
+
+    def api_target(self) -> delivery.ApiTarget | None:
+        """Where delivery and claims go: the saved address, worker_id and token."""
+        paired = self._paired()
+        if paired is None:
+            return None
+        address, worker_id, token = paired
+        base_url = address.rstrip("/") + heartbeat_call.API_SUFFIX
+        return delivery.ApiTarget(base_url, worker_id, token, self.proxy_mode(address))
 
     def start_if_saved(self) -> None:
         """Panel start: a saved pairing connects by itself (heartbeat now, then every 30 s)."""
-        token = worker_auth.load_token()
-        if not self.state.address or not self.state.worker_id or not token:
+        if self._paired() is None:
             return
         self.host.connection_ok()
-        self._connect(self.state.address, self.state.worker_id, token)
+        self._checking(self.state.address, self.state.worker_id, self.state.token)
+        self.loop.now()
 
     def pair(self, key_text: str) -> None:
-        """Yhdistä: parse the pasted key, save it, connect with it."""
+        """Yhdistä: parse the pasted key, save it, connect with it; an empty field: nothing."""
+        if not key_text.strip():
+            self.state = replace(self.state, key_error=None)
+            self.host.refresh()
+            return
         try:
             key = worker_auth.parse_pairing_key(key_text)
         except worker_auth.PairingKeyError as exc:
@@ -101,19 +101,32 @@ class ConnectionController:
             self.host.refresh()
             return
         worker_auth.save_pairing(key)
-        self._connect(key.base_url, key.worker_id, key.token)
+        self._checking(key.base_url, key.worker_id, worker_auth.mask_token(key.token))
+        self.loop.now()
 
-    def _connect(self, address: str, worker_id: str, token: str) -> None:
+    def reconnect(self) -> None:
+        """Yhdistä uudelleen: a heartbeat at once with the saved key."""
+        if self._paired() is not None:
+            self._checking(self.state.address, self.state.worker_id, self.state.token)
+            self.loop.now()
+
+    def watch(self) -> None:
+        """Every second (main thread): the clock runs while paired; an attempt stuck past
+        its time-out shows as Hidas yhteys with the seconds it has taken."""
+        if self._paired() is None:
+            return
+        self.loop.ensure()
+        running = self.loop.running_for()
+        if running > heartbeat_loop.HEARTBEAT_TIMEOUT_S + STUCK_GRACE_S:
+            self.state = replace(self.state, status=STATE_SLOW, slow_s=int(running))
+            self.host.refresh()
+
+    def _checking(self, address: str, worker_id: str, masked_token: str) -> None:
         self.state = ConnectionState(
-            address=address, worker_id=worker_id, token=worker_auth.mask_token(token),
-            status=STATE_CHECKING, testing=True,
-            last_heartbeat=self._last_heartbeat(address, worker_id),
+            address=address, worker_id=worker_id, token=masked_token, status=STATE_CHECKING,
+            testing=True, last_heartbeat=self._last_heartbeat(address, worker_id),
         )
         self.host.refresh()
-        threading.Thread(
-            target=self._attempt, args=(address, worker_id, token), name="heartbeat-connect"
-        ).start()
-        self._start_loop()
 
     def _last_heartbeat(self, address: str, worker_id: str) -> datetime | None:
         """The last answered heartbeat stays shown while the same worker is tried again."""
@@ -122,45 +135,35 @@ class ConnectionController:
     def _is_current(self, address: str, worker_id: str) -> bool:
         return (address, worker_id) == (self.state.address, self.state.worker_id)
 
-    def _attempt(self, address: str, worker_id: str, token: str) -> None:
-        try:
-            self._call(address, worker_id, token)
-        except api.ApiError as exc:
-            self._journal(exc.status, exc.error)
-            self.host.heartbeat_failed(exc.status)
-            self.host.post(functools.partial(self._apply_error, address, worker_id, exc))
+    def _beat(self) -> None:
+        """One heartbeat (the clock's thread); the outcome goes to the main thread."""
+        paired = self._paired()
+        if paired is None:
             return
-        self._journal(200, None)
+        address, worker_id, token = paired
+        started = time.monotonic()
+        try:
+            heartbeat_call.send(self.host, address, worker_id, token,
+                                self.proxy_mode(address))
+        except api.ApiError as exc:
+            slow_s = timed_out(exc, time.monotonic() - started)
+            self._journal(heartbeat_line(exc.status, exc.error, slow_s))
+            if not slow_s:  # slow is not Ei verkkoa, in Lahetys neither
+                self.host.heartbeat_failed(exc.status)
+            self.host.post(functools.partial(self._apply_error, address, worker_id, exc, slow_s))
+            return
+        except Exception as exc:  # a fault inside the panel: shown, the clock goes on
+            self._journal(f"heartbeat: {type(exc).__name__} in the panel: {str(exc)[:160]}")
+            self.host.post(functools.partial(self._apply_panel, address, worker_id, exc))
+            return
+        self._journal(heartbeat_line(200, None))
         self.host.post(functools.partial(self._apply_ok, address, worker_id))
 
-    def _journal(self, status: int, body: api.Error | None) -> None:
+    def _journal(self, line: str) -> None:
         """A changed heartbeat answer goes in the journal (not one line every 30 s)."""
-        if status != self._heard:
-            self._heard = status
-            runtime.journal("http", heartbeat_line(status, body))
-
-    def _call(self, address: str, worker_id: str, token: str) -> api.HeartbeatResponse:
-        """One heartbeat with the collector's leases, outbox, slots and command acks;
-        the answer (renewals, commands) goes back to the collector."""
-        caps = capabilities_of(self.host.report)
-        fields = self.host.heartbeat_fields()
-        request = api.HeartbeatRequest(
-            worker_id=worker_id,
-            worker_version=runtime.current_version_status().file_version,
-            schema_versions=SCHEMA_VERSIONS,
-            capabilities=caps,
-            collecting=fields.collecting,
-            active_jobs=fields.active_jobs,
-            outbox_pending=fields.outbox_pending,
-            free_job_slots=fields.free_job_slots,
-            browser_available=caps.browser,
-            model_available=caps.model,
-            acknowledgements=fields.acknowledgements,
-        )
-        base_url = address.rstrip("/") + API_SUFFIX
-        response = api.heartbeat(base_url, token, request, proxy_mode=self.proxy_mode(address))
-        self.host.heartbeat_answered(response, [a.command_id for a in fields.acknowledgements])
-        return response
+        if line != self._heard:
+            self._heard = line
+            runtime.journal("http", line)
 
     def _apply_ok(self, address: str, worker_id: str) -> None:
         if not self._is_current(address, worker_id):
@@ -172,27 +175,21 @@ class ConnectionController:
         self.host.refresh()
         self.host.connection_ok()
 
-    def _apply_error(self, address: str, worker_id: str, exc: api.ApiError) -> None:
+    def _apply_error(self, address: str, worker_id: str, exc: api.ApiError, slow_s: int) -> None:
         if not self._is_current(address, worker_id):
             return
-        status = STATE_REJECTED if exc.status == 401 else STATE_ERROR
+        status = STATE_SLOW if slow_s else STATE_REJECTED if exc.status == 401 else STATE_ERROR
         body = exc.error
         detail = (body.detail or body.code) if body else str(exc) if not exc.status else ""
-        self.state = ConnectionState(address, worker_id, self.state.token, status, detail,
-                                     exc.status, self.state.last_heartbeat)
+        self.state = ConnectionState(
+            address=address, worker_id=worker_id, token=self.state.token, status=status,
+            error_detail=detail, error_status=exc.status, slow_s=slow_s,
+            last_heartbeat=self.state.last_heartbeat,
+        )
         self.host.refresh()
 
-    def _start_loop(self) -> None:
-        if self._loop_thread is not None and self._loop_thread.is_alive():
-            return
-        self._stop.clear()
-        self._loop_thread = threading.Thread(target=self._loop, name="heartbeat-loop", daemon=True)
-        self._loop_thread.start()
-
-    def _loop(self) -> None:
-        while not self._stop.wait(HEARTBEAT_INTERVAL_S):
-            state = self.state
-            token = worker_auth.load_token()
-            if not state.worker_id or not token or state.status == STATE_REJECTED:
-                continue
-            self._attempt(state.address, state.worker_id, token)
+    def _apply_panel(self, address: str, worker_id: str, exc: Exception) -> None:
+        if self._is_current(address, worker_id):
+            self.state = replace(self.state, status=STATE_PANEL, testing=False,
+                                 error_detail=f"{type(exc).__name__}: {str(exc)[:120]}")
+            self.host.refresh()

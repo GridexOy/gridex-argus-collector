@@ -12,9 +12,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from argus_collector.extraction import email_pattern as patterns
 from argus_collector.extraction import jsonld_people as jsonld
 from argus_collector.extraction import repository, roles, sections, service
 from argus_collector.extraction import text_cards as text_rules
+from argus_collector.extraction.email_pattern import EmailPattern
 from argus_collector.extraction.roles import ChannelRole
 from argus_collector.extraction.sections import OfficeLines, Section
 from argus_collector.extraction.service import (
@@ -29,6 +31,7 @@ __all__ = [
     "Channel",
     "ChannelRole",
     "Contact",
+    "EmailPattern",
     "OfficeLines",
     "PersonCard",
     "Section",
@@ -36,12 +39,14 @@ __all__ = [
     "card_from_json",
     "classify_unattached",
     "country_sections",
+    "email_patterns",
     "extract_channels",
     "has_contact_signals",
     "html_language",
     "jsonld_people",
     "office_lines",
     "panel_sections",
+    "pattern_address",
     "region_resolver",
     "section_at",
     "text_cards",
@@ -106,6 +111,17 @@ def jsonld_people(html: str) -> list[PersonCard]:
 def text_cards(text: str, channels: list[Channel]) -> list[PersonCard]:
     """Cards read by rule: a name line with a phone / email of the page below it."""
     return text_rules.text_cards(text, channels)
+
+
+def email_patterns(text: str) -> list[EmailPattern]:
+    """Address patterns the page states (`firstname.lastname@reimax.net`), with the
+    quoted line; such a placeholder is never a channel or a person's email."""
+    return patterns.find_patterns(text)
+
+
+def pattern_address(pattern: EmailPattern, name: str) -> str | None:
+    """The address a stated pattern gives a full name (None for a one-word name)."""
+    return patterns.address(pattern, name)
 
 
 def card_from_json(data: object) -> PersonCard | None:

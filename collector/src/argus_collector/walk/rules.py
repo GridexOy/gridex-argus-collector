@@ -27,7 +27,7 @@ LINK = "link"
 
 def _open_links(state: WalkState, candidates: list[discovery.Candidate]) -> list[
         discovery.Candidate]:
-    visited = set(state.cp.visited)
+    visited = state.walked()
     return [
         c for c in candidates
         if c.kind == LINK and discovery.is_allowed_url(c.href, state.hosts)

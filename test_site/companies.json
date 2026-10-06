@@ -143,5 +143,23 @@
       "en"
     ],
     "project_id": "fixture-expo-2027"
+  },
+  {
+    "company_id": "reimax",
+    "company_name": "Reimax Oy",
+    "seed_urls": [
+      "http://reimax.localhost:8765/"
+    ],
+    "approved_hosts": [
+      "reimax.localhost"
+    ],
+    "priority_countries": [
+      "FI"
+    ],
+    "priority_languages": [
+      "fi",
+      "en"
+    ],
+    "project_id": "fixture-expo-2027"
   }
 ]

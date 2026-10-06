@@ -58,3 +58,15 @@ def line(job_id: str, url: str, timing: PageTiming) -> str:
 
 def flush(job_id: str, url: str, timing: PageTiming) -> None:
     runtime.journal(CHANNEL, line(job_id, url, timing))
+
+
+def failed(job_id: str, error: str) -> None:
+    """`job <id>: walk error <type>: <first line>` - why a walk ended `failed`."""
+    runtime.journal(CHANNEL, f"job {job_id or 'local'}: walk error {error}")
+
+
+def chrome(job_id: str, start_ms: int, shared: bool) -> None:
+    """`job <id>: chrome start=1840 ms shared=yes`: the browser start of a walk, 0 when the
+    collection's Chrome was already running (owner 06.10.2026)."""
+    runtime.journal(CHANNEL, f"job {job_id or 'local'}: chrome start={start_ms} ms"
+                    f" shared={'yes' if shared else 'no'}")

@@ -15,6 +15,7 @@ from argus_collector.extraction import contract as extraction
 from argus_collector.walk import context as ctx
 from argus_collector.walk.entities import BINDING_CAPTION, CONFIRMED, PageBuilder, status_of
 from argus_collector.walk.offices import add_offices
+from argus_collector.walk.patterns import BINDING_NONE, UNCONFIRMED, add_patterns, from_pattern
 from argus_collector.walk.sink import (
     AuditEntry,
     FieldFinding,
@@ -42,7 +43,7 @@ def probes(contacts: list[extraction.Contact]) -> list[PersonProbe]:
             c.name.quote,
             tuple(
                 ProbeValue(vf.quote, name if name != FIELD_TITLE else "text", vf.value)
-                for name, vf in person_fields(c)
+                for name, vf in person_fields(c) if not from_pattern(vf)  # last: no shift
             ),
         )
         for c in contacts
@@ -52,7 +53,7 @@ def probes(contacts: list[extraction.Contact]) -> list[PersonProbe]:
 def person_key(state: WalkState, contact: extraction.Contact) -> str:
     """Same name = same person, unless both carry different personal emails."""
     base = contact.name.value.casefold()
-    email = contact.email.value if contact.email else None
+    email = contact.email.value if contact.email and not from_pattern(contact.email) else None
     known = state.cp.entities.get(base, {}).get("email")
     return f"{base}|{email}" if known and email and known != email else base
 
@@ -84,11 +85,13 @@ def _add_person(
     key = person_key(page.state, contact)
     probed = person_fields(contact)
     bindings = binding.values
-    name_status = CONFIRMED if probed else "ambiguous"  # a bare name proves little
+    proven = [vf for _name, vf in probed if not from_pattern(vf)]
+    name_status = CONFIRMED if proven else "ambiguous"  # a bare name proves little
     pairs = [(FIELD_NAME, contact.name, _name_binding(bindings), name_status)]
     for i, (name, vf) in enumerate(probed):
-        value_binding = bindings[i] if i < len(bindings) else "none"
-        pairs.append((name, vf, value_binding, status_of(value_binding)))
+        value_binding = bindings[i] if i < len(bindings) and not from_pattern(vf) else BINDING_NONE
+        status = UNCONFIRMED if from_pattern(vf) else status_of(value_binding)
+        pairs.append((name, vf, value_binding, status))
     pairs += _context_pairs(page, contact, binding, context)
     new: list[FieldFinding] = []
     for name, vf, field_binding, status in pairs:
@@ -152,6 +155,7 @@ def build_findings(
         for i, contact in enumerate(contacts)
     ]
     add_offices(page, where, channels)
+    add_patterns(page, where.patterns)
     for channel in channels:
         _add_channel(page, channel, where)
     return PageFindings(source, tuple(page.entities), tuple(page.audit)), keys

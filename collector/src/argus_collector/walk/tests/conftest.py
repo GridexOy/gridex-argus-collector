@@ -34,7 +34,8 @@ def gold() -> dict[str, Any]:
 
 
 def settings_for(
-    site: str, fake: FakeModelServer, tmp_path: Path, budget: int = 10
+    site: str, fake: FakeModelServer, tmp_path: Path, budget: int = 10,
+    stop_at_goal: bool = False,  # these walks read the whole site (gold); goal: test_goal
 ) -> contract.WalkSettings:
     return contract.WalkSettings(
         start_url=site,
@@ -45,4 +46,5 @@ def settings_for(
         evidence_dir=tmp_path / "evidence",
         db_path=tmp_path / "collector.db",
         stop_files=(tmp_path / "STOP",),
+        stop_at_goal=stop_at_goal,
     )

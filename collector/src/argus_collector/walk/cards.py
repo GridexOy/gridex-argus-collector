@@ -4,8 +4,9 @@
 by rule (a name line with a phone / email of the page right below it,
 `extraction.text_cards`), both verified like model cards; the same canonical
 text already read on another URL gives its people again. The card model is
-asked only for what is left: a channel that may be a person's and that no
-read card explains, or a contact page with nobody read. A long page goes in
+asked only when the rules read nobody (owner 06.10.2026: people the rules
+read end the page's model calls): for a channel that may be a person's, or
+a contact page. A long page goes in
 windows around those channels (not the first 8000 characters, Ellego), each
 window one call on a worker thread, so the next step is chosen meanwhile.
 `finish` (before any navigation): the calls are joined and logged, a cut-off
@@ -51,12 +52,11 @@ def _verified(cards: list[extraction.PersonCard], read: PendingRead) -> list[ext
 
 
 def _unexplained(read: PendingRead, sections: list[extraction.Section]) -> list[tuple[int, int]]:
-    """Spans of channels that may be a person's and that no read card explains."""
-    known = {f.value for c in read.people for f in (c.phone, c.email) if f is not None}
+    """Spans of channels that may be a person's (not a company / office channel)."""
     spans = []
     for channel in read.channels:
         span = channel.span
-        if span is None or channel.value in known or extraction.section_at(sections, span.start):
+        if span is None or extraction.section_at(sections, span.start):
             continue
         if extraction.classify_unattached(channel, read.text).entity_type == UNASSIGNED:
             spans.append((span.start, span.end))
@@ -103,9 +103,11 @@ def start(state: WalkState, page: browser.PageState, text: str,
     if read.digest in state.read_cache:
         state.timing.cards = "cache"
         read.people = list(state.read_cache[read.digest])
+    if read.people:  # no model on this page (owner 06.10.2026); its next step: rules
+        state.ruled_urls.add(discovery.normalize_url(page.url))
         return read
     spans = _unexplained(read, sections)
-    contact_page = discovery.contact_link(page.title, page.url) and not read.people
+    contact_page = discovery.contact_link(page.title, page.url)
     if extraction.has_contact_signals(text, channels) and (spans or contact_page):
         _ask(state, page, read, spans)
     return read

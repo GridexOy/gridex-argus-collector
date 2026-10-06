@@ -49,7 +49,7 @@ class PanelApp:
         callbacks = Callbacks(
             self.open_browser, self.collect.start, self.local_test, self.collect.stop,
             self.walk.open_source, self.connection.pair, self.open_attention,
-            self.attention_done,
+            self.attention_done, self.connection.reconnect,
         )
         self.view = PanelView(root, self.props(), callbacks)
         self.render_attention()
@@ -119,6 +119,7 @@ class PanelApp:
         self.browser.poll()
         self._pumps += 1
         if self._pumps % BLOCKS_EVERY == 0:
+            self.connection.watch()  # the heartbeat clock runs; a stuck attempt shows
             self.refresh_blocks()
 
     def schedule_pump(self) -> None:

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 from argus_collector.diagnostics.contract import ChromeState, ModelState, Report
 from argus_collector.ui.repository import Messages
-from argus_collector.walk.contract import WalkEvent
+from argus_collector.walk.contract import LOCATOR_PATTERN, WalkEvent
 
 LEVEL_OK = "ok"
 LEVEL_WARN = "warn"
@@ -21,6 +21,11 @@ STEP_KEYS = {
     "scroll": "collecting.step.scroll",
     "attention": "collecting.step.attention",
     "consent": "collecting.step.consent",
+    "loop": "collecting.step.loop",
+}
+GOAL_KEYS = {  # the walk ended by its goal (owner 06.10.2026)
+    "goal": "collecting.status.goal",
+    "goal_pages": "collecting.status.goalPages",
 }
 MODEL_DETAIL_KEYS = {
     "cards": "collecting.step.modelCards",
@@ -103,7 +108,19 @@ def collect_props(
     )
 
 
+def goal_line(msgs: Messages, event: WalkEvent) -> tuple[str, str] | None:
+    """`Tavoite saavutettu: N henkilöä, M kanavaa` for a goal step or a goal end."""
+    key = GOAL_KEYS.get(event.step)
+    if key is None:
+        return None
+    level = LEVEL_OK if event.step == "goal" else LEVEL_INFO
+    return msgs.t(key, n=event.people, m=event.channels), level
+
+
 def _step_line(msgs: Messages, event: WalkEvent) -> tuple[str, str]:
+    goal = goal_line(msgs, event)
+    if goal is not None:
+        return goal
     if event.step == "model":
         if "failed" in event.detail:
             return msgs.t("collecting.step.modelFailed", detail=event.detail), LEVEL_ERROR
@@ -121,6 +138,8 @@ def walk_event_line(msgs: Messages, event: WalkEvent) -> tuple[str, str] | None:
         return text, LEVEL_INFO
     if event.kind == "step":
         return _step_line(msgs, event)
+    if event.kind == "done":
+        return goal_line(msgs, event)
     if event.kind == "stopped":
         return msgs.t("collecting.status.stopped"), LEVEL_WARN
     if event.kind == "error":
@@ -132,15 +151,19 @@ def done_line(msgs: Messages, pages: int, contacts: int) -> tuple[str, str]:
     return msgs.t("collecting.status.done", pages=pages, contacts=contacts), LEVEL_OK
 
 
-def contact_row(event: WalkEvent) -> tuple[str, str, str, str, str]:
-    """Nimi, Titteli, Puhelin, Sahkoposti, Lahde for the table."""
+def contact_row(event: WalkEvent, msgs: Messages | None = None) -> tuple[str, str, str, str, str]:
+    """Nimi, Titteli, Puhelin, Sahkoposti, Lahde for the table; an address built from
+    the pattern the page states reads `oletettu: ...`."""
     contact = event.contact
     if contact is None:
         return ("", "", "", "", event.url)
+    email = contact.email.value if contact.email else ""
+    if msgs is not None and contact.email and contact.email.locator == LOCATOR_PATTERN:
+        email = msgs.t("collecting.inferred", value=email)
     return (
         contact.name.value,
         contact.title.value if contact.title else "",
         contact.phone.value if contact.phone else "",
-        contact.email.value if contact.email else "",
+        email,
         event.url,
     )

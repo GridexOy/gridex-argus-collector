@@ -62,11 +62,22 @@ def test_a_page_without_personal_channels_is_skipped(fake: FakeModelServer) -> N
     assert (walk.timing.cards, fake.requests) == ("skip", [])
 
 
-def test_a_personal_channel_goes_to_the_card_model(fake: FakeModelServer) -> None:
+LINE = "Anna Virtanen, Myyntijohtaja, 040 123 4567, anna.virtanen@example.fi\n"
+
+
+def test_a_card_the_rules_read_needs_no_model(fake: FakeModelServer) -> None:
     walk = walk_state(fake)
     assert read(walk, "https://example.fi/tiimi/", "Tiimi", CARD) == ["Anna Virtanen"]
+    assert (walk.timing.cards, fake.requests) == ("rules", [])
+
+
+def test_a_personal_channel_the_rules_cannot_read_goes_to_the_card_model(
+    fake: FakeModelServer,
+) -> None:
+    walk = walk_state(fake)
+    assert read(walk, "https://example.fi/tiimi/", "Tiimi", LINE) == ["Anna Virtanen"]
     assert walk.timing.cards == "model:qwen2.5:14b" and len(fake.requests) == 1
-    assert read(walk, "https://example.fi/tiimi/?tab=2", "Tiimi", CARD) == ["Anna Virtanen"]
+    assert read(walk, "https://example.fi/tiimi/?tab=2", "Tiimi", LINE) == ["Anna Virtanen"]
     assert walk.timing.cards == "cache" and len(fake.requests) == 1, "same text: no new call"
 
 

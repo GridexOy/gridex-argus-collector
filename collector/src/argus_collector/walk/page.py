@@ -10,8 +10,9 @@ from argus_collector.evidence import contract as evidence
 from argus_collector.extraction import contract as extraction
 from argus_collector.normalization import contract as norm
 from argus_collector.storage import contract as storage
-from argus_collector.walk import cards, coverage, findings, repository, service, structure
+from argus_collector.walk import cards, coverage, findings, goal, repository, service, structure
 from argus_collector.walk.context import PageContext
+from argus_collector.walk.patterns import from_pattern, with_pattern
 from argus_collector.walk.service import WalkEvent
 from argus_collector.walk.sink import PageFindings, PageSource
 from argus_collector.walk.state import WalkState
@@ -36,13 +37,15 @@ def enter(state: WalkState, page: browser.PageState) -> bool:
 
 
 def ranked(state: WalkState, page: browser.PageState) -> list[discovery.Candidate]:
-    """Page links plus frontier links from earlier pages, then the page's buttons."""
+    """Page links plus frontier links from earlier pages, then the page's buttons; not
+    a link that only led back to a walked page, not a button pressed in this page state."""
     frontier = [c for c in state.frontier_candidates() if not structure.foreign(state, c)]
     pool = structure.offered(state, page.candidates) + frontier
-    ordered = discovery.rank_candidates(pool, set(state.cp.visited), state.hosts, state.focus)
+    ordered = discovery.rank_candidates(pool, state.walked(), state.hosts, state.focus)
     links = [c for c in ordered if c.kind == "link"][:MAX_LINKS_SHOWN]
     finished = discovery.normalize_url(page.url) in state.finished_urls  # finish_branch
-    buttons = [c for c in ordered if c.kind == "button" and c.selector not in state.failed_targets
+    pressed = state.clicked.get(state.current_key, set()) | state.failed_targets
+    buttons = [c for c in ordered if c.kind == "button" and c.selector not in pressed
                and not finished]
     return links + buttons[:MAX_BUTTONS_SHOWN]
 
@@ -57,6 +60,7 @@ class Pending:
     sections: list[extraction.Section]
     channels: list[extraction.Channel]
     read: cards.PendingRead
+    patterns: tuple[extraction.EmailPattern, ...] = ()
 
 
 def observe(
@@ -67,13 +71,15 @@ def observe(
     text = evidence.canonical_text(page.text)
     key = discovery.page_key(page.url, evidence.sha256_text(text))
     offered = structure.offered(state, page.candidates)
-    links = discovery.rank_candidates(offered, set(state.cp.visited), state.hosts)
+    links = discovery.rank_candidates(offered, state.walked(), state.hosts)
+    state.current_key = key
     if state.job_mode:
         coverage.note_foreign_links(state, page.url, [c for c in offered if c.kind == "link"])
     state.remember_links(page.url, [c for c in links if c.kind == "link"])
     pending = None
     if key not in state.cp.seen_keys:
         state.cp.seen_keys.append(key)
+        state.stalled = 0
         pending = _start(state, page, text, key)
     elif state.seen_again(page.url, key):
         state.step(service.STEP_LOOP, "finish_branch", page.url)
@@ -129,7 +135,8 @@ def _start(state: WalkState, page: browser.PageState, text: str, key: str) -> Pe
         lang, region, sections, channels = _channels(state, page, text)
         read = cards.start(state, page, text, channels, sections, region)
     state.page_has_contacts = bool(read.people or read.calls or channels)
-    return Pending(key, source, lang, sections, channels, read)
+    patterns = tuple(extraction.email_patterns(text))
+    return Pending(key, source, lang, sections, channels, read, patterns)
 
 
 def complete(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState,
@@ -138,16 +145,18 @@ def complete(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState,
     if pending is None:
         return
     with timed(state.timing, "cards"):
-        contacts = cards.finish(state, page, pending.read)
+        contacts = with_pattern(cards.finish(state, page, pending.read), pending.patterns)
     state.page_has_contacts = bool(contacts or pending.channels)
     coverage.note_total(state, pending.read.text, len(contacts))
     with timed(state.timing, "bind"):
         bindings = wb.bindings(findings.probes(contacts)) if state.job_mode and contacts else []
     with timed(state.timing, "record"):
-        context = PageContext(tuple(pending.sections), pending.lang)
+        context = PageContext(tuple(pending.sections), pending.lang, pending.patterns)
         found, keys = findings.build_findings(state, pending.source, contacts, bindings,
                                               pending.channels, context)
         _record(state, pending.source, found, list(zip(keys, contacts, strict=True)))
+    for key, contact in zip(keys, contacts, strict=True):
+        goal.note(state.goal, key, contact, from_pattern(contact.email), state.cp.pages)
     state.progress += sum(len(entity.fields) for entity in found.entities)
     state.loops[pending.key] = (0, state.progress)
 

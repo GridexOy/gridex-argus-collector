@@ -140,3 +140,13 @@ def test_load_config_prefers_user_dir(monkeypatch: pytest.MonkeyPatch, tmp_path:
     (tmp_path / "config.yaml").write_text("test_site:\n  port: 9100\n", encoding="utf-8")
     cfg = contract.load_config()
     assert cfg.test_site_port == 9100 and cfg.source == str(tmp_path / "config.yaml")
+
+
+def test_walk_settings_of_the_config_file() -> None:
+    """walk.action_budget (0.4.8.6) and walk.stop_at_goal (owner 06.10.2026)."""
+    parsed = service.config_from_mapping({"walk": {"action_budget": 25, "stop_at_goal": False}},
+                                         "test")
+    assert (parsed.walk_action_budget, parsed.walk_stop_at_goal) == (25, False)
+    assert service.Config().walk_stop_at_goal is True
+    with pytest.raises(ValueError, match="stop_at_goal"):
+        service.config_from_mapping({"walk": {"stop_at_goal": "no"}}, "test")

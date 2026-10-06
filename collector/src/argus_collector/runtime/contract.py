@@ -7,9 +7,10 @@ the VERSION file, the build info written by install.ps1 and the kill switch.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import IO
 
+from argus_collector.runtime import instance, repository, service
 from argus_collector.runtime import journal as journal_file
-from argus_collector.runtime import repository, service
 from argus_collector.runtime.service import (
     BuildInfo,
     Config,
@@ -26,6 +27,9 @@ __all__ = [
     "browser_profile_dir",
     "current_version_status",
     "load_config",
+    "panel_lock",
+    "panel_owner",
+    "panel_release",
     "finnish_stamp",
     "journal",
     "prune_journal",
@@ -106,3 +110,18 @@ def prune_journal() -> int:
 def safe_url(url: str) -> str:
     """URL fit for the journal: no query string, fragment or credentials."""
     return journal_file.safe_url(url)
+
+
+def panel_lock() -> IO[str] | None:
+    """The one-panel lock, held open while the panel runs; None: another panel has it."""
+    return instance.acquire(repository.user_data_dir())
+
+
+def panel_owner() -> str:
+    """Process id of the panel that holds the lock."""
+    return instance.owner(repository.user_data_dir())
+
+
+def panel_release(lock: IO[str]) -> None:
+    """Free the one-panel lock when the panel closes."""
+    instance.release(lock)

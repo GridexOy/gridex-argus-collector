@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # Ordered list of (version, sql) applied once each; never edit an applied entry.
 MIGRATIONS: list[tuple[int, str]] = [
@@ -145,6 +145,15 @@ MIGRATIONS: list[tuple[int, str]] = [
             attempts INTEGER NOT NULL DEFAULT 0,
             acked_at TEXT
         );
+        """,
+    ),
+    (
+        3,
+        """
+        ALTER TABLE outbox ADD COLUMN retry_code TEXT NOT NULL DEFAULT '';
+        ALTER TABLE outbox ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE outbox ADD COLUMN replaced_type TEXT NOT NULL DEFAULT '';
+        ALTER TABLE outbox ADD COLUMN replaced_event_id TEXT NOT NULL DEFAULT '';
         """,
     ),
 ]
