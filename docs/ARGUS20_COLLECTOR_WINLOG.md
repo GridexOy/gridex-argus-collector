@@ -185,6 +185,41 @@ Gap за сутки: `no_progress` 27, `timeout` 16, `domain_ownership_unresolve
 
 ## Ответы на вопросы облака
 
+### cv0.4.8.8 на Windows тоже не встала (06.10 klo 21:35)
+
+Вопрос облака «ставить 0.4.8.8» прочитан, `main` = `ffc90bc` + мой ответ, VERSION 0.4.8.8. `install.ps1` остановился снова, теперь на **двух** тестах:
+
+```
+gates: 11 ok, 0 failed
+FAILED collector/src/argus_collector/delivery/tests/test_holds.py::test_two_threads_open_a_new_database_at_once
+FAILED collector/src/argus_collector/pilot/tests/test_pilot.py::test_report_of_a_batch
+STOP: tests failed - nothing installed
+```
+
+Первое падение — в самой правке 0.4.8.8 («migrations run under a lock»):
+
+```
+assert errors == []
+AssertionError: assert [OperationalE...e is locked')] == []
+  Left contains one more item: OperationalError('database is locked')
+collector\src\argus_collector\delivery\tests\test_holds.py:74
+```
+
+Четыре потока открывают новую базу одновременно (сценарий «первый запуск после обновления с миграцией»), и на Windows один из них получает `database is locked`.
+
+Общий знаменатель обоих падений — нагрузка, а не логика:
+
+| Как запускал | `test_holds` | `test_report_of_a_batch` |
+|---|---|---|
+| файл в одиночку, 3 раза подряд | 3 из 3 passed | passed (9.24 с) |
+| пакет целиком (`delivery` / `pilot`) | **failed** | passed (7 passed) |
+| пакет с соседом (`pilot` + `scheduler`) | — | **failed** |
+| весь набор | **failed** | **failed** |
+
+В контейнере на Linux оба проходят (отчёт облака: 667 passed). На Windows под нагрузкой — нет: это ожидания и таймауты, которых хватает на свободной машине и не хватает на занятой. Для `test_holds` это прямо видно — `database is locked`, то есть у миграции под блокировкой слишком короткое ожидание; это риск не только для теста, но и для первого запуска панели после обновления на машине владельца.
+
+**Итог прохода: на MAIN-PC по-прежнему стоит cv0.4.8.6.** Ни 0.4.8.7, ни 0.4.8.8 установить не удалось, и вопросы 2, 5, 6, 7 остаются без живой проверки до версии, которая проходит тесты на Windows.
+
 ### Ответы на 8 вопросов cv0.4.8.7 (проход 06.10 klo 20:56–21:20)
 
 **Главное: cv0.4.8.7 на Windows не установилась — тесты падают, `install.ps1` ничего не установил.** Панель осталась cv0.4.8.6. Поэтому вопросы 2, 5, 6, 7 остались без живой проверки: они требуют работающей 0.4.8.7.
