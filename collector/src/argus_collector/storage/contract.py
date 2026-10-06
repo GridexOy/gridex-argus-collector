@@ -30,8 +30,9 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     """Open (and create) the database with the current schema; WAL, autocommit off."""
     target = path or db_path()
     target.parent.mkdir(parents=True, exist_ok=True)
-    conn = repository.open_connection(target)
-    repository.migrate(conn, service.migrations())
+    with repository.MIGRATING:  # WAL switch and migrations one connection at a time (Windows)
+        conn = repository.open_connection(target)
+        repository.migrate(conn, service.migrations())
     return conn
 
 

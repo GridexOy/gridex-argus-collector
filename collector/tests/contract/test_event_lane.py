@@ -100,11 +100,17 @@ def test_events_leave_while_the_snapshot_still_uploads(
             rows, upload = states(db)
         sent_after = time.monotonic() - begun
         assert upload == "pending", "the snapshot is still on its way"
-        assert rows == [("accepted", ""), ("accepted", "evidence_pending"), ("accepted", "")]
+        assert rows == [("accepted", ""), ("waiting", "evidence_pending"), ("accepted", "")]
         assert sent_after < 1.0, f"the page's events left after {sent_after:.2f} s"
-        while upload == "pending" and time.monotonic() - begun < 10:
+        while (upload == "pending" or any(s == "waiting" for s, _ in rows)) \
+                and time.monotonic() - begun < 15:
             time.sleep(0.05)
             rows, upload = states(db)
         assert upload == "accepted"
+        assert rows[1] == ("duplicate", ""), "the verdict is asked after the upload"
+        conn = storage.connect(db)
+        status = conn.execute("SELECT channel_status FROM outbox WHERE seq = 2").fetchone()[0]
+        conn.close()
+        assert status == "published_direct", "ARGUS's rating reaches the outbox (pilot)"
     finally:
         deliverer.stop()

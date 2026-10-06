@@ -65,23 +65,52 @@ def lost(conn: sqlite3.Connection, hooks: DeliveryHooks, job_id: str, row: sqlit
 
 def give_up(conn: sqlite3.Connection, hooks: DeliveryHooks, job_id: str, row: sqlite3.Row,
             code: str, last_seq: int, why: str) -> None:
-    """Never sent again; a stand-in takes its seq unless ARGUS already counted the seq."""
+    """Never sent again; a filler takes its seq unless ARGUS already counted the seq: a
+    `source.blocked` that says what was lost, and when ARGUS refuses that one too, a copy
+    of the run's last accepted `job.progress` (06.10.2026: Sonepar's fillers refused)."""
     item = f"event {row['event_id']} seq {row['seq']} ({why})"
-    hooks.rejected(conn, job_id, str(row["type"]), code, item)
+    filler = bool(row["replaced_type"])
+    if not filler:  # a refused filler is no second lost event
+        hooks.rejected(conn, job_id, str(row["type"]), code, item)
     if last_seq >= int(row["seq"]):
         repo.mark_events(conn, [(str(row["event_id"]), "rejected", code, None, None)])
         return
-    stand_in = _stand_in(conn, row, code, why)
+    blocked = None if filler else _stand_in(conn, row, code, why)
+    event: api.SourceBlockedEvent | api.JobProgressEvent | None = (
+        blocked or _progress_copy(conn, row))
+    if event is None:  # nothing left that ARGUS takes: the tail waits, shown as an error
+        runtime.journal("delivery", f"job {job_id}: seq {row['seq']} has no filler ARGUS"
+                        f" takes ({row['type']} refused {code}); the run's tail waits")
+        repo.mark_events(conn, [(str(row["event_id"]), "rejected", code, None, None)])
+        return
     with conn:
         conn.execute(
             "UPDATE outbox SET event_id = ?, type = ?, event_json = ?, evidence_ids_json = '[]',"
-            " status = 'pending', code = '', replaced_type = type, replaced_event_id = event_id,"
-            " retry_code = ? WHERE event_id = ?",
-            (stand_in.event_id, stand_in.type, json.dumps(api.to_json(stand_in)), code,
-             row["event_id"]),
+            " status = 'pending', code = '', retry_code = ?,"
+            " replaced_type = CASE replaced_type WHEN '' THEN type ELSE replaced_type END,"
+            " replaced_event_id = CASE replaced_event_id WHEN '' THEN event_id"
+            " ELSE replaced_event_id END WHERE event_id = ?",
+            (event.event_id, event.type, json.dumps(api.to_json(event)), code, row["event_id"]),
         )
-    runtime.journal("delivery", f"job {job_id}: seq {row['seq']} carries source.blocked"
-                    f" {stand_in.event_id} instead of {row['type']} {row['event_id']}")
+    runtime.journal("delivery", f"job {job_id}: seq {row['seq']} carries {event.type}"
+                    f" {event.event_id} instead of {row['type']} {row['event_id']}")
+
+
+def _progress_copy(conn: sqlite3.Connection, row: sqlite3.Row) -> api.JobProgressEvent | None:
+    """The run's last accepted job.progress again (no new state) under this seq."""
+    found = conn.execute(
+        "SELECT event_json FROM outbox WHERE run_id = ? AND type = ? AND status IN"
+        " ('accepted', 'duplicate') ORDER BY seq DESC LIMIT 1",
+        (row["run_id"], api.JobProgressEvent.type),
+    ).fetchone()
+    if found is None:
+        return None
+    last = api.event_from_json(json.loads(found[0]))
+    assert isinstance(last, api.JobProgressEvent)
+    return api.JobProgressEvent(
+        event_id=str(uuid.uuid4()), job_id=last.job_id, run_id=last.run_id, seq=int(row["seq"]),
+        occurred_at=datetime.now(UTC).isoformat(timespec="milliseconds"), payload=last.payload,
+    )
 
 
 def _stored(conn: sqlite3.Connection, evidence_id: str) -> bool:
@@ -96,13 +125,17 @@ def _note_retry(conn: sqlite3.Connection, event_id: str, code: str, count: int) 
 
 
 def _stand_in(conn: sqlite3.Connection, row: sqlite3.Row, code: str,
-              why: str) -> api.SourceBlockedEvent:
+              why: str) -> api.SourceBlockedEvent | None:
+    """None without a page URL of the run: `about:blank` is no URI ARGUS takes (the
+    Sonepar fillers on seq 99-101 were refused invalid_input)."""
     ids = [str(e) for e in json.loads(row["evidence_ids_json"])]
-    url = next((u for u in (_page_url(conn, e) for e in ids) if u), "about:blank")
-    payload = api.SourcePayload(
-        source_id=f"lost:{row['event_id']}", url=url, state_key="", parent_source_id=None,
-        status=code, evidence_ids=[], detail=f"{row['type']} {row['event_id']} not delivered:"
-        f" {why}",
+    url = next((u for u in (_page_url(conn, e) for e in ids) if u), "") or _run_url(conn, row)
+    if not url.startswith(("http://", "https://")):
+        return None
+    payload = api.SourcePayload(  # shaped as a gap of the walk: a page URL of the run
+        source_id=f"gap:lost:{row['seq']}", url=url, state_key="", parent_source_id=None,
+        status=code.split("/", 1)[0], evidence_ids=[],
+        detail=f"{row['type']} {row['event_id']} not delivered: {why}",
     )
     return api.SourceBlockedEvent(
         event_id=str(uuid.uuid4()), job_id=str(row["job_id"]), run_id=str(row["run_id"]),
@@ -115,3 +148,18 @@ def _page_url(conn: sqlite3.Connection, evidence_id: str) -> str:
     found = conn.execute("SELECT metadata_json FROM evidence_uploads WHERE evidence_id = ?",
                          (evidence_id,)).fetchone()
     return str(json.loads(found[0]).get("final_url") or "") if found else ""
+
+
+def _run_url(conn: sqlite3.Connection, row: sqlite3.Row) -> str:
+    """A page URL of the run: a snapshot it uploaded, else a source event it sent."""
+    found = conn.execute("SELECT metadata_json FROM evidence_uploads WHERE run_id = ?"
+                         " ORDER BY created_at LIMIT 1", (row["run_id"],)).fetchone()
+    if found and json.loads(found[0]).get("final_url"):
+        return str(json.loads(found[0])["final_url"])
+    for (event_json,) in conn.execute(
+            "SELECT event_json FROM outbox WHERE run_id = ? AND type LIKE 'source.%'"
+            " AND replaced_type = '' ORDER BY seq", (row["run_id"],)):
+        url = str(json.loads(event_json).get("payload", {}).get("url") or "")
+        if url.startswith(("http://", "https://")):
+            return url
+    return ""

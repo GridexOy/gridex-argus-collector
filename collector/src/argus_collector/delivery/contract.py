@@ -143,7 +143,7 @@ def reconcile_info(conn: sqlite3.Connection, run_id: str) -> ReconcileInfo:
     rows = repo.run_rows(conn, run_id)
     acked = 0
     for row in rows:
-        if row["status"] not in repo.DONE or int(row["seq"]) != acked + 1:
+        if row["status"] not in repo.ACKED or int(row["seq"]) != acked + 1:
             break
         acked = int(row["seq"])
     pending = [str(r["event_id"]) for r in rows if r["status"] == "pending"]

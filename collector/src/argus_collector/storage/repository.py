@@ -27,7 +27,7 @@ def current_version(conn: sqlite3.Connection) -> int:
     return int(value or 0)
 
 
-MIGRATING = threading.Lock()  # 0.4.8.8: two delivery threads opened a new schema at once
+MIGRATING = threading.RLock()  # opening + migrating: two delivery threads at once (0.4.8.8)
 
 
 def migrate(conn: sqlite3.Connection, migrations: list[tuple[int, str]]) -> None:
