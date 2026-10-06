@@ -9,23 +9,80 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from argus_collector.api_client.serialization_8 import (
-    counts_from_json,
-    counts_to_json,
-    coverage_from_json,
-    coverage_to_json,
-)
 from argus_collector.api_client.types_3 import Stage
-from argus_collector.api_client.types_4 import JobProgressEvent, ProgressPayload, TransportState
+from argus_collector.api_client.types_4 import (
+    Counts,
+    CoverageConfirmation,
+    CoverageFrontierStatus,
+    JobProgressEventSchemaVersion,
+)
 from argus_collector.api_client.types_5 import (
     AttentionPayload,
+    Coverage,
+    CoverageBasis,
     Gap,
     GapReason,
-    JobNeeds_AttentionEvent,
-    ModelUsage,
-    ModelUsagePurpose,
+    JobProgressEvent,
+    ProgressPayload,
+    TransportState,
 )
-from argus_collector.api_client.wire import const, or_none
+from argus_collector.api_client.wire import const, opt, or_none
+
+
+def counts_to_json(value: Counts) -> dict[str, Any]:
+    return {
+        "persons": value.persons,
+        "organization_channels": value.organization_channels,
+        "other_entities": value.other_entities,
+        "observations": value.observations,
+        "pages_processed": value.pages_processed,
+        "browser_actions": value.browser_actions,
+        "evidence_count": value.evidence_count,
+        "gaps": value.gaps,
+        "outbox_pending": value.outbox_pending,
+        "states_processed": value.states_processed,
+    }
+
+
+def counts_from_json(data: dict[str, Any]) -> Counts:
+    return Counts(
+        persons=int(data["persons"]),
+        organization_channels=int(data["organization_channels"]),
+        other_entities=int(data["other_entities"]),
+        observations=int(data["observations"]),
+        pages_processed=int(data["pages_processed"]),
+        browser_actions=int(data["browser_actions"]),
+        evidence_count=int(data["evidence_count"]),
+        gaps=int(data["gaps"]),
+        outbox_pending=int(data["outbox_pending"]),
+        states_processed=int(data["states_processed"]),
+    )
+
+
+def coverage_to_json(value: Coverage) -> dict[str, Any]:
+    return {
+        "frontier_status": value.frontier_status.value,
+        "confirmation": value.confirmation.value,
+        "basis": value.basis.value,
+        "scope_description": value.scope_description,
+        "expected_count": value.expected_count,
+        "found_count": value.found_count,
+        "gap_count": value.gap_count,
+        "evidence_ids": list(value.evidence_ids),
+    }
+
+
+def coverage_from_json(data: dict[str, Any]) -> Coverage:
+    return Coverage(
+        frontier_status=CoverageFrontierStatus(data["frontier_status"]),
+        confirmation=CoverageConfirmation(data["confirmation"]),
+        basis=CoverageBasis(data["basis"]),
+        scope_description=str(data["scope_description"]),
+        expected_count=or_none(data["expected_count"], int),
+        found_count=int(data["found_count"]),
+        gap_count=int(data["gap_count"]),
+        evidence_ids=[str(v) for v in data["evidence_ids"]],
+    )
 
 
 def progress_payload_to_json(value: ProgressPayload) -> dict[str, Any]:
@@ -49,7 +106,7 @@ def progress_payload_from_json(data: dict[str, Any]) -> ProgressPayload:
 
 
 def job_progress_event_to_json(value: JobProgressEvent) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "event_id": value.event_id,
         "job_id": value.job_id,
         "run_id": value.run_id,
@@ -57,8 +114,10 @@ def job_progress_event_to_json(value: JobProgressEvent) -> dict[str, Any]:
         "occurred_at": value.occurred_at,
         "payload": progress_payload_to_json(value.payload),
         "type": value.type,
-        "schema_version": value.schema_version,
     }
+    if value.schema_version is not None:
+        out["schema_version"] = value.schema_version.value
+    return out
 
 
 def job_progress_event_from_json(data: dict[str, Any]) -> JobProgressEvent:
@@ -69,8 +128,8 @@ def job_progress_event_from_json(data: dict[str, Any]) -> JobProgressEvent:
         seq=int(data["seq"]),
         occurred_at=str(data["occurred_at"]),
         payload=progress_payload_from_json(data["payload"]),
+        schema_version=opt(data, "schema_version", JobProgressEventSchemaVersion, None),
         type=const(data, "type", "job.progress"),
-        schema_version=const(data, "schema_version", "1.1"),
     )
 
 
@@ -112,77 +171,19 @@ def attention_payload_from_json(data: dict[str, Any]) -> AttentionPayload:
     )
 
 
-def job_needs_attention_event_to_json(value: JobNeeds_AttentionEvent) -> dict[str, Any]:
-    return {
-        "event_id": value.event_id,
-        "job_id": value.job_id,
-        "run_id": value.run_id,
-        "seq": value.seq,
-        "occurred_at": value.occurred_at,
-        "payload": attention_payload_to_json(value.payload),
-        "type": value.type,
-        "schema_version": value.schema_version,
-    }
-
-
-def job_needs_attention_event_from_json(data: dict[str, Any]) -> JobNeeds_AttentionEvent:
-    return JobNeeds_AttentionEvent(
-        event_id=str(data["event_id"]),
-        job_id=str(data["job_id"]),
-        run_id=str(data["run_id"]),
-        seq=int(data["seq"]),
-        occurred_at=str(data["occurred_at"]),
-        payload=attention_payload_from_json(data["payload"]),
-        type=const(data, "type", "job.needs_attention"),
-        schema_version=const(data, "schema_version", "1.1"),
-    )
-
-
-def model_usage_to_json(value: ModelUsage) -> dict[str, Any]:
-    return {
-        "model_id": value.model_id,
-        "provider": value.provider,
-        "quantization": value.quantization,
-        "context_tokens": value.context_tokens,
-        "input_tokens": value.input_tokens,
-        "output_tokens": value.output_tokens,
-        "cost_eur": value.cost_eur,
-        "purpose": value.purpose.value,
-        "started_at": value.started_at,
-        "duration_ms": value.duration_ms,
-        "local": value.local,
-    }
-
-
-def model_usage_from_json(data: dict[str, Any]) -> ModelUsage:
-    return ModelUsage(
-        model_id=str(data["model_id"]),
-        provider=str(data["provider"]),
-        quantization=or_none(data["quantization"], str),
-        context_tokens=int(data["context_tokens"]),
-        input_tokens=int(data["input_tokens"]),
-        output_tokens=int(data["output_tokens"]),
-        cost_eur=float(data["cost_eur"]),
-        purpose=ModelUsagePurpose(data["purpose"]),
-        started_at=str(data["started_at"]),
-        duration_ms=int(data["duration_ms"]),
-        local=bool(data["local"]),
-    )
-
-
 TO_JSON: dict[type[Any], Callable[[Any], dict[str, Any]]] = {
+    Counts: counts_to_json,
+    Coverage: coverage_to_json,
     ProgressPayload: progress_payload_to_json,
     JobProgressEvent: job_progress_event_to_json,
     Gap: gap_to_json,
     AttentionPayload: attention_payload_to_json,
-    JobNeeds_AttentionEvent: job_needs_attention_event_to_json,
-    ModelUsage: model_usage_to_json,
 }
 FROM_JSON: dict[type[Any], Callable[[dict[str, Any]], Any]] = {
+    Counts: counts_from_json,
+    Coverage: coverage_from_json,
     ProgressPayload: progress_payload_from_json,
     JobProgressEvent: job_progress_event_from_json,
     Gap: gap_from_json,
     AttentionPayload: attention_payload_from_json,
-    JobNeeds_AttentionEvent: job_needs_attention_event_from_json,
-    ModelUsage: model_usage_from_json,
 }

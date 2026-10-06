@@ -1,0 +1,48 @@
+{
+  "fixture": "gavazzi",
+  "host": "gavazzi.localhost",
+  "case": "Owner 06.10.2026 (Carlo Gavazzi): the walk started on /en-br/ (Brazil). The site has locale paths and no hreflang or switcher on the page; /fi/ answers 404 and /en-fi/ is the Finnish version, so the walk goes there before reading anything: Maa: FI (vaihdettu en-br → en-fi). Only the Finnish people are read, their country FI by the +358 phones",
+  "seed": "en-br/",
+  "switched_to": "en-fi/",
+  "persons": [
+    {
+      "name": "Juha Kärkkäinen",
+      "title": "Myyntipäällikkö",
+      "phone": "+358975620101",
+      "phone_text": "+358 9 7562 0101",
+      "email": "juha.karkkainen@gavazzi.example",
+      "country": "FI",
+      "source_page": "en-fi/contact/"
+    },
+    {
+      "name": "Niina Lehto",
+      "title": "Key Account Manager",
+      "phone": "+358975620102",
+      "phone_text": "+358 9 7562 0102",
+      "email": "niina.lehto@gavazzi.example",
+      "country": "FI",
+      "source_page": "en-fi/contact/"
+    },
+    {
+      "name": "Tomi Virtanen",
+      "title": "Sales Engineer",
+      "phone": "+358975620103",
+      "phone_text": "+358 9 7562 0103",
+      "email": "tomi.virtanen@gavazzi.example",
+      "country": "FI",
+      "source_page": "en-fi/contact/"
+    }
+  ],
+  "foreign_persons": [
+    {
+      "name": "Rafael Souza",
+      "phone": "+551130520101",
+      "email": "rafael.souza@gavazzi.example"
+    },
+    {
+      "name": "Camila Ferreira",
+      "phone": "+551130520102",
+      "email": "camila.ferreira@gavazzi.example"
+    }
+  ]
+}

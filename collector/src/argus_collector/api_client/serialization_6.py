@@ -14,19 +14,21 @@ from argus_collector.api_client.serialization_5 import (
     source_payload_to_json,
 )
 from argus_collector.api_client.types_3 import (
-    LocatorBbox,
     LocatorDocument,
-    LocatorDom,
     LocatorJsonPointer,
     LocatorTextSpan,
     SourceBlockedEvent,
+    SourceBlockedEventSchemaVersion,
+    SourceDiscoveredEvent,
+    SourceDiscoveredEventSchemaVersion,
     SourceProcessedEvent,
+    SourceProcessedEventSchemaVersion,
 )
 from argus_collector.api_client.wire import const, nullable, opt
 
 
-def source_processed_event_to_json(value: SourceProcessedEvent) -> dict[str, Any]:
-    return {
+def source_discovered_event_to_json(value: SourceDiscoveredEvent) -> dict[str, Any]:
+    out: dict[str, Any] = {
         "event_id": value.event_id,
         "job_id": value.job_id,
         "run_id": value.run_id,
@@ -34,8 +36,38 @@ def source_processed_event_to_json(value: SourceProcessedEvent) -> dict[str, Any
         "occurred_at": value.occurred_at,
         "payload": source_payload_to_json(value.payload),
         "type": value.type,
-        "schema_version": value.schema_version,
     }
+    if value.schema_version is not None:
+        out["schema_version"] = value.schema_version.value
+    return out
+
+
+def source_discovered_event_from_json(data: dict[str, Any]) -> SourceDiscoveredEvent:
+    return SourceDiscoveredEvent(
+        event_id=str(data["event_id"]),
+        job_id=str(data["job_id"]),
+        run_id=str(data["run_id"]),
+        seq=int(data["seq"]),
+        occurred_at=str(data["occurred_at"]),
+        payload=source_payload_from_json(data["payload"]),
+        schema_version=opt(data, "schema_version", SourceDiscoveredEventSchemaVersion, None),
+        type=const(data, "type", "source.discovered"),
+    )
+
+
+def source_processed_event_to_json(value: SourceProcessedEvent) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "event_id": value.event_id,
+        "job_id": value.job_id,
+        "run_id": value.run_id,
+        "seq": value.seq,
+        "occurred_at": value.occurred_at,
+        "payload": source_payload_to_json(value.payload),
+        "type": value.type,
+    }
+    if value.schema_version is not None:
+        out["schema_version"] = value.schema_version.value
+    return out
 
 
 def source_processed_event_from_json(data: dict[str, Any]) -> SourceProcessedEvent:
@@ -46,13 +78,13 @@ def source_processed_event_from_json(data: dict[str, Any]) -> SourceProcessedEve
         seq=int(data["seq"]),
         occurred_at=str(data["occurred_at"]),
         payload=source_payload_from_json(data["payload"]),
+        schema_version=opt(data, "schema_version", SourceProcessedEventSchemaVersion, None),
         type=const(data, "type", "source.processed"),
-        schema_version=const(data, "schema_version", "1.1"),
     )
 
 
 def source_blocked_event_to_json(value: SourceBlockedEvent) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "event_id": value.event_id,
         "job_id": value.job_id,
         "run_id": value.run_id,
@@ -60,8 +92,10 @@ def source_blocked_event_to_json(value: SourceBlockedEvent) -> dict[str, Any]:
         "occurred_at": value.occurred_at,
         "payload": source_payload_to_json(value.payload),
         "type": value.type,
-        "schema_version": value.schema_version,
     }
+    if value.schema_version is not None:
+        out["schema_version"] = value.schema_version.value
+    return out
 
 
 def source_blocked_event_from_json(data: dict[str, Any]) -> SourceBlockedEvent:
@@ -72,8 +106,8 @@ def source_blocked_event_from_json(data: dict[str, Any]) -> SourceBlockedEvent:
         seq=int(data["seq"]),
         occurred_at=str(data["occurred_at"]),
         payload=source_payload_from_json(data["payload"]),
+        schema_version=opt(data, "schema_version", SourceBlockedEventSchemaVersion, None),
         type=const(data, "type", "source.blocked"),
-        schema_version=const(data, "schema_version", "1.1"),
     )
 
 
@@ -133,59 +167,19 @@ def locator_document_from_json(data: dict[str, Any]) -> LocatorDocument:
     )
 
 
-def locator_bbox_to_json(value: LocatorBbox) -> dict[str, Any]:
-    return {
-        "page": value.page,
-        "x": value.x,
-        "y": value.y,
-        "width": value.width,
-        "height": value.height,
-        "kind": value.kind,
-    }
-
-
-def locator_bbox_from_json(data: dict[str, Any]) -> LocatorBbox:
-    return LocatorBbox(
-        page=int(data["page"]),
-        x=float(data["x"]),
-        y=float(data["y"]),
-        width=float(data["width"]),
-        height=float(data["height"]),
-        kind=const(data, "kind", "bbox"),
-    )
-
-
-def locator_dom_to_json(value: LocatorDom) -> dict[str, Any]:
-    return {
-        "value": value.value,
-        "text_sha256": value.text_sha256,
-        "kind": value.kind,
-    }
-
-
-def locator_dom_from_json(data: dict[str, Any]) -> LocatorDom:
-    return LocatorDom(
-        value=str(data["value"]),
-        text_sha256=str(data["text_sha256"]),
-        kind=const(data, "kind", "dom"),
-    )
-
-
 TO_JSON: dict[type[Any], Callable[[Any], dict[str, Any]]] = {
+    SourceDiscoveredEvent: source_discovered_event_to_json,
     SourceProcessedEvent: source_processed_event_to_json,
     SourceBlockedEvent: source_blocked_event_to_json,
     LocatorTextSpan: locator_text_span_to_json,
     LocatorJsonPointer: locator_json_pointer_to_json,
     LocatorDocument: locator_document_to_json,
-    LocatorBbox: locator_bbox_to_json,
-    LocatorDom: locator_dom_to_json,
 }
 FROM_JSON: dict[type[Any], Callable[[dict[str, Any]], Any]] = {
+    SourceDiscoveredEvent: source_discovered_event_from_json,
     SourceProcessedEvent: source_processed_event_from_json,
     SourceBlockedEvent: source_blocked_event_from_json,
     LocatorTextSpan: locator_text_span_from_json,
     LocatorJsonPointer: locator_json_pointer_from_json,
     LocatorDocument: locator_document_from_json,
-    LocatorBbox: locator_bbox_from_json,
-    LocatorDom: locator_dom_from_json,
 }

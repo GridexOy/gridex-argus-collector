@@ -29,3 +29,9 @@ without the country bonus: a rule may follow it without the model).
 A job walk takes its hosts from the job's `approved_hosts` (K7 ed. 02:
 basis `seed`; `redirect_from_seed` waits for the owner's "ok"); a walk
 started from the panel knows only the seed and its redirect.
+
+0.4.8.7: `site_domain` (registrable domain: the company's subdomains share it, K7);
+`page_country` / `version_label` / `version_candidates` (`versions.py`, owner
+06.10.2026): which country's version a page is, the exhibition country's version
+in the owner's order (hreflang, switcher, `/fi/` `/en-fi/` `/fi-fi/`, a Finland /
+Nordic page) and the global one for a foreign version.

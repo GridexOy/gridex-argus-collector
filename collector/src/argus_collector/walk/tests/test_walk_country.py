@@ -1,107 +1,61 @@
-"""Owner decisions 05.10.2026 on real fixture sites (job mode, fake model).
+"""Owner 06.10.2026 (Carlo Gavazzi went to /en-br/): the exhibition country's version first.
 
-Ledvance: on the international contact page only Finland is opened; its
-office (name, address, switchboard, email, country, fax) is one entity,
-the local version /fi-fi/ is followed through a bot check that clears by
-itself, and its people are taken; no other country is walked.
-Malux: the seed is the Finnish version, every department tab is opened
-(sales first), the Swedish sister site comes after and its people carry SE.
+The seed lands on the Brazilian version; the site has locale paths, `/fi/` answers
+404 and `/en-fi/` is the Finnish version: the walk goes there before reading anything,
+the panel says `Maa: FI (vaihdettu en-br → en-fi)`, nobody of the Brazilian office is
+read and the Finnish people have the country FI.
 """
 
 from __future__ import annotations
 
-from dataclasses import replace
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 from argus_collector.discovery import contract as discovery
+from argus_collector.extraction.contract import VerifiedField
 from argus_collector.models.contract import ModelConfig
-from argus_collector.walk import contract
+from argus_collector.walk import context, contract
 from argus_collector.walk.tests.fake_policy import RankedPolicy
-from argus_collector.walk.tests.test_walk_job import RecordingSink, gold, page_order
+from argus_collector.walk.tests.test_walk_job import RecordingSink, gold
 from argus_collector.walk.tests.test_walk_job import site as site  # noqa: F401 - fixture
 from collector.tests.fake_model_server import FakeModelServer
 from test_site import server
 
+GOLD = gold("gavazzi")
 
-def run(srv: ThreadingHTTPServer, label: str, path: str, hosts: set[str], tmp_path: Path,
-        local: bool = False, goal: bool = True) -> tuple[contract.WalkSummary, RecordingSink]:
-    persons = [p for name in ("ledvance", "malux") for p in gold(name)["persons"]]
-    fake = FakeModelServer(RankedPolicy(persons)).start()
-    sink = RecordingSink()
-    focus = discovery.make_focus(["FI"], ["fi", "en"])
-    assert focus is not None
+
+def test_the_walk_goes_to_the_finnish_version_first(
+    site: ThreadingHTTPServer, tmp_path: Path,  # noqa: F811
+) -> None:
+    fake = FakeModelServer(RankedPolicy(GOLD["persons"])).start()
+    sink, events = RecordingSink(), list[contract.WalkEvent]()
     settings = contract.WalkSettings(
-        start_url=server.vhost_url(srv, label) + path,
-        model=ModelConfig(fake.endpoint, "fake-instruct"), headless=True,
+        start_url=server.vhost_url(site, "gavazzi") + GOLD["seed"],
+        model=ModelConfig(fake.endpoint, "fake"), headless=True,
         profile_dir=tmp_path / "profile", evidence_dir=tmp_path / "evidence",
-        db_path=tmp_path / "collector.db", approved_hosts=frozenset(hosts),
-        focus=replace(focus, local_seed=local),
-        limits=contract.WalkLimits(pages=20, actions=60, seconds=900.0, states=120),
-        id_namespace="job-" + label, stop_at_goal=goal,
+        db_path=tmp_path / "collector.db", approved_hosts=frozenset({GOLD["host"]}),
+        focus=discovery.make_focus(["FI"], ["fi", "en"]),
+        limits=contract.WalkLimits(pages=8, actions=30, seconds=300.0, states=40),
+        id_namespace="job-gavazzi",
     )
     try:
-        summary = contract.run_walk(settings, lambda e: None, lambda: False, sink)
+        contract.run_walk(settings, events.append, lambda: False, sink)
     finally:
         fake.stop()
-    return summary, sink
+    country = [e for e in events if e.kind == "step" and e.step == "country"]
+    assert [e.detail for e in country] == ["FI|en-br|en-fi|local"]
+    assert not any("/en-br/" in s.url for s in sink.sources), "nothing read on /en-br/"
+    people = {e.entity_key: e for e in sink.entities().values() if e.entity_type == "person"}
+    assert set(people) == {p["name"].casefold() for p in GOLD["persons"]}
+    for entity in people.values():
+        fields = {f.field: f.value for f in entity.fields}
+        assert fields.get("country") == "FI", entity.entity_key
 
 
-def fields(entity: contract.EntityFinding) -> dict[str, str]:
-    return {f.field: f.value for f in entity.fields}
-
-
-def test_ledvance_finland_office_and_local_people(site: ThreadingHTTPServer,  # noqa: F811
-                                                  tmp_path: Path) -> None:
-    summary, sink = run(site, "ledvance", "", {"ledvance.localhost"}, tmp_path)
-    assert summary.end_reason == contract.END_GOAL, summary.gaps  # FI sales people read
-    offices = [e for e in sink.entities().values() if e.entity_type == "office"]
-    finland = [fields(e) for e in offices if fields(e).get("country") == "FI"]
-    assert finland and finland[0]["phone"] == "+358974223300"
-    assert finland[0]["email"] == "asiakaspalvelu@ledvance.com"
-    assert finland[0]["office_name"] == "LEDVANCE Oy"
-    assert "00100 Helsinki" in finland[0]["address"]
-    assert finland[0]["fax"] == "+358974223301", "the fax goes as extra `fax` (ANSWERS_S5 3)"
-    phones = {f.value for e in sink.entities().values() for f in e.fields if f.field == "phone"}
-    assert "+358974223301" not in phones, "a fax is never a phone"
-    values = {f.value for e in sink.entities().values() for f in e.fields}
-    others = gold("ledvance")["excluded"][1]["offices"]
-    leaked = {v for o in others for v in (o["email"], o["phone"])} & values
-    assert not leaked, "closed country sections are not read"
-    assert {fields(e).get("country") for e in offices} == {"FI"}, "no other country opened"
-    order = page_order(sink)
-    assert not [p for p in order if p.startswith(("de-de", "sv-se", "fr-fr"))], order
-    names = {e.entity_key for e in sink.entities().values() if e.entity_type == "person"}
-    for person in gold("ledvance")["persons"]:
-        assert person["name"].casefold() in names, person["name"]
-
-
-def test_malux_every_tab_finnish_first_then_sweden(site: ThreadingHTTPServer,  # noqa: F811
-                                                   tmp_path: Path) -> None:
-    hosts = {"malux.localhost", "malux-se.localhost"}
-    summary, sink = run(site, "malux", "fi/", hosts, tmp_path, local=True, goal=False)
-    assert summary.end_reason == contract.END_FINISHED, summary.gaps
-    people = [e for f in sink.findings for e in f.entities if e.entity_type == "person"]
-    first_seen: list[str] = []
-    for entity in people:
-        if entity.entity_key not in first_seen:
-            first_seen.append(entity.entity_key)
-    by_name: dict[str, dict[str, str]] = {e.entity_key: {} for e in people}
-    for entity in people:
-        by_name[entity.entity_key].update(fields(entity))
-    expected = gold("malux")["persons"]
-    for person in expected:
-        got = by_name[person["name"].casefold()]
-        assert got["phone"] == person["phone"], person["name"]
-        assert got.get("country") == person["country"], person["name"]
-        if person.get("department"):
-            assert got.get("department") == person["department"], person["name"]
-    swedes = [p["name"].casefold() for p in expected if p["country"] == "SE"]
-    finns = [p["name"].casefold() for p in expected if p["country"] == "FI"]
-    assert max(first_seen.index(n) for n in finns) < min(first_seen.index(n) for n in swedes)
-    joakim = by_name["joakim flakholm"]
-    assert joakim["job_title"] == "Maajohtaja" and joakim["department"] == "Johto"
-    company = [fields(e) for f in sink.findings for e in f.entities if e.entity_type != "person"]
-    assert all(c.get("country") in ("FI", "SE") for c in company if "phone" in c or "email" in c)
-    kinds = {e.entity_type for f in sink.findings for e in f.entities}
-    assert "unassigned_channel" not in kinds, "an email of a closed tab waits for its card"
+def test_a_person_country_comes_from_the_phone_before_the_page_language() -> None:
+    phone = VerifiedField("+358975620101", "+358 9 7562 0101", 40, 56, "text")
+    page = context.PageContext(lang="en-BR")
+    found = context.country_field(page, 10, phone)
+    assert found is not None and (found.value, found.quote) == ("FI", "+358 9 7562 0101")
+    bare = context.country_field(page, 10, None)
+    assert bare is not None and bare.value == "BR", "no phone: the page's region"

@@ -65,6 +65,12 @@ def call(
         return int(exc.code), json.loads(exc.read().decode("utf-8") or "{}")
 
 
+def approval(entry: str) -> Json:
+    """`host` (basis seed) or `host|basis` (`industryx.localhost|linked_from_contact_section`)."""
+    host, _, basis = entry.partition("|")
+    return {"host": host, "basis": basis or "seed", "evidence_id": None}
+
+
 def company_input(item: Json, rerun_reason: str | None) -> Json:
     company_id = str(item["company_id"])
     return {
@@ -76,10 +82,7 @@ def company_input(item: Json, rerun_reason: str | None) -> Json:
             "geography": "specified",
             "priority_countries": list(item.get("priority_countries", [])),
             "priority_languages": list(item.get("priority_languages", [])),
-            "approved_hosts": [
-                {"host": host, "basis": "seed", "evidence_id": None}
-                for host in item["approved_hosts"]
-            ],
+            "approved_hosts": [approval(entry) for entry in item["approved_hosts"]],
             "include_contact_documents": False,
             "include_historical_observations": False,
         },

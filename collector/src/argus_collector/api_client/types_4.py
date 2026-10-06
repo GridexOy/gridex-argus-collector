@@ -8,17 +8,58 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
+from typing import Any, TypeAlias
 
 from argus_collector.api_client.types_3 import (
-    Binding,
+    ContactObservedEventSchemaVersion,
     ContactPayloadEntityType,
     ContactPayloadRelationship,
-    Locator,
-    ObservationChangeKind,
+    LocatorDocument,
+    LocatorJsonPointer,
+    LocatorTextSpan,
     ObservationExtractionStatus,
-    Stage,
 )
+
+
+@dataclass(frozen=True)
+class LocatorBbox:
+    page: int
+    x: float
+    y: float
+    width: float
+    height: float
+    kind: str = "bbox"
+
+
+@dataclass(frozen=True)
+class LocatorDom:
+    value: str
+    text_sha256: str
+    kind: str = "dom"
+
+
+Locator: TypeAlias = (
+    LocatorTextSpan
+    | LocatorJsonPointer
+    | LocatorDocument
+    | LocatorBbox
+    | LocatorDom
+)
+
+
+class ObservationChangeKind(StrEnum):
+    NEW = "new"
+    RECONFIRMED = "reconfirmed"
+    CHANGED = "changed"
+
+
+class Binding(StrEnum):
+    CARD = "card"
+    TABLE_ROW = "table_row"
+    JSON_OBJECT = "json_object"
+    CAPTION = "caption"
+    PROXIMITY_ONLY = "proximity_only"
+    NONE = "none"
 
 
 @dataclass(frozen=True)
@@ -78,8 +119,13 @@ class ContactObservedEvent:
     seq: int
     occurred_at: str
     payload: ContactPayload
+    schema_version: ContactObservedEventSchemaVersion | None = None
     type: str = "contact.observed"
-    schema_version: str = "1.1"
+
+
+class ContactEnrichedEventSchemaVersion(StrEnum):
+    _1_1 = "1.1"
+    _1_2 = "1.2"
 
 
 @dataclass(frozen=True)
@@ -90,8 +136,13 @@ class ContactEnrichedEvent:
     seq: int
     occurred_at: str
     payload: ContactPayload
+    schema_version: ContactEnrichedEventSchemaVersion | None = None
     type: str = "contact.enriched"
-    schema_version: str = "1.1"
+
+
+class ContactMerge_ProposedEventSchemaVersion(StrEnum):
+    _1_1 = "1.1"
+    _1_2 = "1.2"
 
 
 @dataclass(frozen=True)
@@ -109,8 +160,13 @@ class ContactMerge_ProposedEvent:
     seq: int
     occurred_at: str
     payload: MergePayload
+    schema_version: ContactMerge_ProposedEventSchemaVersion | None = None
     type: str = "contact.merge_proposed"
-    schema_version: str = "1.1"
+
+
+class JobProgressEventSchemaVersion(StrEnum):
+    _1_1 = "1.1"
+    _1_2 = "1.2"
 
 
 @dataclass(frozen=True)
@@ -137,52 +193,3 @@ class CoverageConfirmation(StrEnum):
     UNVERIFIED = "unverified"
     VERIFIED_AGAINST_CATALOG_TOTAL = "verified_against_catalog_total"
     VERIFIED_AGAINST_MANUAL_REFERENCE = "verified_against_manual_reference"
-
-
-class CoverageBasis(StrEnum):
-    UNKNOWN = "unknown"
-    FRONTIER_EXHAUSTED = "frontier_exhausted"
-    CATALOG_TOTAL = "catalog_total"
-    ENUMERATED_CATALOG = "enumerated_catalog"
-    MANUAL_REFERENCE = "manual_reference"
-
-
-@dataclass(frozen=True)
-class Coverage:
-    frontier_status: CoverageFrontierStatus
-    confirmation: CoverageConfirmation
-    basis: CoverageBasis
-    scope_description: str
-    expected_count: int | None
-    found_count: int
-    gap_count: int
-    evidence_ids: list[str]
-
-
-class TransportState(StrEnum):
-    ONLINE = "online"
-    OFFLINE = "offline"
-    SYNCING = "syncing"
-    SYNCED = "synced"
-    DELIVERY_ERROR = "delivery_error"
-
-
-@dataclass(frozen=True)
-class ProgressPayload:
-    stage: Stage
-    counts: Counts
-    coverage: Coverage
-    active_seconds: float
-    transport_state: TransportState
-
-
-@dataclass(frozen=True)
-class JobProgressEvent:
-    event_id: str
-    job_id: str
-    run_id: str
-    seq: int
-    occurred_at: str
-    payload: ProgressPayload
-    type: str = "job.progress"
-    schema_version: str = "1.1"

@@ -161,5 +161,60 @@
       "en"
     ],
     "project_id": "fixture-expo-2027"
+  },
+  {
+    "company_id": "blaklader",
+    "company_name": "Blåkläder Oy",
+    "seed_urls": [
+      "http://blaklader.localhost:8765/"
+    ],
+    "approved_hosts": [
+      "blaklader.localhost"
+    ],
+    "priority_countries": [
+      "FI"
+    ],
+    "priority_languages": [
+      "fi",
+      "en"
+    ],
+    "project_id": "fixture-expo-2027"
+  },
+  {
+    "company_id": "gavazzi",
+    "company_name": "Carlo Gavazzi Oy Ab",
+    "seed_urls": [
+      "http://gavazzi.localhost:8765/en-br/"
+    ],
+    "approved_hosts": [
+      "gavazzi.localhost"
+    ],
+    "priority_countries": [
+      "FI"
+    ],
+    "priority_languages": [
+      "fi",
+      "en"
+    ],
+    "project_id": "fixture-expo-2027"
+  },
+  {
+    "company_id": "elkris",
+    "company_name": "Elkris Oy",
+    "seed_urls": [
+      "http://elkris.localhost:8765/"
+    ],
+    "approved_hosts": [
+      "elkris.localhost",
+      "industryx.localhost|linked_from_contact_section"
+    ],
+    "priority_countries": [
+      "FI"
+    ],
+    "priority_languages": [
+      "fi",
+      "en"
+    ],
+    "project_id": "fixture-expo-2027"
   }
 ]

@@ -11,30 +11,88 @@ from typing import Any
 
 from argus_collector.api_client.serialization_2 import scope_from_json, scope_to_json
 from argus_collector.api_client.serialization_3 import checkpoint_from_json, checkpoint_to_json
-from argus_collector.api_client.serialization_8 import (
+from argus_collector.api_client.serialization_9 import (
+    attention_payload_from_json,
+    attention_payload_to_json,
     counts_from_json,
     counts_to_json,
     coverage_from_json,
     coverage_to_json,
-)
-from argus_collector.api_client.serialization_9 import (
     gap_from_json,
     gap_to_json,
-    model_usage_from_json,
-    model_usage_to_json,
 )
 from argus_collector.api_client.types_5 import (
     BudgetState,
-    FinishedPayload,
     FinishedPayloadCompletionReason,
     FinishedPayloadFreshnessSummary,
     FinishedPayloadRunResultStatus,
-    FreshnessCheck,
-    FreshnessCheckStatus,
-    FreshnessPayload,
-    JobFinishedEvent,
+    JobNeeds_AttentionEvent,
+    JobNeeds_AttentionEventSchemaVersion,
+    ModelUsage,
+    ModelUsagePurpose,
 )
-from argus_collector.api_client.wire import const, or_none
+from argus_collector.api_client.types_6 import FinishedPayload
+from argus_collector.api_client.wire import const, opt, or_none
+
+
+def job_needs_attention_event_to_json(value: JobNeeds_AttentionEvent) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "event_id": value.event_id,
+        "job_id": value.job_id,
+        "run_id": value.run_id,
+        "seq": value.seq,
+        "occurred_at": value.occurred_at,
+        "payload": attention_payload_to_json(value.payload),
+        "type": value.type,
+    }
+    if value.schema_version is not None:
+        out["schema_version"] = value.schema_version.value
+    return out
+
+
+def job_needs_attention_event_from_json(data: dict[str, Any]) -> JobNeeds_AttentionEvent:
+    return JobNeeds_AttentionEvent(
+        event_id=str(data["event_id"]),
+        job_id=str(data["job_id"]),
+        run_id=str(data["run_id"]),
+        seq=int(data["seq"]),
+        occurred_at=str(data["occurred_at"]),
+        payload=attention_payload_from_json(data["payload"]),
+        schema_version=opt(data, "schema_version", JobNeeds_AttentionEventSchemaVersion, None),
+        type=const(data, "type", "job.needs_attention"),
+    )
+
+
+def model_usage_to_json(value: ModelUsage) -> dict[str, Any]:
+    return {
+        "model_id": value.model_id,
+        "provider": value.provider,
+        "quantization": value.quantization,
+        "context_tokens": value.context_tokens,
+        "input_tokens": value.input_tokens,
+        "output_tokens": value.output_tokens,
+        "cost_eur": value.cost_eur,
+        "purpose": value.purpose.value,
+        "started_at": value.started_at,
+        "duration_ms": value.duration_ms,
+        "local": value.local,
+    }
+
+
+def model_usage_from_json(data: dict[str, Any]) -> ModelUsage:
+    return ModelUsage(
+        model_id=str(data["model_id"]),
+        provider=str(data["provider"]),
+        quantization=or_none(data["quantization"], str),
+        context_tokens=int(data["context_tokens"]),
+        input_tokens=int(data["input_tokens"]),
+        output_tokens=int(data["output_tokens"]),
+        cost_eur=float(data["cost_eur"]),
+        purpose=ModelUsagePurpose(data["purpose"]),
+        started_at=str(data["started_at"]),
+        duration_ms=int(data["duration_ms"]),
+        local=bool(data["local"]),
+    )
 
 
 def finished_payload_freshness_summary_to_json(
@@ -119,81 +177,17 @@ def finished_payload_from_json(data: dict[str, Any]) -> FinishedPayload:
     )
 
 
-def job_finished_event_to_json(value: JobFinishedEvent) -> dict[str, Any]:
-    return {
-        "event_id": value.event_id,
-        "job_id": value.job_id,
-        "run_id": value.run_id,
-        "seq": value.seq,
-        "occurred_at": value.occurred_at,
-        "payload": finished_payload_to_json(value.payload),
-        "type": value.type,
-        "schema_version": value.schema_version,
-    }
-
-
-def job_finished_event_from_json(data: dict[str, Any]) -> JobFinishedEvent:
-    return JobFinishedEvent(
-        event_id=str(data["event_id"]),
-        job_id=str(data["job_id"]),
-        run_id=str(data["run_id"]),
-        seq=int(data["seq"]),
-        occurred_at=str(data["occurred_at"]),
-        payload=finished_payload_from_json(data["payload"]),
-        type=const(data, "type", "job.finished"),
-        schema_version=const(data, "schema_version", "1.1"),
-    )
-
-
-def freshness_check_to_json(value: FreshnessCheck) -> dict[str, Any]:
-    return {
-        "canonical_contact_id": value.canonical_contact_id,
-        "field": value.field,
-        "status": value.status.value,
-        "scope_description": value.scope_description,
-        "evidence_ids": list(value.evidence_ids),
-        "checked_at": value.checked_at,
-        "observation_id": value.observation_id,
-    }
-
-
-def freshness_check_from_json(data: dict[str, Any]) -> FreshnessCheck:
-    return FreshnessCheck(
-        canonical_contact_id=str(data["canonical_contact_id"]),
-        field=str(data["field"]),
-        status=FreshnessCheckStatus(data["status"]),
-        scope_description=str(data["scope_description"]),
-        evidence_ids=[str(v) for v in data["evidence_ids"]],
-        checked_at=str(data["checked_at"]),
-        observation_id=or_none(data["observation_id"], str),
-    )
-
-
-def freshness_payload_to_json(value: FreshnessPayload) -> dict[str, Any]:
-    return {
-        "checks": [freshness_check_to_json(v) for v in value.checks],
-    }
-
-
-def freshness_payload_from_json(data: dict[str, Any]) -> FreshnessPayload:
-    return FreshnessPayload(
-        checks=[freshness_check_from_json(v) for v in data["checks"]],
-    )
-
-
 TO_JSON: dict[type[Any], Callable[[Any], dict[str, Any]]] = {
+    JobNeeds_AttentionEvent: job_needs_attention_event_to_json,
+    ModelUsage: model_usage_to_json,
     FinishedPayloadFreshnessSummary: finished_payload_freshness_summary_to_json,
     BudgetState: budget_state_to_json,
     FinishedPayload: finished_payload_to_json,
-    JobFinishedEvent: job_finished_event_to_json,
-    FreshnessCheck: freshness_check_to_json,
-    FreshnessPayload: freshness_payload_to_json,
 }
 FROM_JSON: dict[type[Any], Callable[[dict[str, Any]], Any]] = {
+    JobNeeds_AttentionEvent: job_needs_attention_event_from_json,
+    ModelUsage: model_usage_from_json,
     FinishedPayloadFreshnessSummary: finished_payload_freshness_summary_from_json,
     BudgetState: budget_state_from_json,
     FinishedPayload: finished_payload_from_json,
-    JobFinishedEvent: job_finished_event_from_json,
-    FreshnessCheck: freshness_check_from_json,
-    FreshnessPayload: freshness_payload_from_json,
 }

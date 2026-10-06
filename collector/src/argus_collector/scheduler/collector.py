@@ -144,7 +144,7 @@ class Collector(CollectorHooks):
                                    capabilities=self.capabilities())
         try:
             resp = api.claim_jobs(target.base_url, target.token, request,
-                                  proxy_mode=self.mode(target))
+                                  proxy_mode=self.mode(target), timeout_s=delivery.API_TIMEOUT_S)
         except api.ApiError as exc:
             self.claim_state, self.claim_error = "failed", str(exc)
             runtime.journal("http", f"claim: HTTP {exc.status} {delivery.error_text(exc)}")

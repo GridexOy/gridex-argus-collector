@@ -24,17 +24,19 @@ def job(argus: Argus) -> api.ClaimedJob:
     return claim(argus)[0]
 
 
-def test_observation_needs_its_snapshot_first(argus: Argus, job: api.ClaimedJob) -> None:
+def test_observation_before_its_snapshot_waits_for_it(argus: Argus, job: api.ClaimedJob) -> None:
+    """Contract 3.1.0 (ARGUS 0.4.24.4): accepted + evidence_pending, the upload applies it."""
     contact = phone_contact(job, 1, "not-uploaded-yet")
-    result = post(argus, job, [contact]).results[0]
-    assert (result.status.value, result.code) == ("rejected", "evidence_missing")
-    evidence = upload(argus, job)
+    resp = post(argus, job, [contact])
+    first = resp.results[0]
+    assert (first.status.value, first.code) == ("accepted", "evidence_pending")
+    assert resp.last_contiguous_seq == 1 and not first.state_applied
+    assert post(argus, job, [contact]).results[0].code == "evidence_pending", "still waits"
+    evidence = upload(argus, job, evidence_id="not-uploaded-yet")
     assert evidence.status.value == "accepted"
-    again = phone_contact(job, 1, evidence.evidence_id)
-    resp = post(argus, job, [again])
-    assert resp.results[0].status.value == "accepted" and resp.last_contiguous_seq == 1
-    assert resp.results[0].channel_status == api.ChannelStatus("published_direct")
-    assert post(argus, job, [again]).results[0].status.value == "duplicate"
+    again = post(argus, job, [contact]).results[0]
+    assert (again.status.value, again.code) == ("duplicate", None)
+    assert again.channel_status == api.ChannelStatus("published_direct")
 
 
 def test_evidence_upload_is_idempotent(argus: Argus, job: api.ClaimedJob) -> None:

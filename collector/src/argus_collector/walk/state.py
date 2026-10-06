@@ -67,6 +67,7 @@ class WalkState:
     stalled: int = 0  # actions since the last new page state
     ruled_urls: set[str] = field(default_factory=set)  # rules read people: no model there
     goal: Tally = field(default_factory=Tally)  # people read so far (`goal.py`)
+    foreign_hosts: set[str] = field(default_factory=set)  # K7: told once per host (`scope.py`)
     _mark: float = field(default_factory=time.monotonic)
 
     def submit(self, fn: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:

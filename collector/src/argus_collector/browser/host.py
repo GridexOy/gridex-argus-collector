@@ -21,7 +21,13 @@ from pathlib import Path
 
 from playwright.sync_api import Browser, BrowserContext, Playwright, sync_playwright
 
-from argus_collector.browser.service import LaunchPlan, launch_kwargs
+from argus_collector.browser.service import (
+    ACCEPT_LANGUAGE,
+    CONTEXT_ONLY,
+    TIMEZONE,
+    LaunchPlan,
+    launch_kwargs,
+)
 
 
 def _plan(headless: bool, profile_dir: Path | None) -> LaunchPlan:
@@ -61,7 +67,10 @@ class BrowserHost:
         when the browser was already running)."""
         launched = 0 if self.running else self._launch()
         assert self._browser is not None
-        return self._browser.new_context(no_viewport=True), launched
+        context = self._browser.new_context(
+            no_viewport=True, timezone_id=TIMEZONE,
+            extra_http_headers={"Accept-Language": ACCEPT_LANGUAGE})
+        return context, launched
 
     def profile_context(self) -> tuple[BrowserContext, int]:
         """The work-browser profile in a Chrome of its own, closed with the context."""
@@ -74,8 +83,8 @@ class BrowserHost:
     def _launch(self) -> int:
         self._drop_browser()  # it died: a new one, the same Playwright
         kwargs = launch_kwargs(_plan(self.headless, self.profile_dir))
-        kwargs.pop("user_data_dir")
-        kwargs.pop("no_viewport")
+        for key in ("user_data_dir", "no_viewport", *CONTEXT_ONLY):
+            kwargs.pop(key)
         started = time.monotonic()
         self._pw = self._pw or sync_playwright().start()
         self._browser = self._pw.chromium.launch(**kwargs)  # type: ignore[arg-type]

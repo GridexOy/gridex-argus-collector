@@ -48,6 +48,16 @@ class PageBuilder:
         )
         return found, obs_id
 
+    def restated(self, key: str, name: str, vf: extraction.VerifiedField, binding: str,
+                 status: str) -> FieldFinding:
+        """A known value said again from this snapshot (the person's name in every event
+        about the person: contract 3.1.0 refuses a person event without it)."""
+        evidence_id = self.source.snapshot.evidence_id
+        obs_id = self.state.uid("obs", f"{key}|{name}|{vf.value}|{evidence_id}")
+        return FieldFinding(
+            obs_id, name, vf.quote, vf.value, vf.start, vf.end, vf.locator, binding, status
+        )
+
     def add_entity(self, key: str, kind: str, fields: list[FieldFinding]) -> None:
         if not fields:
             return

@@ -12,6 +12,8 @@ from argus_collector.api_client import contract as api
 from argus_collector.api_client.tests import samples, wire_samples
 from argus_collector.api_client.tests.fake_argus import FakeArgus, parse_multipart
 
+WIRE = api.EventsRequestSchemaVersion("1.2")  # contract 3.1.0
+
 TOKEN = "worker-token"
 CONTENT = b"\x00\xff<html>--argus-not-the-boundary\r\n\r\n</html>"
 
@@ -48,11 +50,11 @@ def test_claim_jobs_posts_the_request_and_parses_every_job(server: FakeArgus) ->
 def test_post_events_puts_the_quoted_job_id_in_the_path(server: FakeArgus) -> None:
     server.reply(200, wire_samples.EVENTS_RESPONSE)
     events: list[api.Event] = [samples.job_started(), samples.contact_observed()]
-    request = api.EventsRequest(execution_token="exec-1", events=events)
+    request = api.EventsRequest(schema_version=WIRE, execution_token="exec-1", events=events)
     response = api.post_events(server.base_url, TOKEN, "job/1 x", request, proxy_mode="direct")
     assert server.last.path == "/jobs/job%2F1%20x/events"
     body = server.last.json()
-    assert body["schema_version"] == "1.1"
+    assert body["schema_version"] == "1.2"
     assert body["execution_token"] == "exec-1"
     assert [event["type"] for event in body["events"]] == ["job.started", "contact.observed"]
     assert body["events"][1]["payload"]["observations"][0]["locator"]["kind"] == "text_span"
@@ -111,7 +113,8 @@ def test_upload_evidence_sends_metadata_json_and_the_exact_bytes(
 
 def test_an_error_body_becomes_api_error_with_code_and_retry_after(server: FakeArgus) -> None:
     server.reply(429, wire_samples.ERROR, {"Retry-After": "5"})
-    request = api.EventsRequest(execution_token="exec-1", events=[samples.job_started()])
+    request = api.EventsRequest(schema_version=WIRE, execution_token="exec-1",
+                                events=[samples.job_started()])
     with pytest.raises(api.ApiError) as excinfo:
         api.post_events(server.base_url, TOKEN, "job-1", request, proxy_mode="direct")
     error = excinfo.value

@@ -26,18 +26,16 @@ from argus_collector.api_client.serialization_5 import (
     evidence_metadata_to_json,
     evidence_response_from_json,
 )
-from argus_collector.api_client.serialization_12 import (
-    events_request_to_json,
+from argus_collector.api_client.serialization_13 import events_request_to_json
+from argus_collector.api_client.serialization_14 import (
     events_response_from_json,
-)
-from argus_collector.api_client.serialization_13 import (
     reconcile_request_to_json,
     reconcile_response_from_json,
 )
 from argus_collector.api_client.types_1 import ClaimRequest, HeartbeatRequest, HeartbeatResponse
-from argus_collector.api_client.types_2 import ClaimResponse, EvidenceMetadata
-from argus_collector.api_client.types_3 import EvidenceResponse
-from argus_collector.api_client.types_6 import (
+from argus_collector.api_client.types_2 import ClaimResponse
+from argus_collector.api_client.types_3 import EvidenceMetadata, EvidenceResponse
+from argus_collector.api_client.types_7 import (
     EventsRequest,
     EventsResponse,
     ReconcileRequest,

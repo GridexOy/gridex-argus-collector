@@ -13,7 +13,7 @@ from argus_collector.scheduler import contract as scheduler
 from argus_collector.ui import heartbeat_loop
 from argus_collector.ui.app_collect import capabilities_of
 
-SCHEMA_VERSIONS = ["1.1"]
+SCHEMA_VERSIONS = ["1.1", "1.2"]  # 1.2: refusals carry their rule (CONTRACT_3.1)
 API_SUFFIX = "/api/collector"
 
 

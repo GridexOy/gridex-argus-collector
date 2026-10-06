@@ -70,17 +70,33 @@ def test_gap_rejects_the_whole_tail(flow: Flow) -> None:
     assert body["last_contiguous_seq"] == 0
 
 
-def test_evidence_missing_does_not_advance_and_retry_works(flow: Flow) -> None:
+def test_an_event_before_its_evidence_waits_and_the_upload_applies_it(
+    flow: Flow, client: Client,
+) -> None:
+    """Contract 3.1.0 (ARGUS 0.4.24.4): accepted + evidence_pending, the seq is spent."""
     job = flow.start()
     contact = phone_event(flow, job, "ev-later")
     progress = flow.event(job, "job.progress", payloads.progress())
     body = flow.send(job, contact, progress)[1]
-    assert statuses(body) == [("rejected", "evidence_missing"), ("rejected", "sequence_gap")]
-    assert body["last_contiguous_seq"] == 0
-    flow.page(job, evidence_id="ev-later")
-    body = flow.send(job, contact, progress)[1]
-    assert statuses(body) == [("accepted", None)] * 2
+    assert statuses(body) == [("accepted", "evidence_pending"), ("accepted", None)]
     assert body["last_contiguous_seq"] == 2
+    assert not body["results"][0]["state_applied"]
+    assert client.get(f"/_stand/jobs/{job.job_id}/contacts")[1]["contacts"] == []
+    again = flow.send(job, contact)[1]
+    assert statuses(again) == [("duplicate", "evidence_pending")], "a repeat while it waits"
+    flow.page(job, evidence_id="ev-later")
+    assert len(client.get(f"/_stand/jobs/{job.job_id}/contacts")[1]["contacts"]) == 1
+    body = flow.send(job, contact, progress)[1]
+    assert statuses(body) == [("duplicate", None)] * 2, "the upload applied it"
+
+
+def test_evidence_of_another_job_is_still_evidence_missing(flow: Flow) -> None:
+    other = flow.start("c2")
+    evidence_id = flow.page(other)
+    job = flow.start()
+    body = flow.send(job, phone_event(flow, job, evidence_id))[1]
+    assert statuses(body) == [("rejected", "evidence_missing")]
+    assert body["last_contiguous_seq"] == 0, "not recorded: the seq stays free"
 
 
 def test_schema_errors_are_recorded_rejections(flow: Flow, client: Client) -> None:

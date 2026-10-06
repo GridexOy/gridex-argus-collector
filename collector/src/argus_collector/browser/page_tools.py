@@ -7,6 +7,8 @@ is nothing else (TZ_SELAIN 8.5); the choice is written to the journal.
 
 from __future__ import annotations
 
+from urllib.parse import urlsplit
+
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Page
 
@@ -15,13 +17,14 @@ from argus_collector.browser.scripts import (
     CHALLENGE_JS,
     CONSENT_JS,
     IDX_ATTR,
+    PROBE_JS,
     QUIET_DOM_JS,
 )
 from argus_collector.browser.service import consent_choice, is_challenge, is_challenge_hint
 from argus_collector.discovery.contract import Candidate, host_of
 from argus_collector.runtime import contract as runtime
 
-CLICK_TIMEOUT_MS = 10_000
+CLICK_TIMEOUT_MS = 3_000  # WINLOG 06.10.2026: a missing or covered element costs 3 s, not 10
 
 
 def candidates(page: Page) -> list[Candidate]:
@@ -84,3 +87,20 @@ def answer_consent(page: Page, done: set[str]) -> str:
         return ""
     runtime.journal("browser", f"cookie banner on {host}: {kind} ({text[:40]})")
     return f"{kind}: {text}"
+
+
+PROBE_TIMEOUT_MS = 10_000
+
+
+def probe(page: Page, url: str) -> tuple[int, str]:
+    """(HTTP status, final URL after redirects) of `url` with the page's cookies and
+    headers, without leaving the page; (0, "") when nothing answers. The page's own
+    `fetch` for its origin, the context's request API for another one."""
+    try:
+        if urlsplit(page.url).netloc == urlsplit(url).netloc:
+            status, final = page.evaluate(PROBE_JS, [url, PROBE_TIMEOUT_MS])
+            return int(status), str(final)
+        resp = page.request.get(url, timeout=PROBE_TIMEOUT_MS, max_redirects=10)
+    except PlaywrightError:
+        return 0, ""
+    return resp.status, resp.url

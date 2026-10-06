@@ -14,7 +14,7 @@ from argus_collector.browser import contract as browser
 from argus_collector.discovery import contract as discovery
 from argus_collector.models import contract as models
 from argus_collector.storage import contract as storage
-from argus_collector.walk import ending, repository, service, timing, vision
+from argus_collector.walk import country, ending, repository, service, timing, vision
 from argus_collector.walk import page as page_step
 from argus_collector.walk.actions import gap_reason, goto, perform_safely
 from argus_collector.walk.decide import decide, end_budget, end_stalled
@@ -137,14 +137,13 @@ def _next(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState, te
     if pending is not None and not pending.read.calls:  # the rules read it: nothing to wait
         page_step.complete(state, wb, page, pending)
         pending = None
-    if ending.reached(state, page.url):
-        return Action(service.ACTION_FINISH, source="goal")
+    goal_action = ending.after_goal(state, page)
+    if goal_action is not None:
+        return goal_action
     with timing.timed(state.timing, "action"):
         action = decide(state, wb, page, text)
     page_step.complete(state, wb, page, pending)
-    if ending.reached(state, page.url):
-        return Action(service.ACTION_FINISH, source="goal")
-    return action
+    return ending.after_goal(state, page) or action
 
 
 def _vision_bot_check(
@@ -195,4 +194,4 @@ def _open(state: WalkState, wb: browser.WalkBrowser) -> browser.PageState | None
         state.add_gap(url, DOMAIN_GAP, detail, False)
         state.end_reason = service.END_DOMAIN
         return None
-    return page
+    return country.settle(state, wb, page)

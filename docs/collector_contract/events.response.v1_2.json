@@ -1,0 +1,40 @@
+{
+  "schema": "EventsResponse",
+  "method": "POST",
+  "path": "/api/collector/jobs/{job_id}/events",
+  "status": 200,
+  "body": {
+    "results": [
+      {
+        "event_id": "evt-0001",
+        "seq": 1,
+        "status": "accepted",
+        "code": null,
+        "canonical_contact_id": null,
+        "server_revision": 2,
+        "state_applied": true,
+        "channel_status": null
+      },
+      {
+        "event_id": "evt-0002",
+        "seq": 2,
+        "status": "rejected",
+        "code": "invalid_input",
+        "canonical_contact_id": null,
+        "server_revision": 2,
+        "state_applied": false,
+        "channel_status": null,
+        "detail": {
+          "rule": "person_without_name",
+          "observation_id": "o3",
+          "field": "email",
+          "message": "observation o3 (email): a person observation without full_name in this event; enrichment needs the person's name"
+        }
+      }
+    ],
+    "last_contiguous_seq": 2,
+    "job_state": "running",
+    "next_run_scheduled": false
+  },
+  "note": "Wire schema 1.2 (контракт 3.1.0): ответ воркеру, согласовавшему 1.2 в heartbeat; поле `detail` есть у каждого результата (null у принятого). Воркеру 1.1 ARGUS отвечает как в events.response.json, без ключа `detail`."
+}

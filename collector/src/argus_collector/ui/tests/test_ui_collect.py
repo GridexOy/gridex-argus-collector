@@ -91,13 +91,13 @@ def test_kaynnista_collects_an_argus_job_into_jono_and_lahetys(
         pump_until(app, root, lambda: bool(rows()) and rows()[0][-1].startswith("Valmis"))
         pump_until(app, root, lambda: app.view.delivery.state_label.cget("text") == "Lähetetty")
         company, _stage, persons, channels, sources, _tila = rows()[0]
-        assert company == "Fixture Oy" and int(persons) == 3, "the goal ends the walk"
-        assert int(channels) >= 6 and int(sources) >= 2
+        assert company == "Fixture Oy" and int(persons) == 5, "goal, then the found team link"
+        assert int(channels) >= 10 and int(sources) >= 3
         status = app.view.collect.status_label.cget("text")
-        assert status == "Tavoite saavutettu: 3 henkilöä, 6 kanavaa", status
+        assert status == "Tavoite saavutettu: 5 henkilöä, 10 kanavaa", status
         counts = app.view.delivery.counts_label.cget("text")
         assert counts.startswith("Odottaa lähetystä: 0 · Lähetysvirhe: 0")
         app.collect.stop()
-        assert app.view.collect.row_count() == 3, "the walk's rows are shown as before"
+        assert app.view.collect.row_count() == 5, "the walk's rows are shown as before"
     finally:
         root.destroy()

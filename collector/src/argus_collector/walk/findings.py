@@ -72,7 +72,7 @@ def _context_pairs(
     department = ctx.department_field(page.source.text, binding.group, contact, binding.in_panel)
     if department is not None:
         out.append(("department", department, BINDING_CAPTION, CONFIRMED))
-    country = ctx.country_field(context, contact.name.start)
+    country = ctx.country_field(context, contact.name.start, contact.phone)
     if country is not None:
         out.append(("country", country, BINDING_CAPTION, CONFIRMED))
     return out
@@ -102,6 +102,8 @@ def _add_person(
             page.claim(name, vf.value, obs_id)
         page.audit.append(AuditEntry(f"person[{index}].{name}", (obs_id,), vf.quote,
                                      extra_label_of(name)))
+    if new and all(f.field != FIELD_NAME for f in new):  # 3.1.0: the name in every event
+        new.insert(0, page.restated(key, *pairs[0]))
     page.add_entity(key, PERSON, new)
     return key
 

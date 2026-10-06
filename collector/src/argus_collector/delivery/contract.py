@@ -49,6 +49,7 @@ __all__ = [
 
 MakeEvent = Callable[[str, int, str], api.Event]  # (event_id, seq, occurred_at) -> event
 P95_WINDOW_S = 60
+API_TIMEOUT_S = service.API_TIMEOUT_S  # every ARGUS call of the collector waits 30 s
 
 
 @dataclass(frozen=True)
@@ -126,6 +127,11 @@ def rejections(conn: sqlite3.Connection) -> list[Rejection]:
 def reason(code: str) -> str:
     """English words for a rejection code (journal, `pilot rejected`)."""
     return service.reason(code)
+
+
+def unsent_runs(conn: sqlite3.Connection) -> set[str]:
+    """Runs with events still to send: their lease is renewed until the tail is out."""
+    return {run_id for _, run_id in repo.pending_runs(conn)}
 
 
 def job_totals(conn: sqlite3.Connection, job_id: str) -> tuple[int, int]:

@@ -81,11 +81,12 @@ def heartbeat_body(
     acks: list[Json] | None = None,
     worker_id: str = WORKER_ID,
     outbox_pending: int = 0,
+    schema_versions: tuple[str, ...] = ("1.1",),
 ) -> Json:
     return {
         "worker_id": worker_id,
         "worker_version": "0.4.2.0",
-        "schema_versions": ["1.1"],
+        "schema_versions": list(schema_versions),
         "capabilities": capabilities(),
         "collecting": True,
         "active_jobs": active or [],

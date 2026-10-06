@@ -5,13 +5,14 @@ from __future__ import annotations
 import pytest
 
 from contract_server.channels import channel_status
-from contract_server.tests import payloads
+from contract_server.tests import builders, payloads
 from contract_server.tests.client import Client
 from contract_server.tests.flow import Flow
 from contract_server.util import Json, sha256_hex
 
 PHONE = "+358 40 123 4567"
 EMAIL = "anna.virtanen@example.fi"
+NAME = "Anna Virtanen"
 
 
 def send_one(flow: Flow, observations: list[Json], evidence_id: str, **kw: str) -> Json:
@@ -150,17 +151,17 @@ def test_canonical_contact_is_stable_and_observations_deduplicate(
     phone = payloads.observation("phone", PHONE, evidence_id, observation_id="o-phone")
     email = payloads.observation("email", EMAIL, evidence_id, observation_id="o-email")
     first = flow.send(job, flow.contact(job, evidence_id, [phone]))[1]["results"][0]
-    second = flow.send(
-        job, flow.event(job, "contact.enriched", payloads.contact(evidence_id, [phone, email]))
-    )[1]["results"][0]
+    name = payloads.observation("full_name", NAME, evidence_id, observation_id="o-name")
+    enriched = payloads.contact(evidence_id, [name, phone, email])  # 3.1.0: the name every time
+    second = flow.send(job, flow.event(job, "contact.enriched", enriched))[1]["results"][0]
     assert first["canonical_contact_id"] == second["canonical_contact_id"]
     view = client.get(f"/_stand/jobs/{job.job_id}/contacts")[1]
     assert len(view["contacts"]) == 1
     observed = view["contacts"][0]["observations"]
-    assert [o["observation_id"] for o in observed] == ["o-phone", "o-email"]
+    assert [o["observation_id"] for o in observed] == ["o-phone", "o-name", "o-email"]
     assert observed[0]["channel_status"] == "published_direct"
     assert flow.job_status(job.job_id)["counts"]["persons"] == 1
-    assert flow.job_status(job.job_id)["counts"]["observations"] == 2
+    assert flow.job_status(job.job_id)["counts"]["observations"] == 3
 
 
 def test_contact_on_another_jobs_evidence_is_missing(flow: Flow) -> None:
@@ -170,3 +171,26 @@ def test_contact_on_another_jobs_evidence_is_missing(flow: Flow) -> None:
     contact = flow.contact(second, evidence_id, [payloads.observation("phone", PHONE, "ev-1")])
     body = flow.send(second, contact)[1]
     assert body["results"][0]["code"] == "evidence_missing"
+
+
+def test_enriched_person_without_name_is_refused_with_its_rule(flow: Flow, client: Client) -> None:
+    """Contract 3.1.0: a 1.2 worker gets `detail` (rule, observation, field); 1.1 gets no key."""
+    status, _ = client.post("/workers/heartbeat", builders.heartbeat_body(
+        schema_versions=("1.1", "1.2")))
+    assert status == 200
+    job = flow.start()
+    evidence_id = flow.page(job)
+    phone = payloads.observation("phone", PHONE, evidence_id, observation_id="o-phone")
+    first = flow.send(job, flow.contact(job, evidence_id, [phone]))[1]["results"][0]
+    assert first["detail"] is None, "an accepted event carries detail null for 1.2"
+    email = payloads.observation("email", EMAIL, evidence_id, observation_id="o-email")
+    refused = flow.send(job, flow.event(job, "contact.enriched",
+                                        payloads.contact(evidence_id, [email])))[1]["results"][0]
+    assert (refused["status"], refused["code"]) == ("rejected", "invalid_input")
+    assert refused["detail"]["rule"] == "person_without_name"
+    assert (refused["detail"]["observation_id"], refused["detail"]["field"]) == (
+        "o-email", "email")
+    client.post("/workers/heartbeat", builders.heartbeat_body())
+    other = flow.send(job, flow.contact(job, evidence_id, [payloads.observation(
+        "phone", PHONE, evidence_id)]))[1]["results"][0]
+    assert "detail" not in other, "a 1.1 worker gets the 3.0.0 shape"

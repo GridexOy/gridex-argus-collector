@@ -81,6 +81,14 @@ the panel's Yhteys block ("Paritusavain" -> "Yhdistä").
   `office_name`, `address` and `fax` only as `field="extra"` with that
   `extra_label` (a direct field or an `extra` without a label -> event
   rejection `invalid_input`); the quote is checked like every other.
+- **Contract 3.1.0 (wire 1.2)**: the heartbeat takes `schema_versions` 1.1 and 1.2
+  and keeps the highest common one; a 1.2 events answer carries `detail`
+  (`{rule, observation_id, field, message}`, null when accepted), a 1.1 one has no
+  key. Rules: `snapshot_missing`, `quote_not_found`, `person_without_name` (a
+  `contact.enriched` person without its name). A contact event whose evidence
+  was never uploaded is `accepted` + `evidence_pending` (`state_applied=false`, the
+  seq is spent) and waits in `pending.py`; the upload of its last evidence applies
+  it and its stored result becomes the outcome (ARGUS 0.4.24.4).
 - `--state PATH` saves the whole state as JSON after every POST (atomic) and
   loads it at start; evidence bytes and texts go to `PATH.evidence/`.
 

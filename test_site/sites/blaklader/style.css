@@ -1,0 +1,6 @@
+body { font-family: sans-serif; margin: 0 2rem; }
+.site-header, .site-footer { padding: 1rem 0; }
+.people { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 1rem; }
+.person { border: 1px solid #ccc; padding: 0.5rem 1rem; }
+/* The owner's case 06.10.2026: names shown in capitals by CSS only. */
+.person .name, h1, h2 { text-transform: uppercase; letter-spacing: 0.05em; }

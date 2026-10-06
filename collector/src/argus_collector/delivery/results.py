@@ -3,7 +3,9 @@
 `evidence_missing` and `sequence_gap` stay pending and `retry.py` decides what
 comes next (the snapshot first, at most 3 retries, then given up); other
 rejections are counted on the company's row through the hooks and are not sent
-again.
+again. Contract 3.1.0 (wire 1.2): a refusal carries its rule; the stored code is then
+`<code>/<rule>` (`invalid_input/person_without_name`), the rule's words go to Jono,
+Lähetys and the journal with the observation and field it names.
 """
 
 from __future__ import annotations
@@ -32,16 +34,20 @@ def apply(
     for result in resp.results:
         code, status = result.code or "", result.status.value
         row, item = rows[result.event_id], f"event {result.event_id} seq {result.seq}"
+        refusal = result.detail
+        if refusal is not None:
+            item += f" [{refusal.observation_id} {refusal.field}: {refusal.message[:160]}]"
         if status == "rejected" and code == "sequence_gap":
             gaps.append(result.seq)
             continue
         if status == "rejected" and code in KEEP_PENDING:
             retry.after_rejection(conn, hooks, job_id, row, code, resp.last_contiguous_seq)
             continue
+        shown = f"{code}/{refusal.rule.value}" if refusal is not None else code
         if status == "rejected":
-            hooks.rejected(conn, job_id, str(row["type"]), code, item)
+            hooks.rejected(conn, job_id, str(row["type"]), shown, item)
         channel = result.channel_status.value if result.channel_status else None
-        updates.append((result.event_id, status, code, result.canonical_contact_id, channel))
+        updates.append((result.event_id, status, shown, result.canonical_contact_id, channel))
     repo.mark_events(conn, updates)
     accepted = sum(1 for u in updates if u[1] != "rejected")
     runtime.journal(

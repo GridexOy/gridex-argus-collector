@@ -28,3 +28,8 @@ once; it was a fixed 2 x 0.8 s); navigation timeout 45 s (section 8.5).
 The installed Chrome needs no `playwright install`; the bundled Chromium is
 used only on non-Windows machines (CI, this container). The walk and
 "Avaa tyoselain" share the profile, so only one of them runs at a time.
+
+0.4.8.7: every context is fi-FI whatever Windows says (K10 step 1: `--lang`,
+`--accept-lang`, `Accept-Language: fi,sv;q=0.8,en;q=0.6`, `Europe/Helsinki`); the
+page text is read with CSS `text-transform` off (names as the HTML writes them);
+`probe(wb, url)` gives status and final URL without leaving the page; clicks wait 3 s.

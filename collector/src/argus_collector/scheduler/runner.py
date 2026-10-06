@@ -103,6 +103,9 @@ def walk_settings(
         region_fallback=countries[0].upper() if countries else DEFAULT_REGION,
         navigation=env.navigation, vision=env.vision, stop_at_goal=env.stop_at_goal,
         browser_host=host,
+        company_domains=service.company_domains(
+            [(host_key(h.host), h.basis.value) for h in scope.approved_hosts],
+            host_key(job.seed_urls[0])),
     )
 
 

@@ -22,10 +22,16 @@ STEP_KEYS = {
     "attention": "collecting.step.attention",
     "consent": "collecting.step.consent",
     "loop": "collecting.step.loop",
+    "foreign": "collecting.step.foreign",
 }
 GOAL_KEYS = {  # the walk ended by its goal (owner 06.10.2026)
     "goal": "collecting.status.goal",
     "goal_pages": "collecting.status.goalPages",
+}
+COUNTRY_KEYS = {  # the exhibition country's version of the site (owner 06.10.2026)
+    "local": "collecting.step.country",
+    "global": "collecting.step.countryGlobal",
+    "none": "collecting.step.countryNone",
 }
 MODEL_DETAIL_KEYS = {
     "cards": "collecting.step.modelCards",
@@ -117,10 +123,19 @@ def goal_line(msgs: Messages, event: WalkEvent) -> tuple[str, str] | None:
     return msgs.t(key, n=event.people, m=event.channels), level
 
 
+def country_line(msgs: Messages, detail: str) -> str:
+    """`Maa: FI (vaihdettu en-br → en-fi)` of a `FI|en-br|en-fi|local` step."""
+    country, was, now, kind = (detail.split("|") + ["", "", "", ""])[:4]
+    key = COUNTRY_KEYS.get(kind, COUNTRY_KEYS["none"])
+    return msgs.t(key, country=country, was=was, now=now)
+
+
 def _step_line(msgs: Messages, event: WalkEvent) -> tuple[str, str]:
     goal = goal_line(msgs, event)
     if goal is not None:
         return goal
+    if event.step == "country":
+        return country_line(msgs, event.detail), LEVEL_INFO
     if event.step == "model":
         if "failed" in event.detail:
             return msgs.t("collecting.step.modelFailed", detail=event.detail), LEVEL_ERROR

@@ -26,13 +26,13 @@ from argus_collector.browser.binding import (
     probe_payload,
 )
 from argus_collector.browser.host import BrowserHost, open_context
-from argus_collector.browser.scripts import HIDDEN_LINKS_JS, TAB_PANELS_JS
+from argus_collector.browser.scripts import HIDDEN_LINKS_JS, PLAIN_TEXT_JS
 from argus_collector.discovery.contract import Candidate
 from argus_collector.runtime import contract as runtime
 
 NAVIGATION_TIMEOUT_MS = 45_000
 LOAD_TIMEOUT_MS = 10_000
-CLICK_TIMEOUT_MS = 10_000
+CLICK_TIMEOUT_MS = 3_000  # WINLOG 06.10.2026: a missing or covered element costs 3 s, not 10
 SETTLE_MS = 800  # longest wait for a quiet DOM after load / click
 QUIET_MS = 300  # no DOM mutation for this long: the page is ready
 CHALLENGE_WAIT_S = 20.0  # target state timeout (TZ_SELAIN 8.5)
@@ -181,9 +181,9 @@ class WalkBrowser:
     def observe(self) -> PageState:
         """Current page without acting: html, visible text, candidates."""
         candidates = tools.candidates(self.page)
-        text = self.page.evaluate("() => document.body ? document.body.innerText : ''")
+        read = self.page.evaluate(PLAIN_TEXT_JS) or {}
+        text, panels = read.get("text", ""), read.get("panels") or []
         hidden = self.page.evaluate(HIDDEN_LINKS_JS)
-        panels = self.page.evaluate(TAB_PANELS_JS) or []
         return PageState(
             url=self.page.url,
             title=self.page.title(),

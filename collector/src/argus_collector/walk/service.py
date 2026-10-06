@@ -33,6 +33,8 @@ STEP_ATTENTION = "attention"  # a bot check did not clear: detail = url
 STEP_CONSENT = "consent"  # a cookie banner was answered: detail = `kind: button text`
 STEP_LOOP = "loop"  # a page state repeated 3 times without progress: finish_branch
 STEP_GOAL = "goal"  # the goal is reached: people, channels (owner 06.10.2026)
+STEP_COUNTRY = "country"  # the country's version: detail = `FI|en-br|en-fi|local`
+STEP_FOREIGN = "foreign"  # K7: a page of another domain, a source only: detail = host
 STEP_GOAL_PAGES = "goal_pages"  # 2 more pages read after the first people, no goal
 
 ACTION_NAVIGATE = "navigate"
@@ -81,6 +83,7 @@ class WalkSettings:
     vision: ModelConfig | None = None
     stop_at_goal: bool = True  # the goal rule (`goal.py`); off: walk until nothing is left
     browser_host: BrowserHost | None = None  # the collection's Chrome; None: own (profile)
+    company_domains: frozenset[str] | None = None  # K7: people only from these; None: any
 
     def run_limits(self) -> WalkLimits:
         if self.limits is not None:

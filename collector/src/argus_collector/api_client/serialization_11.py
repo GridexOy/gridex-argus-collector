@@ -10,25 +10,91 @@ from collections.abc import Callable
 from typing import Any
 
 from argus_collector.api_client.serialization_4 import route_from_json, route_to_json
-from argus_collector.api_client.serialization_9 import model_usage_from_json, model_usage_to_json
 from argus_collector.api_client.serialization_10 import (
-    freshness_payload_from_json,
-    freshness_payload_to_json,
+    finished_payload_from_json,
+    finished_payload_to_json,
 )
-from argus_collector.api_client.types_5 import ContactFreshnessEvent, RouteRecordedPayload
+from argus_collector.api_client.types_5 import JobFinishedEventSchemaVersion
 from argus_collector.api_client.types_6 import (
-    ModelCalledEvent,
-    ModelCalledPayload,
+    ContactFreshnessEvent,
+    ContactFreshnessEventSchemaVersion,
+    FreshnessCheck,
+    FreshnessCheckStatus,
+    FreshnessPayload,
+    JobFinishedEvent,
     RouteRecordedEvent,
-    RouteVerifiedEvent,
-    RouteVerifiedPayload,
-    RouteVerifiedPayloadResult,
+    RouteRecordedEventSchemaVersion,
+    RouteRecordedPayload,
 )
-from argus_collector.api_client.wire import const, or_none
+from argus_collector.api_client.wire import const, opt, or_none
+
+
+def job_finished_event_to_json(value: JobFinishedEvent) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "event_id": value.event_id,
+        "job_id": value.job_id,
+        "run_id": value.run_id,
+        "seq": value.seq,
+        "occurred_at": value.occurred_at,
+        "payload": finished_payload_to_json(value.payload),
+        "type": value.type,
+    }
+    if value.schema_version is not None:
+        out["schema_version"] = value.schema_version.value
+    return out
+
+
+def job_finished_event_from_json(data: dict[str, Any]) -> JobFinishedEvent:
+    return JobFinishedEvent(
+        event_id=str(data["event_id"]),
+        job_id=str(data["job_id"]),
+        run_id=str(data["run_id"]),
+        seq=int(data["seq"]),
+        occurred_at=str(data["occurred_at"]),
+        payload=finished_payload_from_json(data["payload"]),
+        schema_version=opt(data, "schema_version", JobFinishedEventSchemaVersion, None),
+        type=const(data, "type", "job.finished"),
+    )
+
+
+def freshness_check_to_json(value: FreshnessCheck) -> dict[str, Any]:
+    return {
+        "canonical_contact_id": value.canonical_contact_id,
+        "field": value.field,
+        "status": value.status.value,
+        "scope_description": value.scope_description,
+        "evidence_ids": list(value.evidence_ids),
+        "checked_at": value.checked_at,
+        "observation_id": value.observation_id,
+    }
+
+
+def freshness_check_from_json(data: dict[str, Any]) -> FreshnessCheck:
+    return FreshnessCheck(
+        canonical_contact_id=str(data["canonical_contact_id"]),
+        field=str(data["field"]),
+        status=FreshnessCheckStatus(data["status"]),
+        scope_description=str(data["scope_description"]),
+        evidence_ids=[str(v) for v in data["evidence_ids"]],
+        checked_at=str(data["checked_at"]),
+        observation_id=or_none(data["observation_id"], str),
+    )
+
+
+def freshness_payload_to_json(value: FreshnessPayload) -> dict[str, Any]:
+    return {
+        "checks": [freshness_check_to_json(v) for v in value.checks],
+    }
+
+
+def freshness_payload_from_json(data: dict[str, Any]) -> FreshnessPayload:
+    return FreshnessPayload(
+        checks=[freshness_check_from_json(v) for v in data["checks"]],
+    )
 
 
 def contact_freshness_event_to_json(value: ContactFreshnessEvent) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "event_id": value.event_id,
         "job_id": value.job_id,
         "run_id": value.run_id,
@@ -36,8 +102,10 @@ def contact_freshness_event_to_json(value: ContactFreshnessEvent) -> dict[str, A
         "occurred_at": value.occurred_at,
         "payload": freshness_payload_to_json(value.payload),
         "type": value.type,
-        "schema_version": value.schema_version,
     }
+    if value.schema_version is not None:
+        out["schema_version"] = value.schema_version.value
+    return out
 
 
 def contact_freshness_event_from_json(data: dict[str, Any]) -> ContactFreshnessEvent:
@@ -48,8 +116,8 @@ def contact_freshness_event_from_json(data: dict[str, Any]) -> ContactFreshnessE
         seq=int(data["seq"]),
         occurred_at=str(data["occurred_at"]),
         payload=freshness_payload_from_json(data["payload"]),
+        schema_version=opt(data, "schema_version", ContactFreshnessEventSchemaVersion, None),
         type=const(data, "type", "contact.freshness"),
-        schema_version=const(data, "schema_version", "1.1"),
     )
 
 
@@ -68,7 +136,7 @@ def route_recorded_payload_from_json(data: dict[str, Any]) -> RouteRecordedPaylo
 
 
 def route_recorded_event_to_json(value: RouteRecordedEvent) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "event_id": value.event_id,
         "job_id": value.job_id,
         "run_id": value.run_id,
@@ -76,8 +144,10 @@ def route_recorded_event_to_json(value: RouteRecordedEvent) -> dict[str, Any]:
         "occurred_at": value.occurred_at,
         "payload": route_recorded_payload_to_json(value.payload),
         "type": value.type,
-        "schema_version": value.schema_version,
     }
+    if value.schema_version is not None:
+        out["schema_version"] = value.schema_version.value
+    return out
 
 
 def route_recorded_event_from_json(data: dict[str, Any]) -> RouteRecordedEvent:
@@ -88,112 +158,24 @@ def route_recorded_event_from_json(data: dict[str, Any]) -> RouteRecordedEvent:
         seq=int(data["seq"]),
         occurred_at=str(data["occurred_at"]),
         payload=route_recorded_payload_from_json(data["payload"]),
+        schema_version=opt(data, "schema_version", RouteRecordedEventSchemaVersion, None),
         type=const(data, "type", "route.recorded"),
-        schema_version=const(data, "schema_version", "1.1"),
-    )
-
-
-def route_verified_payload_to_json(value: RouteVerifiedPayload) -> dict[str, Any]:
-    return {
-        "route_id": value.route_id,
-        "result": value.result.value,
-        "record_count": value.record_count,
-        "evidence_ids": list(value.evidence_ids),
-        "detail": value.detail,
-    }
-
-
-def route_verified_payload_from_json(data: dict[str, Any]) -> RouteVerifiedPayload:
-    return RouteVerifiedPayload(
-        route_id=str(data["route_id"]),
-        result=RouteVerifiedPayloadResult(data["result"]),
-        record_count=or_none(data["record_count"], int),
-        evidence_ids=[str(v) for v in data["evidence_ids"]],
-        detail=str(data["detail"]),
-    )
-
-
-def route_verified_event_to_json(value: RouteVerifiedEvent) -> dict[str, Any]:
-    return {
-        "event_id": value.event_id,
-        "job_id": value.job_id,
-        "run_id": value.run_id,
-        "seq": value.seq,
-        "occurred_at": value.occurred_at,
-        "payload": route_verified_payload_to_json(value.payload),
-        "type": value.type,
-        "schema_version": value.schema_version,
-    }
-
-
-def route_verified_event_from_json(data: dict[str, Any]) -> RouteVerifiedEvent:
-    return RouteVerifiedEvent(
-        event_id=str(data["event_id"]),
-        job_id=str(data["job_id"]),
-        run_id=str(data["run_id"]),
-        seq=int(data["seq"]),
-        occurred_at=str(data["occurred_at"]),
-        payload=route_verified_payload_from_json(data["payload"]),
-        type=const(data, "type", "route.verified"),
-        schema_version=const(data, "schema_version", "1.1"),
-    )
-
-
-def model_called_payload_to_json(value: ModelCalledPayload) -> dict[str, Any]:
-    return {
-        "usage": model_usage_to_json(value.usage),
-        "source_ids": list(value.source_ids),
-    }
-
-
-def model_called_payload_from_json(data: dict[str, Any]) -> ModelCalledPayload:
-    return ModelCalledPayload(
-        usage=model_usage_from_json(data["usage"]),
-        source_ids=[str(v) for v in data["source_ids"]],
-    )
-
-
-def model_called_event_to_json(value: ModelCalledEvent) -> dict[str, Any]:
-    return {
-        "event_id": value.event_id,
-        "job_id": value.job_id,
-        "run_id": value.run_id,
-        "seq": value.seq,
-        "occurred_at": value.occurred_at,
-        "payload": model_called_payload_to_json(value.payload),
-        "type": value.type,
-        "schema_version": value.schema_version,
-    }
-
-
-def model_called_event_from_json(data: dict[str, Any]) -> ModelCalledEvent:
-    return ModelCalledEvent(
-        event_id=str(data["event_id"]),
-        job_id=str(data["job_id"]),
-        run_id=str(data["run_id"]),
-        seq=int(data["seq"]),
-        occurred_at=str(data["occurred_at"]),
-        payload=model_called_payload_from_json(data["payload"]),
-        type=const(data, "type", "model.called"),
-        schema_version=const(data, "schema_version", "1.1"),
     )
 
 
 TO_JSON: dict[type[Any], Callable[[Any], dict[str, Any]]] = {
+    JobFinishedEvent: job_finished_event_to_json,
+    FreshnessCheck: freshness_check_to_json,
+    FreshnessPayload: freshness_payload_to_json,
     ContactFreshnessEvent: contact_freshness_event_to_json,
     RouteRecordedPayload: route_recorded_payload_to_json,
     RouteRecordedEvent: route_recorded_event_to_json,
-    RouteVerifiedPayload: route_verified_payload_to_json,
-    RouteVerifiedEvent: route_verified_event_to_json,
-    ModelCalledPayload: model_called_payload_to_json,
-    ModelCalledEvent: model_called_event_to_json,
 }
 FROM_JSON: dict[type[Any], Callable[[dict[str, Any]], Any]] = {
+    JobFinishedEvent: job_finished_event_from_json,
+    FreshnessCheck: freshness_check_from_json,
+    FreshnessPayload: freshness_payload_from_json,
     ContactFreshnessEvent: contact_freshness_event_from_json,
     RouteRecordedPayload: route_recorded_payload_from_json,
     RouteRecordedEvent: route_recorded_event_from_json,
-    RouteVerifiedPayload: route_verified_payload_from_json,
-    RouteVerifiedEvent: route_verified_event_from_json,
-    ModelCalledPayload: model_called_payload_from_json,
-    ModelCalledEvent: model_called_event_from_json,
 }

@@ -25,6 +25,7 @@ from argus_collector.api_client import (
     serialization_11,
     serialization_12,
     serialization_13,
+    serialization_14,
 )
 
 _T = TypeVar("_T")
@@ -42,6 +43,7 @@ _TO_JSON: dict[type[Any], Callable[[Any], dict[str, Any]]] = {
     **serialization_11.TO_JSON,
     **serialization_12.TO_JSON,
     **serialization_13.TO_JSON,
+    **serialization_14.TO_JSON,
 }
 _FROM_JSON: dict[type[Any], Callable[[dict[str, Any]], Any]] = {
     **serialization_1.FROM_JSON,
@@ -57,6 +59,7 @@ _FROM_JSON: dict[type[Any], Callable[[dict[str, Any]], Any]] = {
     **serialization_11.FROM_JSON,
     **serialization_12.FROM_JSON,
     **serialization_13.FROM_JSON,
+    **serialization_14.FROM_JSON,
 }
 
 

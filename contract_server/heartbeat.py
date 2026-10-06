@@ -13,7 +13,7 @@ from contract_server.context import Request, Stand
 from contract_server.errors import ApiError
 from contract_server.util import Json, iso
 
-SUPPORTED_SCHEMA_VERSIONS = {"1.1"}
+SUPPORTED_SCHEMA_VERSIONS = {"1.1", "1.2"}  # contract 3.1.0: the highest common one is kept
 COMMAND_FIELDS = ("command_id", "job_id", "action", "state_revision", "policy_patch")
 
 
@@ -29,6 +29,7 @@ def record_worker(stand: Stand, worker_id: str, body: Json, now: float) -> None:
         "browser_available": body["browser_available"],
         "model_available": body["model_available"],
         "active_job_ids": [item["job_id"] for item in body["active_jobs"]],
+        "schema_version": max(SUPPORTED_SCHEMA_VERSIONS.intersection(body["schema_versions"])),
     }
     stand.registry.record_heartbeat(worker_id, datetime.fromtimestamp(now, UTC))
 

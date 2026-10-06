@@ -30,3 +30,6 @@ observation ids come from SQLite, so nothing is sent twice.
 
 Tests (`tests/`) run the collector headless against `contract_server/`, the
 fixture site and the fake model.
+
+0.4.8.7: a finished job keeps its lease in the heartbeat while its run has events
+to send; `service.company_domains` gives the walk the company's domains (K7).

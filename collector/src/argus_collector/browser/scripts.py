@@ -117,6 +117,39 @@ TAB_PANELS_JS = """
 }).filter(item => item && item.label && item.text.trim())
 """
 
+# The page's text and its tab panels as the HTML writes them: CSS `text-transform`
+# is off while innerText is read (owner 06.10.2026, Blåkläder: names in capitals).
+PLAIN_TEXT_JS = """
+() => {
+  const style = document.createElement('style');
+  style.textContent = '*, *::before, *::after { text-transform: none !important; }';
+  (document.head || document.documentElement).appendChild(style);
+  try {
+    return {text: document.body ? document.body.innerText : '', panels: (PANELS)()};
+  } finally {
+    style.remove();
+  }
+}
+""".replace("(PANELS)", "(" + TAB_PANELS_JS.strip() + ")")
+
+# Status and final URL of a same-origin URL, asked through the page's own network
+# (Chrome resolves `*.localhost`, sends the context's cookies and Accept-Language).
+PROBE_JS = """
+async ([url, ms]) => {
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), ms);
+  try {
+    const resp = await fetch(url, {redirect: 'follow', credentials: 'include',
+                                   signal: stop.signal});
+    return [resp.status, resp.url];
+  } catch (e) {
+    return [0, ''];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+"""
+
 # A visible cookie-consent banner and its buttons (OneTrust, Cookiebot, generic
 # dialogs and bars that talk about cookies); `service.consent_choice` picks one.
 CONSENT_JS = """

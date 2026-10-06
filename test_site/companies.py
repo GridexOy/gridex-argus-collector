@@ -53,6 +53,11 @@ def companies(port: int = DEFAULT_PORT) -> list[dict[str, Any]]:
         ),
         _company("ellego", "Ellego Powertec Oy", vhost("ellego"), ["ellego.localhost"]),
         _company("reimax", "Reimax Oy", vhost("reimax"), ["reimax.localhost"]),
+        _company("blaklader", "Blåkläder Oy", vhost("blaklader"), ["blaklader.localhost"]),
+        _company("gavazzi", "Carlo Gavazzi Oy Ab", vhost("gavazzi") + "en-br/",
+                 ["gavazzi.localhost"]),
+        _company("elkris", "Elkris Oy", vhost("elkris"),
+                 ["elkris.localhost", "industryx.localhost|linked_from_contact_section"]),
     ]
 
 

@@ -54,6 +54,19 @@ def host_of(url: str) -> str:
     return _host(url)
 
 
+SECOND_LEVEL = frozenset({"co.uk", "org.uk", "ac.uk", "com.au", "co.nz", "co.jp", "com.br",
+                          "com.cn", "com.mx", "com.ar", "com.tr", "co.za", "co.in", "com.sg"})
+
+
+def site_domain(host: str) -> str:
+    """The registrable domain of a host (`industryx.dimecc.com` -> `dimecc.com`); an IP stays."""
+    labels = host.lower().rstrip(".").split(".")
+    if all(part.isdigit() for part in labels):
+        return host
+    keep = 3 if ".".join(labels[-2:]) in SECOND_LEVEL else 2
+    return ".".join(labels[-keep:])
+
+
 def normalize_url(url: str) -> str:
     try:
         parts = urlsplit(url.strip())

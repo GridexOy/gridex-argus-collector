@@ -54,6 +54,16 @@ def test_queue_props_states_and_row_levels(msgs: repository.Messages) -> None:
     assert props.row_levels == [queue_lines.LEVEL_OK, queue_lines.LEVEL_ERROR]
 
 
+def test_a_failed_claim_shows_above_a_queue_already_shown(msgs: repository.Messages) -> None:
+    """WINLOG 06.10.2026: 73 of 106 claims failed while Jono showed the old rows only."""
+    view = QueueView([row()], "failed", "HTTP 0", collecting=True)
+    props = queue_lines.queue_props(msgs, view)
+    assert props.state_text == msgs.t("queue.claimFailed") != "queue.claimFailed"
+    assert props.state_level == queue_lines.LEVEL_ERROR and len(props.rows) == 1
+    again = queue_lines.queue_props(msgs, QueueView([row()], "done", "", collecting=True))
+    assert again.state_text == "", "the next claim that passes clears it"
+
+
 def test_delivery_props_counts_and_transport(msgs: repository.Messages) -> None:
     props = queue_lines.delivery_props(msgs, DeliveryView(3, 1, 2.5, "delivery_error"))
     assert props.counts_level == queue_lines.LEVEL_ERROR

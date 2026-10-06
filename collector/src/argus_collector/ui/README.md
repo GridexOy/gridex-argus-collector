@@ -25,5 +25,7 @@ Blocks and states:
 - Huomio (0.4.4.0, `attention_lines.py`, `view_attention.py`): shown only while a job is `needs_attention` (a bot check did not clear in 20 s): `Tarvitsee huomiota: <company> — <reason>: <url>`, "Avaa työselain" on that URL (`app_browser.py`; disabled while a walk runs) and "Jatka käsin tehdyn toimen jälkeen" (the job walks on). The collector starts no walk while the work browser is open.
 - STOP file in the repo root or in the user data dir: red banner with the paths; a running walk stops at its next step.
 
+- 0.4.8.7: a refusal shows its rule's words (wire 1.2); Keruu shows `Maa: FI (vaihdettu en-br → en-fi)` and `Vieras verkkotunnus …`; when collecting, each company starts its own table and `Löydetty`.
+
 Tests (`tests/`) build props without a display and render the real window
 under Xvfb when no display is present (skipped when neither exists).

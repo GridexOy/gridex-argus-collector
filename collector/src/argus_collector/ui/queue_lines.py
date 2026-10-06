@@ -52,6 +52,15 @@ REJECT_KEYS = {
     "budget_exceeded": "delivery.rejected.budget_exceeded",
     "participation_not_confirmed": "delivery.rejected.participation_not_confirmed",
 }
+RULE_KEYS = {  # RefusalDetail.rule of contract 3.1.0
+    "person_without_name": "delivery.rule.person_without_name",
+    "no_channel": "delivery.rule.no_channel",
+    "channel_value_unreadable": "delivery.rule.channel_value_unreadable",
+    "snapshot_missing": "delivery.rule.snapshot_missing",
+    "quote_not_found": "delivery.rule.quote_not_found",
+    "value_not_in_quote": "delivery.rule.value_not_in_quote",
+    "job_mismatch": "delivery.rule.job_mismatch",
+}
 COLUMN_KEYS = (
     "queue.col.company",
     "queue.col.stage",
@@ -94,6 +103,10 @@ class DeliveryProps:
 
 
 def rejection_text(msgs: Messages, code: str) -> str:
+    """Words of a code, or of the rule a 1.2 refusal names (`invalid_input/no_channel`)."""
+    code, _, rule = code.partition("/")
+    if rule in RULE_KEYS:
+        return msgs.t(RULE_KEYS[rule])
     key = REJECT_KEYS.get(code)
     if key:
         return msgs.t(key)
@@ -135,7 +148,9 @@ def queue_props(msgs: Messages, view: QueueView | None) -> QueueProps:
     levels = [
         LEVEL_ERROR if r.rejected or r.state == "failed" else LEVEL_OK for r in view.rows
     ]
-    return QueueProps(title, columns, [_row(msgs, r) for r in view.rows], levels)
+    failed = view.claim_state == "failed"  # WINLOG 06.10: also above a table already shown
+    return QueueProps(title, columns, [_row(msgs, r) for r in view.rows], levels,
+                      msgs.t("queue.claimFailed") if failed else "", LEVEL_ERROR)
 
 
 def delivery_props(msgs: Messages, view: DeliveryView | None) -> DeliveryProps:

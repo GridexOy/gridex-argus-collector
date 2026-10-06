@@ -48,8 +48,8 @@ ENVELOPE = envelope_schema()
 def read_envelope(req: Request) -> Json:
     body = req.json()
     if isinstance(body, dict) and "schema_version" in body:
-        if not same(body["schema_version"], "1.1"):
-            raise ApiError(400, "schema_unsupported", "events need schema_version 1.1")
+        if not any(same(body["schema_version"], v) for v in ("1.1", "1.2")):
+            raise ApiError(400, "schema_unsupported", "events need schema_version 1.1 or 1.2")
     return validated(body, ENVELOPE)
 
 
@@ -80,8 +80,9 @@ def prescan(state: Json, events: list[Json]) -> list[str]:
     return digests
 
 
-def result(event: Json, outcome: Outcome, revision: int) -> Json:
-    return {
+def result(event: Json, outcome: Outcome, revision: int, wire: str = "1.1") -> Json:
+    """One EventResult; a 1.2 worker gets `detail` (null without a rule), 1.1 never."""
+    row: Json = {
         "event_id": event["event_id"],
         "seq": event["seq"],
         "status": outcome.status,
@@ -91,6 +92,9 @@ def result(event: Json, outcome: Outcome, revision: int) -> Json:
         "state_applied": outcome.state_applied,
         "channel_status": outcome.channel_status,
     }
+    if wire == "1.2":
+        row["detail"] = outcome.refusal()
+    return row
 
 
 def evaluate(batch: Batch, event: Json) -> Outcome:
@@ -105,7 +109,7 @@ def evaluate(batch: Batch, event: Json) -> Outcome:
 def store(batch: Batch, event: Json, digest: str, outcome: Outcome) -> Json:
     revision = bump_revision(batch.state)
     batch.run["last_contiguous_seq"] = event["seq"]
-    row = result(event, outcome, revision)
+    row = result(event, outcome, revision, batch.wire)
     batch.state["events"][event["event_id"]] = {
         "job_id": batch.job["job_id"],
         "run_id": batch.run["run_id"],
@@ -140,11 +144,11 @@ def process(batch: Batch, event: Json, digest: str) -> Json:
     revision = int(batch.state["revision"])
     if batch.gap or event["seq"] != batch.run["last_contiguous_seq"] + 1:
         batch.gap = True
-        return result(event, rejected("sequence_gap"), revision)
+        return result(event, rejected("sequence_gap"), revision, batch.wire)
     outcome = evaluate(batch, event)
     if not outcome.record:
         batch.gap = True
-        return result(event, outcome, revision)
+        return result(event, outcome, revision, batch.wire)
     return store(batch, event, digest, outcome)
 
 
@@ -155,7 +159,8 @@ def handle(stand: Stand, req: Request) -> tuple[int, Json]:
     token = body["execution_token"]
     rights = execution_rights(job, run, token, req.principal, stand.now())
     digests = prescan(stand.state, body["events"])
-    batch = Batch(stand, job, run, rights)
+    wire = str(stand.state["workers"].get(req.principal, {}).get("schema_version", "1.1"))
+    batch = Batch(stand, job, run, rights, wire=wire)
     pairs = zip(body["events"], digests, strict=True)
     results = [process(batch, event, digest) for event, digest in pairs]
     return 200, {

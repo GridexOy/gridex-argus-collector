@@ -30,6 +30,7 @@ class WalkHost(Protocol):
     @property
     def walking(self) -> bool: ...
     def stop(self) -> None: ...
+    def reset(self) -> None: ...
     def on_event(self, event: walk.WalkEvent) -> None: ...
 
 
@@ -72,7 +73,7 @@ class CollectController:
         settings = scheduler.Settings(env=env, stop_files=runtime.stop_files,
                                       browser_free=lambda: not host.work_browser_running())
         self._dirty = threading.Event()
-        self._job_contacts = 0
+        self._job_contacts, self._job_open = 0, False
         self.collector = scheduler.Collector(
             settings, target, lambda: capabilities_of(self.host.report), self._changed,
             self._walk_event,
@@ -97,6 +98,9 @@ class CollectController:
 
     def _on_walk_event(self, event: walk.WalkEvent) -> None:
         """Main thread: the lines of the local walk, plus the end line of each job walk."""
+        if not self._job_open:  # a new company: its own table and count (Blåkläder 44/22)
+            self._job_open = True
+            self.host.walk.reset()
         self.host.walk.on_event(event)
         if event.kind == walk.EVENT_CONTACT:
             self._job_contacts += 1
@@ -104,7 +108,7 @@ class CollectController:
             text, level = walk_lines.done_line(self.host.msgs, event.page_no, self._job_contacts)
             self.host.view.collect.set_status(text, level)
         if event.kind in (walk.EVENT_DONE, walk.EVENT_STOPPED, walk.EVENT_ERROR):
-            self._job_contacts = 0
+            self._job_contacts, self._job_open = 0, False
 
     def start(self) -> None:
         """Kaynnista: claim ARGUS jobs and walk them."""

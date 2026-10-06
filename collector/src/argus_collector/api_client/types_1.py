@@ -131,6 +131,11 @@ class ClaimRequest:
     capabilities: Capabilities
 
 
+class JobDefinitionSchemaVersion(StrEnum):
+    _1_1 = "1.1"
+    _1_2 = "1.2"
+
+
 class ScopeGeography(StrEnum):
     ALL_PUBLISHED = "all_published"
     SPECIFIED = "specified"

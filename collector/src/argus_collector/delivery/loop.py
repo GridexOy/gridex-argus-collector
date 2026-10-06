@@ -1,7 +1,9 @@
-"""The delivery thread: snapshots first, then events in seq order, results back.
+"""The delivery threads: events in seq order on one, snapshots on the other, results back.
 
-Independent of the walk (TZ_SELAIN 8.1 p.4): it runs while a connection is
-saved, also after Pysayta or a STOP file, until the outbox is empty.
+Independent of the walk (TZ_SELAIN 8.1 p.4): they run while a connection is
+saved, also after Pysayta or a STOP file, until the outbox is empty. Events do
+not wait for the snapshot lane (WINLOG 06.10.2026: ARGUS takes 3-5 s per new
+snapshot); a page's events leave once its closing event is written.
 """
 
 from __future__ import annotations
@@ -16,19 +18,19 @@ from pathlib import Path
 
 from argus_collector.api_client import contract as api
 from argus_collector.delivery import repository as repo
-from argus_collector.delivery import results, service
+from argus_collector.delivery import results, retry, service
 from argus_collector.delivery.hooks import ApiTarget, DeliveryHooks, Failed
 from argus_collector.delivery.transport import Transport
-from argus_collector.evidence import contract as evidence
-from argus_collector.runtime import contract as runtime
+from argus_collector.delivery.uploads import Lane, Lanes
 from argus_collector.storage import contract as storage
 
 TICK_S = 0.5
-UPLOADS_PER_TICK = 20
-HTML_MIME = "text/html; charset=utf-8"
+EVENTS_TICK_S = 0.2  # a page's batch leaves 0.1-0.3 s after the page (owner 06.10.2026)
+WIRE = "1.2"  # the events request schema (contract 3.1.0; heartbeat lists 1.1 and 1.2)
+RUN_END = (api.ContactFreshnessEvent.type, api.JobFinishedEvent.type)  # after the snapshots
 
 
-class Deliverer:
+class Deliverer(Lanes):
     def __init__(
         self,
         db_path: Path | None,
@@ -41,7 +43,8 @@ class Deliverer:
         self.error, self.failures, self.connected, self.pending = "", 0, False, 0
         self.server_error = 0  # the HTTP status of the last 5xx answer until a pass succeeds
         self._stop, self._wake, self._flush = threading.Event(), threading.Event(), False
-        self._thread: threading.Thread | None = None
+        self._threads: list[threading.Thread] = []
+        self._failing: tuple[Lane, ...] = ()  # the lanes whose error the panel shows
         self.transport = Transport()  # the one state of Lahetys, from heartbeat and delivery
 
     @property
@@ -60,11 +63,14 @@ class Deliverer:
             self.on_change()
 
     def start(self) -> None:
-        if self._thread is not None and self._thread.is_alive():
+        if any(t.is_alive() for t in self._threads):
             return
         self._stop.clear()
-        self._thread = threading.Thread(target=self._loop, name="delivery", daemon=True)
-        self._thread.start()
+        lanes = ((self._events, EVENTS_TICK_S, "delivery"), (self._uploads, TICK_S, "evidence"))
+        self._threads = [threading.Thread(target=self._loop, args=(lane, tick), name=name,
+                                          daemon=True) for lane, tick, name in lanes]
+        for thread in self._threads:
+            thread.start()
 
     def stop(self) -> None:
         self._stop.set()
@@ -75,27 +81,31 @@ class Deliverer:
         self._flush = True
         self._wake.set()
 
-    def _loop(self) -> None:
+    def _loop(self, lane: Lane, tick_s: float) -> None:
         conn = storage.connect(self.db_path)
         try:
             while not self._stop.is_set():
-                delay = self.tick(conn)
+                delay = self.tick(conn, (lane,), tick_s)
                 self._wake.wait(delay)
                 self._wake.clear()
         finally:
             conn.close()
 
-    def tick(self, conn: sqlite3.Connection) -> float:
-        """One pass; returns the delay before the next one."""
-        target, delay = self.target(), TICK_S
+    def tick(self, conn: sqlite3.Connection, lanes: tuple[Lane, ...] = (),
+             tick_s: float = TICK_S) -> float:
+        """One pass of the lanes (both: snapshots, then events); the delay before the next."""
+        target, delay = self.target(), tick_s
         self.connected = target is not None  # paired
+        run = lanes or (self._uploads, self._events)
         if target is not None:
             try:
-                self._uploads(conn, target)
-                self._events(conn, target)
-                self.error, self.failures, self.server_error = "", 0, 0
+                for lane in run:
+                    lane(conn, target)
             except Failed as failed:
-                delay = self._failed(failed)
+                delay, self._failing = self._failed(failed), run
+            else:
+                if self._failing in ((), run) or not lanes:  # only the failing lane clears it
+                    self.error, self.failures, self.server_error, self._failing = "", 0, 0, ()
         self.pending = repo.totals(conn)[0]
         self.transport.note(self.state)
         self.on_change()
@@ -108,55 +118,6 @@ class Deliverer:
         self.failures += 1
         return service.backoff_s(self.failures, failed.retry_after)
 
-    def _api_error(self, exc: api.ApiError, job_id: str, run_id: str, token: str) -> str:
-        """Code of an error that rejects the request; raises Failed for the classes that
-        stop this pass. The journal gets the words and ARGUS's request_id."""
-        body = exc.error
-        code = body.code if body else service.status_code(exc.status) if exc.status else ""
-        kind = service.classify(exc.status, code, body.retryable if body else False)
-        rid = f" request_id={body.request_id}" if body and body.request_id else ""
-        runtime.journal("delivery", f"job {job_id}: HTTP {exc.status} {code or kind}"
-                        f" ({service.reason(code or kind)}){rid}")
-        self.transport.answered() if exc.status else self.transport.no_answer()
-        self.server_error = exc.status if exc.status >= 500 else self.server_error
-        if kind == service.ERROR_LEASE:
-            self.hooks.lease_problem(job_id, run_id, code, token)
-        if kind in (service.ERROR_PERMANENT, service.ERROR_CONFLICT):
-            return code or kind
-        raise Failed(kind, exc.retry_after)
-
-    def _uploads(self, conn: sqlite3.Connection, target: ApiTarget) -> None:
-        for row in repo.pending_uploads(conn, UPLOADS_PER_TICK):
-            job_id, run_id, evidence_id = row["job_id"], row["run_id"], row["evidence_id"]
-            token = self.hooks.token_for(conn, job_id, run_id)
-            if token is None:
-                continue
-            snap = evidence.load_snapshot(conn, row["local_evidence_id"])
-            if snap is None:
-                self._reject_upload(conn, job_id, evidence_id, "evidence_missing")
-                continue
-            metadata = api.from_json(api.EvidenceMetadata, json.loads(row["metadata_json"]))
-            started = time.monotonic()
-            try:
-                resp = api.upload_evidence(
-                    target.base_url, target.token, job_id, token, metadata, snap.html,
-                    file_content_type=HTML_MIME, proxy_mode=target.api_mode,
-                )
-            except api.ApiError as exc:
-                code = self._api_error(exc, job_id, run_id, token)
-                self._reject_upload(conn, job_id, evidence_id, code)
-                continue
-            self.transport.answered()
-            repo.mark_upload(conn, evidence_id, resp.status.value, "")
-            runtime.journal("delivery", f"job {job_id}: evidence {len(snap.html)} B uploaded"
-                            f" in {service.elapsed_ms(started)} ms")
-
-    def _reject_upload(
-        self, conn: sqlite3.Connection, job_id: str, evidence_id: str, code: str
-    ) -> None:
-        repo.mark_upload(conn, evidence_id, "rejected", code)
-        self.hooks.rejected(conn, job_id, "evidence", code, f"evidence {evidence_id}")
-
     def _events(self, conn: sqlite3.Connection, target: ApiTarget) -> None:
         flush, self._flush = self._flush, False
         for job_id, run_id in repo.pending_runs(conn):
@@ -166,16 +127,22 @@ class Deliverer:
             rows = {r["event_id"]: r for r in repo.pending_events(conn, run_id, service.MAX_BATCH)}
             pending = [service.pending_from_row(dict(r)) for r in rows.values()]
             wanted = sorted({e for p in pending for e in p.evidence_ids})
-            chunk = service.batch(pending, repo.upload_states(conn, wanted))
+            uploads = repo.upload_states(conn, wanted)
+            hold = RUN_END if repo.pending_upload_ids(conn, run_id) else ()
+            chunk = service.batch(pending, uploads, hold)
+            if not chunk and pending:
+                retry.lost(conn, self.hooks, job_id, rows[pending[0].event_id], uploads)
             if not service.ready(chunk, datetime.now(UTC), flush):
                 continue
             events = [api.event_from_json(json.loads(rows[p.event_id]["event_json"]))
                       for p in chunk]
-            request = api.EventsRequest(execution_token=token, events=events)
+            request = api.EventsRequest(schema_version=api.EventsRequestSchemaVersion(WIRE),
+                                        execution_token=token, events=events)
             started = time.monotonic()
             try:
                 resp = api.post_events(
-                    target.base_url, target.token, job_id, request, proxy_mode=target.api_mode
+                    target.base_url, target.token, job_id, request, proxy_mode=target.api_mode,
+                    timeout_s=service.API_TIMEOUT_S,
                 )
             except api.ApiError as exc:
                 code = self._api_error(exc, job_id, run_id, token)

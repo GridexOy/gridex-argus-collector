@@ -11,8 +11,8 @@ Covers the operationIds in `scripts/codegen/manifest.py`: `heartbeat`, `claimJob
 | `service.py` | one function per operation: serialize, POST, parse any 2xx body |
 | `repository.py` | `urllib.request` transport, `ApiError`, the `system`/`direct` openers |
 | `multipart.py` | multipart/form-data encoding (no I/O) |
-| `types_1..6.py` | `StrEnum`s, frozen dataclasses, union aliases (dependencies first) |
-| `serialization_1..13.py` | `<snake>_to_json`/`_from_json` pairs, a class registry |
+| `types_1..7.py` | `StrEnum`s, frozen dataclasses, union aliases (dependencies first) |
+| `serialization_1..14.py` | `<snake>_to_json`/`_from_json` pairs, a class registry |
 | `codec.py` | generic `to_json(value)` / `from_json(kind, data)` over the registries |
 | `wire.py` | the small helpers the codecs share (`opt`, `const`, `or_none`, ...) |
 | `tests/` | hand-written: codec round trips, an embedded `http.server` double |

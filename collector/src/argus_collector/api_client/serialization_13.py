@@ -9,64 +9,163 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from argus_collector.api_client.serialization_3 import lease_from_json, lease_to_json
-from argus_collector.api_client.types_6 import (
-    JobState,
-    ReconcileRequest,
-    ReconcileResponse,
-    ReconcileResponseMode,
+from argus_collector.api_client.serialization_5 import (
+    job_started_event_from_json,
+    job_started_event_to_json,
 )
+from argus_collector.api_client.serialization_6 import (
+    source_blocked_event_from_json,
+    source_blocked_event_to_json,
+    source_discovered_event_from_json,
+    source_discovered_event_to_json,
+    source_processed_event_from_json,
+    source_processed_event_to_json,
+)
+from argus_collector.api_client.serialization_8 import (
+    contact_enriched_event_from_json,
+    contact_enriched_event_to_json,
+    contact_merge_proposed_event_from_json,
+    contact_merge_proposed_event_to_json,
+    contact_observed_event_from_json,
+    contact_observed_event_to_json,
+)
+from argus_collector.api_client.serialization_9 import (
+    job_progress_event_from_json,
+    job_progress_event_to_json,
+)
+from argus_collector.api_client.serialization_10 import (
+    job_needs_attention_event_from_json,
+    job_needs_attention_event_to_json,
+)
+from argus_collector.api_client.serialization_11 import (
+    contact_freshness_event_from_json,
+    contact_freshness_event_to_json,
+    job_finished_event_from_json,
+    job_finished_event_to_json,
+    route_recorded_event_from_json,
+    route_recorded_event_to_json,
+)
+from argus_collector.api_client.serialization_12 import (
+    model_called_event_from_json,
+    model_called_event_to_json,
+    route_verified_event_from_json,
+    route_verified_event_to_json,
+)
+from argus_collector.api_client.types_3 import (
+    EventsRequestSchemaVersion,
+    JobStartedEvent,
+    SourceBlockedEvent,
+    SourceDiscoveredEvent,
+    SourceProcessedEvent,
+)
+from argus_collector.api_client.types_4 import (
+    ContactEnrichedEvent,
+    ContactMerge_ProposedEvent,
+    ContactObservedEvent,
+)
+from argus_collector.api_client.types_5 import JobNeeds_AttentionEvent, JobProgressEvent
+from argus_collector.api_client.types_6 import (
+    ContactFreshnessEvent,
+    JobFinishedEvent,
+    ModelCalledEvent,
+    RouteRecordedEvent,
+    RouteVerifiedEvent,
+)
+from argus_collector.api_client.types_7 import (
+    Event,
+    EventsRequest,
+    RefusalDetail,
+    RefusalDetailRule,
+)
+from argus_collector.api_client.wire import or_none
+
+_EVENT_TO_JSON: dict[type[Any], Callable[[Any], dict[str, Any]]] = {
+    JobStartedEvent: job_started_event_to_json,
+    SourceDiscoveredEvent: source_discovered_event_to_json,
+    SourceProcessedEvent: source_processed_event_to_json,
+    SourceBlockedEvent: source_blocked_event_to_json,
+    ContactObservedEvent: contact_observed_event_to_json,
+    ContactEnrichedEvent: contact_enriched_event_to_json,
+    ContactMerge_ProposedEvent: contact_merge_proposed_event_to_json,
+    JobProgressEvent: job_progress_event_to_json,
+    JobNeeds_AttentionEvent: job_needs_attention_event_to_json,
+    JobFinishedEvent: job_finished_event_to_json,
+    ContactFreshnessEvent: contact_freshness_event_to_json,
+    RouteRecordedEvent: route_recorded_event_to_json,
+    RouteVerifiedEvent: route_verified_event_to_json,
+    ModelCalledEvent: model_called_event_to_json,
+}
+_EVENT_FROM_JSON: dict[object, Callable[[dict[str, Any]], Event]] = {
+    "job.started": job_started_event_from_json,
+    "source.discovered": source_discovered_event_from_json,
+    "source.processed": source_processed_event_from_json,
+    "source.blocked": source_blocked_event_from_json,
+    "contact.observed": contact_observed_event_from_json,
+    "contact.enriched": contact_enriched_event_from_json,
+    "contact.merge_proposed": contact_merge_proposed_event_from_json,
+    "job.progress": job_progress_event_from_json,
+    "job.needs_attention": job_needs_attention_event_from_json,
+    "job.finished": job_finished_event_from_json,
+    "contact.freshness": contact_freshness_event_from_json,
+    "route.recorded": route_recorded_event_from_json,
+    "route.verified": route_verified_event_from_json,
+    "model.called": model_called_event_from_json,
+}
 
 
-def reconcile_request_to_json(value: ReconcileRequest) -> dict[str, Any]:
+def event_to_json(value: Event) -> dict[str, Any]:
+    dump = _EVENT_TO_JSON.get(type(value))
+    if dump is None:
+        raise TypeError(f"Event: not a variant: {type(value).__name__}")
+    return dump(value)
+
+
+def event_from_json(data: dict[str, Any]) -> Event:
+    parse = _EVENT_FROM_JSON.get(data.get("type"))
+    if parse is None:
+        raise ValueError(f"Event: unknown type {data.get('type')!r}")
+    return parse(data)
+
+
+def events_request_to_json(value: EventsRequest) -> dict[str, Any]:
     return {
-        "worker_id": value.worker_id,
-        "run_id": value.run_id,
-        "last_acknowledged_seq": value.last_acknowledged_seq,
-        "pending_event_ids": list(value.pending_event_ids),
-        "pending_evidence_ids": list(value.pending_evidence_ids),
+        "schema_version": value.schema_version.value,
+        "execution_token": value.execution_token,
+        "events": [event_to_json(v) for v in value.events],
     }
 
 
-def reconcile_request_from_json(data: dict[str, Any]) -> ReconcileRequest:
-    return ReconcileRequest(
-        worker_id=str(data["worker_id"]),
-        run_id=str(data["run_id"]),
-        last_acknowledged_seq=int(data["last_acknowledged_seq"]),
-        pending_event_ids=[str(v) for v in data["pending_event_ids"]],
-        pending_evidence_ids=[str(v) for v in data["pending_evidence_ids"]],
+def events_request_from_json(data: dict[str, Any]) -> EventsRequest:
+    return EventsRequest(
+        schema_version=EventsRequestSchemaVersion(data["schema_version"]),
+        execution_token=str(data["execution_token"]),
+        events=[event_from_json(v) for v in data["events"]],
     )
 
 
-def reconcile_response_to_json(value: ReconcileResponse) -> dict[str, Any]:
+def refusal_detail_to_json(value: RefusalDetail) -> dict[str, Any]:
     return {
-        "mode": value.mode.value,
-        "lease": lease_to_json(value.lease),
-        "accepted_event_ids": list(value.accepted_event_ids),
-        "accepted_evidence_ids": list(value.accepted_evidence_ids),
-        "missing_evidence_ids": list(value.missing_evidence_ids),
-        "last_contiguous_seq": value.last_contiguous_seq,
-        "job_state": value.job_state.value,
+        "rule": value.rule.value,
+        "observation_id": value.observation_id,
+        "field": value.field,
+        "message": value.message,
     }
 
 
-def reconcile_response_from_json(data: dict[str, Any]) -> ReconcileResponse:
-    return ReconcileResponse(
-        mode=ReconcileResponseMode(data["mode"]),
-        lease=lease_from_json(data["lease"]),
-        accepted_event_ids=[str(v) for v in data["accepted_event_ids"]],
-        accepted_evidence_ids=[str(v) for v in data["accepted_evidence_ids"]],
-        missing_evidence_ids=[str(v) for v in data["missing_evidence_ids"]],
-        last_contiguous_seq=int(data["last_contiguous_seq"]),
-        job_state=JobState(data["job_state"]),
+def refusal_detail_from_json(data: dict[str, Any]) -> RefusalDetail:
+    return RefusalDetail(
+        rule=RefusalDetailRule(data["rule"]),
+        observation_id=or_none(data["observation_id"], str),
+        field=or_none(data["field"], str),
+        message=str(data["message"]),
     )
 
 
 TO_JSON: dict[type[Any], Callable[[Any], dict[str, Any]]] = {
-    ReconcileRequest: reconcile_request_to_json,
-    ReconcileResponse: reconcile_response_to_json,
+    EventsRequest: events_request_to_json,
+    RefusalDetail: refusal_detail_to_json,
 }
 FROM_JSON: dict[type[Any], Callable[[dict[str, Any]], Any]] = {
-    ReconcileRequest: reconcile_request_from_json,
-    ReconcileResponse: reconcile_response_from_json,
+    EventsRequest: events_request_from_json,
+    RefusalDetail: refusal_detail_from_json,
 }

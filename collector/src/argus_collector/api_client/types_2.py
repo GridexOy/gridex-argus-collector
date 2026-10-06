@@ -10,11 +10,17 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-from argus_collector.api_client.types_1 import ParticipationStatus, Policy, Scope
+from argus_collector.api_client.types_1 import (
+    JobDefinitionSchemaVersion,
+    ParticipationStatus,
+    Policy,
+    Scope,
+)
 
 
 @dataclass(frozen=True)
 class JobDefinition:
+    schema_version: JobDefinitionSchemaVersion
     batch_id: str
     job_id: str
     company_id: str
@@ -27,7 +33,6 @@ class JobDefinition:
     participation_claim_id: str | None
     override_reason: str | None
     rerun_reason: str | None
-    schema_version: str = "1.1"
 
 
 @dataclass(frozen=True)
@@ -173,24 +178,3 @@ class EvidenceMetadataSourceKind(StrEnum):
     SCREENSHOT = "screenshot"
     OCR = "ocr"
     CHECKPOINT = "checkpoint"
-
-
-@dataclass(frozen=True)
-class EvidenceMetadata:
-    evidence_id: str
-    job_id: str
-    run_id: str
-    company_id: str
-    source_url: str
-    final_url: str
-    source_kind: EvidenceMetadataSourceKind
-    mime_type: str
-    fetched_at: str
-    sha256: str
-    byte_length: int
-    capture_truncated: bool
-    redacted: bool
-    extractor_version: str
-    canonical_text_sha256: str | None = None
-    canonical_text: str | None = None
-    document_date: str | None = None

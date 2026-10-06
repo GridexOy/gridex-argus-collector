@@ -10,7 +10,11 @@ from collections.abc import Callable
 from typing import Any
 
 from argus_collector.api_client.serialization_2 import scope_from_json, scope_to_json
-from argus_collector.api_client.types_1 import ParticipationStatus, Policy
+from argus_collector.api_client.types_1 import (
+    JobDefinitionSchemaVersion,
+    ParticipationStatus,
+    Policy,
+)
 from argus_collector.api_client.types_2 import (
     Checkpoint,
     FrontierItem,
@@ -18,7 +22,7 @@ from argus_collector.api_client.types_2 import (
     JobDefinition,
     Lease,
 )
-from argus_collector.api_client.wire import const, opt, or_none
+from argus_collector.api_client.wire import opt, or_none
 
 
 def policy_to_json(value: Policy) -> dict[str, Any]:
@@ -63,6 +67,7 @@ def policy_from_json(data: dict[str, Any]) -> Policy:
 
 def job_definition_to_json(value: JobDefinition) -> dict[str, Any]:
     return {
+        "schema_version": value.schema_version.value,
         "batch_id": value.batch_id,
         "job_id": value.job_id,
         "company_id": value.company_id,
@@ -75,12 +80,12 @@ def job_definition_to_json(value: JobDefinition) -> dict[str, Any]:
         "participation_claim_id": value.participation_claim_id,
         "override_reason": value.override_reason,
         "rerun_reason": value.rerun_reason,
-        "schema_version": value.schema_version,
     }
 
 
 def job_definition_from_json(data: dict[str, Any]) -> JobDefinition:
     return JobDefinition(
+        schema_version=JobDefinitionSchemaVersion(data["schema_version"]),
         batch_id=str(data["batch_id"]),
         job_id=str(data["job_id"]),
         company_id=str(data["company_id"]),
@@ -93,7 +98,6 @@ def job_definition_from_json(data: dict[str, Any]) -> JobDefinition:
         participation_claim_id=or_none(data["participation_claim_id"], str),
         override_reason=or_none(data["override_reason"], str),
         rerun_reason=or_none(data["rerun_reason"], str),
-        schema_version=const(data, "schema_version", "1.1"),
     )
 
 

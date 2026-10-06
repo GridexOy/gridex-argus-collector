@@ -27,6 +27,7 @@ DICT_KEYS = (
     "commands",
     "workers",
     "controls",
+    "waiting",  # 0.4.24.4: contact events that arrived before their evidence (`pending.py`)
 )
 LIST_KEYS = ("model_calls", "sources", "records", "rejected")
 

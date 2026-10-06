@@ -2,8 +2,17 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from argus_collector.extraction.contract import Contact, VerifiedField
-from argus_collector.walk import goal, service
+from argus_collector.walk import contract, goal, service
+from argus_collector.walk.tests.conftest import GOLD as GOLD_FILE
+from argus_collector.walk.tests.conftest import settings_for
+from argus_collector.walk.tests.fake_policy import GoldPolicy
+from collector.tests.fake_model_server import FakeModelServer
+
+GOLD = json.loads(GOLD_FILE.read_text(encoding="utf-8"))
 
 
 def field(value: str, locator: str = "text") -> VerifiedField:
@@ -48,3 +57,19 @@ def test_people_without_the_goal_allow_two_more_pages() -> None:
     assert goal.verdict(tally, 4) == service.END_GOAL_PAGES
     goal.note(tally, "d", person("Dora", "Sales Manager", phone="+358402"), False, 3)
     assert goal.verdict(tally, 3) == service.END_GOAL, "a later page gives Dora her phone"
+
+
+def test_found_team_links_are_still_read_after_the_goal(site: str, tmp_path: Path) -> None:
+    """Owner 06.10.2026 (0.4.8.7): the goal on contact.html, then the found team link."""
+    fake = FakeModelServer(GoldPolicy(GOLD["persons"])).start()
+    events: list[contract.WalkEvent] = []
+    try:
+        summary = contract.run_walk(settings_for(site, fake, tmp_path, stop_at_goal=True),
+                                    events.append, lambda: False)
+    finally:
+        fake.stop()
+    assert summary.end_reason == service.END_GOAL
+    visited = [u.rsplit("/", 1)[-1] for u in summary.visited]
+    assert "contact.html" in visited and "team.html" in visited, visited
+    goal_step = [e for e in events if e.kind == "step" and e.step == "goal"]
+    assert len(goal_step) == 1 and goal_step[0].people >= 5, "3 on contact.html + the team pages"
