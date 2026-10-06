@@ -50,6 +50,10 @@ def apply(
     for row, shown in out.fills:  # the seq ARGUS did not take goes to a filler (Sonepar 61-101)
         why = f"{shown}, ARGUS did not take seq {row['seq']}"
         retry.give_up(conn, hooks, job_id, row, shown, resp.last_contiguous_seq, why)
+    if out.gaps and not out.fills:  # refused before 0.4.8.9 and never taken: fill them now
+        run_id = str(next(iter(rows.values()))["run_id"])
+        out.moved += retry.reopen(conn, hooks, job_id, run_id, resp.last_contiguous_seq,
+                                  min(out.gaps))
     _journal(job_id, resp, out.updates, out.gaps, elapsed_ms)
     hooks.applied(conn, job_id, resp)
     return out.moved + len(out.fills)

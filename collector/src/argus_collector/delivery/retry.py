@@ -63,14 +63,28 @@ def lost(conn: sqlite3.Connection, hooks: DeliveryHooks, job_id: str, row: sqlit
     return True
 
 
+def reopen(conn: sqlite3.Connection, hooks: DeliveryHooks, job_id: str, run_id: str,
+           last_seq: int, gap_seq: int) -> int:
+    """Refused events before a sequence_gap whose seq ARGUS never took (marked rejected
+    before 0.4.8.9: Sonepar 61-101, Tele-Tukku 28-34) give their seq to fillers now, so
+    the tail behind them goes on; their loss was counted then, not again."""
+    rows = conn.execute(
+        "SELECT * FROM outbox WHERE run_id = ? AND status = 'rejected' AND seq > ? AND seq < ?"
+        " ORDER BY seq", (run_id, last_seq, gap_seq)).fetchall()
+    for row in rows:
+        give_up(conn, hooks, job_id, row, str(row["code"]), last_seq,
+                "refused before, its seq never taken", counted=True)
+    return len(rows)
+
+
 def give_up(conn: sqlite3.Connection, hooks: DeliveryHooks, job_id: str, row: sqlite3.Row,
-            code: str, last_seq: int, why: str) -> None:
+            code: str, last_seq: int, why: str, counted: bool = False) -> None:
     """Never sent again; a filler takes its seq unless ARGUS already counted the seq: a
     `source.blocked` that says what was lost, and when ARGUS refuses that one too, a copy
     of the run's last accepted `job.progress` (06.10.2026: Sonepar's fillers refused)."""
     item = f"event {row['event_id']} seq {row['seq']} ({why})"
     filler = bool(row["replaced_type"])
-    if not filler:  # a refused filler is no second lost event
+    if not filler and not counted:  # a refused filler is no second lost event
         hooks.rejected(conn, job_id, str(row["type"]), code, item)
     if last_seq >= int(row["seq"]):
         repo.mark_events(conn, [(str(row["event_id"]), "rejected", code, None, None)])

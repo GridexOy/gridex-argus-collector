@@ -103,3 +103,41 @@ def test_a_refused_seq_is_filled_and_the_tail_goes_on(
 def _left(conn: sqlite3.Connection) -> int:
     return int(conn.execute("SELECT count(*) FROM outbox WHERE status IN ('pending', 'waiting')"
                             ).fetchone()[0])
+
+
+def test_a_tail_stuck_before_0_4_8_9_goes_on(
+    tmp_path: Path, argus: contract_server.ContractServer, site: ThreadingHTTPServer,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The MAIN-PC outbox of 06.10: seq 3 already `rejected` (ARGUS never took it), the tail
+    after it pending - the first pass of the new version fills seq 3 and the tail goes."""
+    monkeypatch.setenv("ARGUS_COLLECTOR_HOME", str(tmp_path / "home"))
+    job_id = System(argus).batch(site, ["fixture_oy"])["fixture_oy"]
+    collector = make_collector(tmp_path, argus, "http://127.0.0.1:9/v1")
+    conn = storage.connect(tmp_path / "collector.db")
+    target = collector.target()
+    assert target is not None
+    collector._claim(conn, target)
+    run_id = conn.execute("SELECT run_id FROM jobs").fetchone()[0]
+    page = (f"src-{run_id}", server.base_url(site), "k1", None, "extracted")
+    for make in (events.started(job_id, run_id, "t"),
+                 events.source_event("processed", job_id, run_id, page)([])):
+        delivery.enqueue_event(conn, job_id, run_id, make, [])
+    conn.commit()
+    collector.deliverer.flush()
+    collector.deliverer.tick(conn)  # ARGUS takes seq 1-2
+    for _ in range(3):
+        delivery.enqueue_event(conn, job_id, run_id, events.started(job_id, run_id, "t"), [])
+    conn.execute("UPDATE outbox SET status = 'rejected', code = 'invalid_input' WHERE seq = 3")
+    conn.commit()
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline and _left(conn):
+        collector.deliverer.flush()
+        collector.deliverer.tick(conn)
+        time.sleep(0.1)
+    rows = [tuple(r) for r in conn.execute("SELECT seq, type, status FROM outbox ORDER BY seq")]
+    conn.close()
+    assert rows == [(1, "job.started", "accepted"), (2, "source.processed", "accepted"),
+                    (3, "source.blocked", "accepted"), (4, "job.started", "accepted"),
+                    (5, "job.started", "accepted")], rows
+    assert collector.queue_view().rows[0].rejected == 0, "its loss was counted before"
