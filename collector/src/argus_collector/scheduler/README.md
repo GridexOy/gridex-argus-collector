@@ -33,3 +33,6 @@ fixture site and the fake model.
 
 0.4.8.7: a finished job keeps its lease in the heartbeat while its run has events
 to send; `service.company_domains` gives the walk the company's domains (K7).
+
+0.4.8.8: `old_runs.py` keeps the token of a run when a claim brings a new run of the
+job; its outbox goes out with it, a 409 on it reconciles that run (drain-only).

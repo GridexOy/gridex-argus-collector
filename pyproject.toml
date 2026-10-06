@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "argus-collector"
-version = "0.4.8.7"
+version = "0.4.8.8"
 description = "ARGUS 2.0 local contact collector (Selain) for Windows"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -153,6 +153,7 @@ forbidden_modules = [
   "argus_collector.pilot.render",
   "argus_collector.delivery.hooks",
   "argus_collector.delivery.loop", "argus_collector.delivery.uploads",
+  "argus_collector.delivery.holds", "argus_collector.scheduler.old_runs",
   "argus_collector.delivery.repository",
   "argus_collector.delivery.service",
   "argus_collector.api_client.service",

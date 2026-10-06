@@ -20,3 +20,6 @@ tables from their `repository.py`: `models` -> `model_calls`, `evidence`
 -> `evidence_manifest`, `walk` -> `runs`, `observations`; migration 2
 (0.4.3.0): `scheduler` -> `jobs`, `checkpoints`, `entity_map`, `commands`;
 `delivery` -> `outbox`, `evidence_uploads`.
+Migration 4 (0.4.8.8): `scheduler` -> `run_tokens` (the token of a run that is no
+longer its job's current run). `migrate` runs under a lock: two threads opening the
+database at once do not apply a migration twice.

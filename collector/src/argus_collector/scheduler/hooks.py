@@ -19,7 +19,7 @@ from typing import cast
 from argus_collector.api_client import contract as api
 from argus_collector.delivery import contract as delivery
 from argus_collector.runtime import contract as runtime
-from argus_collector.scheduler import leases, runner, service
+from argus_collector.scheduler import leases, old_runs, runner, service
 from argus_collector.scheduler import repository as repo
 from argus_collector.storage import contract as storage
 from argus_collector.walk import contract as walk
@@ -68,10 +68,11 @@ class CollectorHooks:
 
     # Delivery hooks -----------------------------------------------------------------
     def token_for(self, conn: sqlite3.Connection, job_id: str, run_id: str) -> str | None:
+        """The current run's lease; an old run's own token (`old_runs.py`)."""
         row = repo.job(conn, job_id)
-        if row is None or row["run_id"] != run_id:
-            return None
-        return str(row["lease_token"])
+        if row is not None and row["run_id"] == run_id:
+            return str(row["lease_token"])
+        return old_runs.token(conn, run_id)
 
     def lease_problem(self, job_id: str, run_id: str, code: str, token: str) -> None:
         """409 lease_* on `token`: reconcile, unless someone already got a new lease."""
@@ -82,6 +83,9 @@ class CollectorHooks:
             row = repo.job(conn, job_id)
             if row is not None and row["run_id"] == run_id and row["lease_token"] == token:
                 self.reconcile_row(conn, target, row)
+            elif old_runs.token(conn, run_id) == token:
+                with self._reconcile_lock:
+                    old_runs.reconcile(conn, target, job_id, run_id)
 
     def rejected(
         self, conn: sqlite3.Connection, job_id: str, kind: str, code: str, item: str
