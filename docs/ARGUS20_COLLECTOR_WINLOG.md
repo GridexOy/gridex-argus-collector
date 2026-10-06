@@ -178,6 +178,47 @@ Gap за сутки: `no_progress` 27, `timeout` 16, `domain_ownership_unresolve
 4. Таймаут `claim_jobs` (а с ним `post_events` и `reconcile_job`) — 10 с против 30 с у heartbeat и загрузки снимка. На нынешнем ARGUS это 69 % провалов claim при зелёной связи. Предлагаю 30 с всем пяти вызовам.
 5. Панель должна говорить о провале claim и тогда, когда очередь не пуста (`ui/queue_lines.py:130`): сейчас строка `queue.loadError` появляется только при пустом списке.
 
+## Ответы облака на «Вопросы облаку» (06.10, cv0.4.8.7)
+
+| Вопрос MAIN-PC | Ответ облачной сессии |
+|---|---|
+| 1. Снимок 60–500 КБ обрабатывается 3–8 с, heartbeat 503 | Сторона ARGUS, сборщик это не исправит; вынесено владельцу в сдаче cv0.4.8.7. Сборщик больше не ждёт снимков: события идут своим потоком (п. 6а cv0.4.8.7). |
+| 2. Причина `invalid_input` словами и поле | Сделано в cv0.4.8.7: схема 1.2. Jono и Lähetys показывают правило словами («henkilöltä puuttuu nimi» и т. д.), журнал — `[obs_id поле: сообщение]`. Восемь целых карточек — вероятно, `person_without_name` у `contact.enriched` (CONTRACT_3.1, Beckhoff/BCC). Сборщик теперь шлёт имя в каждом событии о человеке. |
+| 3. Продлевать аренду, пока досылается хвост | Сделано в cv0.4.8.7: задание с законченным обходом остаётся в heartbeat, пока у прогона есть недоставленные события (тест `test_lease_tail`: 480 с хвоста при аренде 180 с — ни одного `lease_expired`). |
+| 4. Таймаут claim / events / reconcile 10 с | Сделано в cv0.4.8.7: все пять вызовов ARGUS ждут 30 с (`delivery.API_TIMEOUT_S`). |
+| 5. Провал claim при непустой очереди | Сделано в cv0.4.8.7: красная строка «Uusien tehtävien haku epäonnistui — alla viimeksi haetut» над таблицей Jono, пока claim не пройдёт. |
+
+## Вопросы облака (06.10, cv0.4.8.7, коммит `ad4f842` (код), отчёт `9b32994`)
+
+Ответ — в «Ответы на вопросы облака» в форме: номер → проверено на Windows: да/нет → вывод → время. Сдача cv0.4.8.7 ждёт этих ответов.
+
+1. **Установка.** Остановить сбор («Pysäytä»), `git pull`, `scripts\install.ps1` из `main` с чистым деревом. Проверить:
+   - тесты установки прошли (число passed / failed);
+   - панель показывает `cv0.4.8.7` и дату сборки.
+2. **Heartbeat 1.2 против прод-ARGUS.** После «Yhdistä»:
+   - Yhteys — «Yhdistetty», в журнале нет `schema_unsupported`;
+   - любой отказ ARGUS после этого в Jono — словами правила, а не «virheellinen tieto»: какие правила пришли и сколько.
+3. **Язык Chrome сбора (K10 шаг 1).** На сборе Wera, OMICRON и Carlo Gavazzi:
+   - куда попал обход (первые строки `browser: job …: page` в журнале);
+   - строка «Löydetty: … · Maa: …» в Keruu.
+   В видимом Chrome сбора F12 → Console: `navigator.language`, `navigator.languages`, `Intl.DateTimeFormat().resolvedOptions().locale`, `…timeZone`.
+4. **Carlo Gavazzi 06.10 — как попал на `/en-br/`.** Нужны строки журнала того задания за 06.10:
+   - `http: claim …`;
+   - первые 3 строки `browser: job <id>: …`.
+   Плюс сид из Jono / ARGUS. Отдельно — открывается ли сид без Hiddify (напрямую) тоже на `/en-br/` (редирект по IP — это шаг 2 K10).
+5. **Доставка без ожидания снимков.**
+   - Видно ли в журнале `job …: N events sent …` раньше `evidence … uploaded` той же страницы.
+   - Есть ли в ответах ARGUS `evidence_pending` (строка `accepted/duplicate`).
+   - Ушли ли `evidence_missing` и `lease_expired` за час сбора.
+6. **Blåkläder повторно.** Пакет с Blåkläder Oy:
+   - Keruu «Löydetty: N» = числу людей этой компании;
+   - в ARGUS — столько же строк людей, имена не капсом;
+   - в журнале нет `lease_expired`.
+7. **K7.** На сборе Elkris / Reimax:
+   - нет ли людей с чужого домена (`industryx.dimecc.com`);
+   - строка «Vieras verkkotunnus …» в Keruu.
+8. **Pysäytä закрывает Chrome сбора.** Процессов `chrome.exe` до и после.
+
 ## Файлы
 
 | Файл | Что внутри |
