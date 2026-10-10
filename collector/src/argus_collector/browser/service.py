@@ -112,11 +112,6 @@ def is_challenge(signals: object) -> bool:
     return challenge_hits(signals) >= 2
 
 
-def is_challenge_hint(signals: object) -> bool:
-    """One sign only: the DOM cannot tell; the vision model looks (0.4.8.0)."""
-    return challenge_hits(signals) == 1
-
-
 # Cookie banners (TZ_SELAIN 8.5): automatic, the necessary cookies preferred.
 CONSENT_NECESSARY = (
     "vain välttämättömät", "välttämättömät", "only necessary", "necessary only",

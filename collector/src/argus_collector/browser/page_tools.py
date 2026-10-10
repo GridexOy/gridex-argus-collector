@@ -20,7 +20,7 @@ from argus_collector.browser.scripts import (
     PROBE_JS,
     QUIET_DOM_JS,
 )
-from argus_collector.browser.service import consent_choice, is_challenge, is_challenge_hint
+from argus_collector.browser.service import consent_choice, is_challenge
 from argus_collector.discovery.contract import Candidate, host_of
 from argus_collector.runtime import contract as runtime
 
@@ -57,14 +57,6 @@ def challenged(page: Page) -> bool | None:
         return is_challenge(page.evaluate(CHALLENGE_JS))
     except PlaywrightError:
         return None
-
-
-def challenge_hint(page: Page) -> bool:
-    """One bot-check sign only (an uncertain case for the vision model)."""
-    try:
-        return is_challenge_hint(page.evaluate(CHALLENGE_JS))
-    except PlaywrightError:
-        return False
 
 
 def answer_consent(page: Page, done: set[str]) -> str:

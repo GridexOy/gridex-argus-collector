@@ -50,7 +50,6 @@ class PageState:
     hidden_hrefs: tuple[str, ...] = ()  # mailto:/tel: links not rendered now
     consent: str = ""  # the cookie banner answered on this page (`necessary: <text>`)
     tab_panels: tuple[tuple[str, str], ...] = ()  # (selected tab label, its panel's text)
-    challenge_hint: bool = False  # one bot-check sign only: the vision model may look
 
 
 class WalkBrowser:
@@ -125,20 +124,7 @@ class WalkBrowser:
             if consent:
                 self._settle()
         state = self.observe()
-        hint = not challenged and tools.challenge_hint(self.page)
-        return replace(state, challenge=challenged, consent=consent, challenge_hint=hint)
-
-    def wait_out_challenge(self) -> PageState:
-        """The vision model saw a bot check: wait up to 20 s for it to clear, observe."""
-        deadline = time.monotonic() + CHALLENGE_WAIT_S
-        while tools.challenge_hint(self.page) and time.monotonic() < deadline:
-            self.page.wait_for_timeout(CHALLENGE_POLL_MS)
-        state = self._ready()
-        return replace(state, challenge=state.challenge or state.challenge_hint)
-
-    def screenshot(self) -> bytes:
-        """The visible part of the page as JPEG (for the vision model)."""
-        return self.page.screenshot(type="jpeg", quality=70)
+        return replace(state, challenge=challenged, consent=consent)
 
     def goto(self, url: str) -> PageState:
         """Navigate, wait for DOM content + a short settle, observe."""
