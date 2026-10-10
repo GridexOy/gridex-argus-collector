@@ -12,7 +12,6 @@ from argus_collector.normalization import contract as norm
 from argus_collector.storage import contract as storage
 from argus_collector.walk import cards, coverage, findings, goal, repository, service, structure
 from argus_collector.walk.context import PageContext
-from argus_collector.walk.patterns import from_pattern, with_pattern
 from argus_collector.walk.scope import own_page
 from argus_collector.walk.service import WalkEvent
 from argus_collector.walk.sink import PageFindings, PageSource
@@ -149,7 +148,7 @@ def complete(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState,
     if pending is None:
         return
     with timed(state.timing, "cards"):
-        contacts = with_pattern(cards.finish(state, page, pending.read), pending.patterns)
+        contacts = cards.finish(state, page, pending.read)
     state.page_has_contacts = bool(contacts or pending.channels)
     coverage.note_total(state, pending.read.text, len(contacts))
     with timed(state.timing, "bind"):
@@ -160,7 +159,7 @@ def complete(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState,
                                               pending.channels, context)
         _record(state, pending.source, found, list(zip(keys, contacts, strict=True)))
     for key, contact in zip(keys, contacts, strict=True):
-        goal.note(state.goal, key, contact, from_pattern(contact.email), state.cp.pages)
+        goal.note(state.goal, key, contact, state.cp.pages)
     state.progress += sum(len(entity.fields) for entity in found.entities)
     state.loops[pending.key] = (0, state.progress)
 

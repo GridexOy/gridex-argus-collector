@@ -130,18 +130,19 @@ def reset_upload(conn: sqlite3.Connection, evidence_ids: list[str]) -> None:
             )
 
 
-def totals(conn: sqlite3.Connection, job_id: str | None = None) -> tuple[int, int]:
-    """(pending events + uploads, rejected events + uploads), for one job or all; an event
-    given up whose seq carries a stand-in (`retry.py`) counts as rejected."""
+def totals(conn: sqlite3.Connection, job_id: str | None = None) -> tuple[int, int, int]:
+    """(pending, rejected, expired) events + uploads, for one job or all. An event given up
+    whose seq carries a stand-in (`retry.py`) counts as rejected; `expired` is the queue of
+    an earlier version, terminal since 0.4.8.11 and never sent again (`Vanhentunut`)."""
     where, args = ("WHERE job_id = ?", (job_id,)) if job_id else ("", ())
     sql = (
-        "SELECT SUM(status IN ('pending', 'waiting')), SUM(status = 'rejected' OR lost != '')"
-        " FROM ("
+        "SELECT SUM(status IN ('pending', 'waiting')), SUM(status = 'rejected' OR lost != ''),"
+        " SUM(status = 'expired') FROM ("
         f"SELECT status, replaced_type AS lost FROM outbox {where} UNION ALL"
         f" SELECT status, '' FROM evidence_uploads {where})"
     )
     row = conn.execute(sql, args * 2).fetchone()
-    return int(row[0] or 0), int(row[1] or 0)
+    return int(row[0] or 0), int(row[1] or 0), int(row[2] or 0)
 
 
 def acked_since(conn: sqlite3.Connection, since: str) -> list[tuple[str, str]]:

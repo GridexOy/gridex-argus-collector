@@ -1,13 +1,17 @@
-"""The address pattern a page states, applied to its people (owner 06.10.2026, Reimax).
+"""The address pattern a page states (owner 06.10.2026, Reimax; owner 10.10.2026).
 
-A person of the page without a printed email gets the address of the first
-pattern the page states; the field is unconfirmed with binding `none`, so
-ARGUS shows it `inferred` (oletettu), and its quote is the pattern's line. A
-printed address always wins. The pattern itself goes as the company's
-`email_pattern` field (never an address, RULES K3) on the company's channel
-entity (generic mailbox / switchboard) of this page or an earlier one, so a
-re-run finds it by that channel and reconfirms it on the same row; without
-such a channel, on an `organization_channel` entity of its own.
+The pattern goes as the company's `email_pattern` field (never an address,
+RULES K3) on the company's channel entity (generic mailbox / switchboard) of
+this page or an earlier one, so a re-run finds it by that channel and
+reconfirms it on the same row; without such a channel, on an
+`organization_channel` entity of its own. Its value is the pattern as printed,
+so the quoted line contains it.
+
+Until 0.4.8.10 a person without a printed email also got the address the
+pattern gives for the name. ARGUS refuses such an observation - the derived
+address stands in no line of the page, so no quote can hold it
+(`invalid_input/value_not_in_quote`, Destia 10.10.2026). The addresses are
+ARGUS's to derive from `email_pattern`; the walk only reports what is printed.
 """
 
 from __future__ import annotations
@@ -18,30 +22,8 @@ from argus_collector.extraction import contract as extraction
 from argus_collector.walk.entities import BINDING_CAPTION, CONFIRMED, PageBuilder
 from argus_collector.walk.sink import AuditEntry, FieldFinding
 
-LOCATOR_PATTERN = "pattern"  # VerifiedField.locator of an address built from a pattern
 FIELD_PATTERN = "email_pattern"
 COMPANY = "organization_channel"
-BINDING_NONE, UNCONFIRMED = "none", "ambiguous"
-
-
-def from_pattern(field: extraction.VerifiedField | None) -> bool:
-    return field is not None and field.locator == LOCATOR_PATTERN
-
-
-def with_pattern(contacts: list[extraction.Contact],
-                 patterns: tuple[extraction.EmailPattern, ...]) -> list[extraction.Contact]:
-    """Each person without an email gets the address the page's pattern gives the name."""
-    if not patterns:
-        return contacts
-    pattern, out = patterns[0], []
-    for contact in contacts:
-        built = None if contact.email else extraction.pattern_address(pattern, contact.name.value)
-        if built is not None:
-            email = extraction.VerifiedField(built, pattern.quote, pattern.start, pattern.end,
-                                             LOCATOR_PATTERN)
-            contact = replace(contact, email=email)
-        out.append(contact)
-    return out
 
 
 def _company_key(page: PageBuilder) -> str | None:

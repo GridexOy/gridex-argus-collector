@@ -44,6 +44,7 @@ class DeliveryView:
     state: str  # TransportState
     last_code: str = ""  # code of the latest rejection
     server_error: int = 0  # HTTP status of the last 5xx answer while it lasts
+    expired: int = 0  # events and snapshots given up as `Vanhentunut` (0.4.8.11)
 
 
 def _stage(row: sqlite3.Row, pending: int, running: bool) -> str:
@@ -92,7 +93,7 @@ def delivery_view(conn: sqlite3.Connection, transport_state: str,
                   server_error: int = 0) -> DeliveryView:
     stats = delivery.stats(conn)
     return DeliveryView(stats.pending, stats.errors, stats.p95_s, transport_state,
-                        stats.last_code, server_error)
+                        stats.last_code, server_error, stats.expired)
 
 
 @dataclass(frozen=True)

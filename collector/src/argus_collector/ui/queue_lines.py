@@ -163,6 +163,8 @@ def delivery_props(msgs: Messages, view: DeliveryView | None) -> DeliveryProps:
         errors = msgs.t("delivery.errorReason", n=view.errors,
                         reason=rejection_text(msgs, view.last_code))
     parts = [msgs.t("delivery.pending", n=view.pending), errors, p95_text]
+    if view.expired:
+        parts.append(msgs.t("delivery.expired", n=view.expired))
     if view.server_error:
         parts.append(msgs.t("delivery.serverError", status=view.server_error))
     state_key = TRANSPORT_KEYS.get(view.state, TRANSPORT_KEYS["syncing"])

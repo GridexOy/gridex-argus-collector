@@ -17,7 +17,6 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from argus_collector.walk import service
-from argus_collector.walk.patterns import LOCATOR_PATTERN
 from argus_collector.walk.service import WalkEvent, WalkSettings, WalkSummary
 from argus_collector.walk.sink import (
     EXTRA_FIELDS,
@@ -37,7 +36,6 @@ __all__ = [
     "DEFAULT_ACTION_BUDGET",
     "DEFAULT_PAGE_BUDGET",
     "END_ATTENTION",
-    "LOCATOR_PATTERN",
     "END_BUDGET",
     "END_DOMAIN",
     "END_ERROR",

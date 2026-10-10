@@ -1,9 +1,10 @@
-"""Reimax through the contract (owner 06.10.2026): addresses of the stated pattern.
+"""Reimax through the contract (owner 06.10.2026, 10.10.2026): the stated pattern.
 
-ARGUS accepts the address the page's pattern gives each person (quote = the pattern
-line) and derives `inferred` (oletettu) for it; the pattern is the company's
-`email_pattern`, not a channel. A re-run whose known contacts carry that address
-sends it `reconfirmed`: the same row gets one more source, not a second row.
+The pattern is the company's `email_pattern`, not a channel, and its value is the
+pattern as printed, so ARGUS finds it in the quoted line. No person carries an
+address built from it (0.4.8.11): a derived address is in no line of the page, and
+ARGUS refuses what its quote does not contain. A re-run reconfirms the pattern on the
+same row instead of adding a second one.
 """
 
 from __future__ import annotations
@@ -18,7 +19,6 @@ from collector.tests.fake_model_server import FakeModelServer
 from contract_server import server as contract_server
 
 GOLD = gold("reimax")
-EMAILS = {p["name"]: p["email"] for p in GOLD["persons"]}
 
 
 def run(collector: scheduler.Collector, system: System, job_id: str) -> dict[str, Any]:
@@ -37,7 +37,7 @@ def emails(system: System) -> dict[str, list[dict[str, Any]]]:
     return out
 
 
-def test_pattern_addresses_are_inferred_and_a_rerun_keeps_one_row(
+def test_the_pattern_rides_on_one_row_and_no_person_gets_a_built_address(
     tmp_path: Path, argus: contract_server.ContractServer, site: ThreadingHTTPServer,
     model: FakeModelServer,
 ) -> None:
@@ -50,11 +50,8 @@ def test_pattern_addresses_are_inferred_and_a_rerun_keeps_one_row(
         assert run(collector, system, first)["state"] == "completed"
         assert collector.delivery_view().errors == 0, "ARGUS took every event"
         found = emails(system)
-        assert set(found) == set(EMAILS)
-        for name, rows in found.items():
-            assert [(o["normalized_value"], o["channel_status"]) for o in rows] == [
-                (EMAILS[name], "inferred")], name
-            assert rows[0]["quote"] == GOLD["pattern"]["quote"]
+        assert len(found) == 14 and not any(found.values()), (
+            "all 14 people arrive, none with an address built from the pattern")
         patterns = [o for c in system.company("reimax")["contacts"] for o in c["observations"]
                     if o["field"] == "email_pattern"]
         assert [(o["normalized_value"], o["channel_status"]) for o in patterns] == [
@@ -64,10 +61,7 @@ def test_pattern_addresses_are_inferred_and_a_rerun_keeps_one_row(
     finally:
         collector.stop()
         collector.deliverer.stop()
-    again = emails(system)
-    for name, rows in again.items():
-        assert len(rows) == 1, f"{name}: the known address is reconfirmed, not a second row"
-        assert rows[0]["last_confirmed_at"] is not None, name
+    assert not any(emails(system).values()), "the re-run adds no built address either"
     patterns = [o for c in system.company("reimax")["contacts"] for o in c["observations"]
                 if o["field"] == "email_pattern"]
     assert len(patterns) == 1 and patterns[0]["last_confirmed_at"], (

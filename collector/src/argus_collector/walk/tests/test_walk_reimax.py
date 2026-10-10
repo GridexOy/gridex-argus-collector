@@ -1,8 +1,10 @@
 """Owner 06.10.2026 (Reimax): the page states its address pattern; the rules read 14 people.
 
-Every person gets the address the stated pattern gives the name, unconfirmed with
-the pattern line as its quote; the pattern is the company's `email_pattern`; no model
-is called on the page; the walk ends at its goal (sales people with a phone).
+The pattern is the company's `email_pattern`, valued as printed so its quote contains
+it. Nobody gets an address built from it (0.4.8.11, owner 10.10.2026): a derived
+address stands in no line of the page, so ARGUS refuses it (`value_not_in_quote`) -
+the server derives those addresses itself. No model is called on the page; the walk
+ends at its goal (sales people with a phone).
 """
 
 from __future__ import annotations
@@ -42,7 +44,7 @@ def run(srv: ThreadingHTTPServer, tmp_path: Path, events: list[contract.WalkEven
     return summary, sink
 
 
-def test_every_person_gets_the_stated_pattern_unconfirmed(
+def test_the_pattern_is_the_companys_field_and_nobody_gets_a_built_address(
     site: ThreadingHTTPServer, tmp_path: Path,  # noqa: F811
 ) -> None:
     events: list[contract.WalkEvent] = []
@@ -54,17 +56,16 @@ def test_every_person_gets_the_stated_pattern_unconfirmed(
     for person in GOLD["persons"]:
         fields = {f.field: f for f in entities[person["name"].casefold()].fields}
         assert fields["phone"].value == person["phone"] and fields["phone"].status == "confirmed"
-        email = fields["email"]
-        assert email.value == person["email"], person["name"]
-        assert (email.status, email.binding) == ("ambiguous", "none"), "ARGUS: inferred"
-        assert email.raw == PATTERN["quote"], "the quote is the line that states the pattern"
-        text = sink.sources[-1].text
-        assert text[email.start:email.end] == email.raw
+        assert "email" not in fields, f"{person['name']}: no address is built from the pattern"
     patterns = [f for e in entities.values() for f in e.fields if f.field == "email_pattern"]
     assert [(f.value, f.raw) for f in patterns] == [(PATTERN["value"], PATTERN["quote"])]
+    text = sink.sources[-1].text
+    for found in patterns:
+        assert found.value in found.raw, "ARGUS checks that the quote holds the value"
+        assert text[found.start:found.end] == found.raw
     values = {f.value for e in entities.values() for f in e.fields if f.field == "email"}
     assert PATTERN["value"] not in values, "the pattern is never an address (RULES K3)"
     goal = [e for e in events if e.step == "goal"]
     assert goal and (goal[-1].people, goal[-1].channels) == (14, 14), "14 people, 14 phones"
     shown = [e.contact for e in events if e.kind == contract.EVENT_CONTACT and e.contact]
-    assert len(shown) == 14 and all(c.email and c.email.locator == "pattern" for c in shown)
+    assert len(shown) == 14 and not any(c.email for c in shown)

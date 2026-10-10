@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 from argus_collector.diagnostics.contract import ChromeState, ModelState, Report
 from argus_collector.ui.repository import Messages
-from argus_collector.walk.contract import LOCATOR_PATTERN, WalkEvent
+from argus_collector.walk.contract import WalkEvent
 
 LEVEL_OK = "ok"
 LEVEL_WARN = "warn"
@@ -167,14 +167,12 @@ def done_line(msgs: Messages, pages: int, contacts: int) -> tuple[str, str]:
 
 
 def contact_row(event: WalkEvent, msgs: Messages | None = None) -> tuple[str, str, str, str, str]:
-    """Nimi, Titteli, Puhelin, Sahkoposti, Lahde for the table; an address built from
-    the pattern the page states reads `oletettu: ...`."""
+    """Nimi, Titteli, Puhelin, Sahkoposti, Lahde for the table. Every address shown is
+    printed on the page: since 0.4.8.11 none is built from a stated pattern."""
     contact = event.contact
     if contact is None:
         return ("", "", "", "", event.url)
     email = contact.email.value if contact.email else ""
-    if msgs is not None and contact.email and contact.email.locator == LOCATOR_PATTERN:
-        email = msgs.t("collecting.inferred", value=email)
     return (
         contact.name.value,
         contact.title.value if contact.title else "",

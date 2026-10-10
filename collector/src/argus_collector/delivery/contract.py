@@ -58,6 +58,7 @@ class DeliveryStats:
     errors: int  # events + snapshots ARGUS rejected
     p95_s: float | None  # delivery time of events queued and acknowledged in the last minute
     last_code: str = ""  # code of the latest rejection (words: `reason`, fi.json)
+    expired: int = 0  # given up as `Vanhentunut` (0.4.8.11): never sent, never an error
 
 
 @dataclass(frozen=True)
@@ -99,13 +100,13 @@ def enqueue_evidence(
 
 
 def stats(conn: sqlite3.Connection) -> DeliveryStats:
-    pending, errors = repo.totals(conn)
+    pending, errors, expired = repo.totals(conn)
     since = (datetime.now(UTC) - timedelta(seconds=P95_WINDOW_S)).isoformat(
         timespec="milliseconds"
     )
     last = repo.rejected_rows(conn)[:1]
     return DeliveryStats(pending, errors, service.p95_s(repo.acked_since(conn, since)),
-                         str(last[0]["code"]) if last else "")
+                         str(last[0]["code"]) if last else "", expired)
 
 
 @dataclass(frozen=True)
@@ -136,7 +137,8 @@ def unsent_runs(conn: sqlite3.Connection) -> set[str]:
 
 def job_totals(conn: sqlite3.Connection, job_id: str) -> tuple[int, int]:
     """(pending, rejected) events + snapshots of one job."""
-    return repo.totals(conn, job_id)
+    pending, rejected, _expired = repo.totals(conn, job_id)
+    return pending, rejected
 
 
 def reconcile_info(conn: sqlite3.Connection, run_id: str) -> ReconcileInfo:

@@ -16,24 +16,19 @@ def test_patterns_in_several_languages_with_their_line() -> None:
     found = extraction.email_patterns(text)
     assert [(p.value, p.separator, p.last_first) for p in found] == [
         ("firstname.lastname@reimax.example", ".", False),
-        ("firstname.lastname@firma.example", ".", False),
-        ("firstname_lastname@firma.example", "_", False),
-        ("lastname-firstname@ab.example", "-", True),
-    ]
+        ("etunimi.sukunimi@firma.example", ".", False),
+        ("[Vorname]_[Nachname]@firma.example", "_", False),
+        ("efternamn-fornamn@ab.example", "-", True),
+    ], "the value is the pattern as printed, so its quote contains it"
+    for found_pattern in found:
+        assert found_pattern.value in found_pattern.quote
     assert found[0].quote == NOTE and text[found[0].start:found[0].end] == NOTE
 
 
-def test_an_address_per_full_name_in_plain_letters() -> None:
-    pattern = extraction.email_patterns(NOTE)[0]
-    assert extraction.pattern_address(pattern, "Jari Mäkelä") == "jari.makela@reimax.example"
-    assert extraction.pattern_address(pattern, "Anna-Kaisa Lähde") == (
-        "anna-kaisa.lahde@reimax.example")
-    assert extraction.pattern_address(pattern, "Jörg Groß") == "jorg.gross@reimax.example"
-    assert extraction.pattern_address(pattern, "Matti Juhani Virtanen") == (
-        "matti.virtanen@reimax.example"), "first and last word"
-    assert extraction.pattern_address(pattern, "Madonna") is None
-    other = extraction.email_patterns("lastname.firstname@x.example")[0]
-    assert extraction.pattern_address(other, "Päivi Öhman") == "ohman.paivi@x.example"
+def test_no_address_is_derived_from_a_pattern() -> None:
+    """0.4.8.11 (owner 10.10.2026): a derived address stands in no line of the page,
+    so no quote could contain it and ARGUS refuses it (`value_not_in_quote`)."""
+    assert not hasattr(extraction, "pattern_address")
 
 
 def test_a_pattern_is_never_a_channel_or_a_persons_email() -> None:

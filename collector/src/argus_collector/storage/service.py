@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # Ordered list of (version, sql) applied once each; never edit an applied entry.
 MIGRATIONS: list[tuple[int, str]] = [
@@ -166,6 +166,19 @@ MIGRATIONS: list[tuple[int, str]] = [
             drain_only INTEGER NOT NULL DEFAULT 0,
             updated_at TEXT NOT NULL
         );
+        """,
+    ),
+    (
+        # 0.4.8.11 (owner 10.10.2026): everything still queued or refused when this
+        # version is installed belongs to the runs of 05-06.10, whose leases ARGUS let
+        # go long ago. It is terminal now - `Vanhentunut`, never sent again - so the
+        # queue starts at zero and `Odottaa lähetystä` counts only this version's work.
+        5,
+        """
+        UPDATE outbox SET status = 'expired'
+            WHERE status IN ('pending', 'waiting', 'rejected');
+        UPDATE evidence_uploads SET status = 'expired'
+            WHERE status IN ('pending', 'rejected');
         """,
     ),
 ]

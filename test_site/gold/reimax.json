@@ -1,7 +1,7 @@
 {
   "fixture": "reimax",
   "host": "reimax.localhost",
-  "case": "Owner case 06.10.2026 (Reimax, 14:16): /contact/ states the address pattern in plain words ('Our e-mail addresses are the following: firstname.lastname@reimax.net') above 14 person cards with name, title and phone and no email. The rules read all 14. Expected: every person of the page gets the address the stated pattern gives the name, sent unconfirmed (ARGUS: inferred, oletettu) with the pattern line as its quote; the pattern itself is the company's email_pattern field, never an address or a channel; no model call on the page; the walk ends at the goal (sales people with a phone) on contact/.",
+  "case": "Owner case 06.10.2026 (Reimax, 14:16): /contact/ states the address pattern in plain words ('Our e-mail addresses are the following: firstname.lastname@reimax.example') above 14 person cards with name, title and phone and no email. The rules read all 14. Expected: the pattern itself is the company's email_pattern field, quoted from its line and never an address or a channel; no person gets an address, because a derived one stands in no line of the page and ARGUS refuses an observation its quote does not contain (value_not_in_quote, 0.4.8.11) - the addresses below are what ARGUS derives server-side from the pattern. No model call on the page; the walk ends at the goal (sales people with a phone) on contact/.",
   "seed": "/",
   "pattern": {
     "page": "contact/",

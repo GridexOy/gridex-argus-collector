@@ -46,7 +46,6 @@ __all__ = [
     "jsonld_people",
     "office_lines",
     "panel_sections",
-    "pattern_address",
     "region_resolver",
     "section_at",
     "text_cards",
@@ -118,10 +117,6 @@ def email_patterns(text: str) -> list[EmailPattern]:
     quoted line; such a placeholder is never a channel or a person's email."""
     return patterns.find_patterns(text)
 
-
-def pattern_address(pattern: EmailPattern, name: str) -> str | None:
-    """The address a stated pattern gives a full name (None for a one-word name)."""
-    return patterns.address(pattern, name)
 
 
 def card_from_json(data: object) -> PersonCard | None:

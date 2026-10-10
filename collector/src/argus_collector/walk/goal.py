@@ -1,8 +1,9 @@
 """Has the walk reached its goal? Asked before every next action (owner 06.10.2026).
 
 The tally holds every person read so far: a sales / marketing title or not,
-and the person's own channels printed on the site (an address built from a
-stated pattern is not one, `patterns.py`). A sales or marketing person with a
+and the person's own channels printed on the site (since 0.4.8.11 every
+channel of a person is printed: nothing is built from a pattern any more,
+`patterns.py`). A sales or marketing person with a
 printed channel is the goal: the walk ends completed at once. People without
 it (no channel, or no such role) allow 2 more pages, then the walk ends. An
 unvisited link alone is no reason to go on.
@@ -51,11 +52,11 @@ class Tally:
         return any(sales and values for sales, values in self.people.values())
 
 
-def note(tally: Tally, key: str, contact: extraction.Contact, built: bool, pages: int) -> None:
-    """One person read on the page counted `pages`; `built`: its email came from a pattern."""
+def note(tally: Tally, key: str, contact: extraction.Contact, pages: int) -> None:
+    """One person read on the page counted `pages`."""
     sales, values = tally.people.get(key, (False, frozenset()))
     sales = sales or (contact.title is not None and is_sales(contact.title.value))
-    own = [contact.phone] + ([] if built else [contact.email])
+    own = [contact.phone, contact.email]
     values = values | {f.value for f in own if f is not None}
     tally.people[key] = (sales, values)
     if tally.first_page is None:
