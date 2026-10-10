@@ -120,6 +120,11 @@ def base_score(text: str, href: str) -> int:
     return score
 
 
+def unfolds(text: str) -> bool:
+    """A control that only unfolds the page it is on (`Näytä yhteystiedot`, `Show more`)."""
+    return any(word in text.casefold() for word in tables.NEXT_WORDS)
+
+
 def score_link(text: str, href: str, focus: Focus | None = None) -> int:
     score = base_score(text, href) + focus_score(text, href, focus)
     if focus is not None and focus.country and countries.url_country(href) == focus.country:

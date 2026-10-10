@@ -1,17 +1,13 @@
-# install_model.ps1 - the local models on this PC (Windows PowerShell 5.1, ASCII only).
-# Installs Ollama when missing; sets OLLAMA_CONTEXT_LENGTH, OLLAMA_MAX_LOADED_MODELS=2,
-# OLLAMA_NUM_PARALLEL=3; pulls the card (14b), navigation (7b) and vision (VL) models
-# (routing, owner 05.10.2026; a missing 7b / VL is only a warning); checks nvidia-smi and
+# install_model.ps1 - the local model on this PC (Windows PowerShell 5.1, ASCII only).
+# Installs Ollama when missing; sets OLLAMA_CONTEXT_LENGTH; pulls the card model (14b) -
+# the only model of the collector since 6.1 (TZ_SELAIN v4.0 4.1), so no second model is
+# ever loaded and OLLAMA_MAX_LOADED_MODELS is not needed; checks nvidia-smi and
 # that the card model runs on the GPU. Downloads go through curl.exe (the WinHTTP proxy
 # is broken here); when curl fails it prints the URL and path to fetch by hand.
 param(
     [string]$ModelName = 'qwen2.5:14b-instruct',
-    [string]$NavigationModel = 'qwen2.5:7b',
-    [string]$VisionModel = 'qwen2.5-vl:7b',
     [string]$Endpoint = 'http://127.0.0.1:11434/v1',
-    [int]$ContextLength = 16384,
-    [int]$MaxLoadedModels = 2,
-    [int]$NumParallel = 3
+    [int]$ContextLength = 16384
 )
 $ErrorActionPreference = 'Continue'
 $OllamaSetupUrl = 'https://ollama.com/download/OllamaSetup.exe'
@@ -109,11 +105,9 @@ function Set-OllamaVariable([string]$Name, [string]$Value) {
 }
 
 function Set-OllamaContext {
-    # 4k context by default, the walk sends ~6k tokens; 7b + 14b stay loaded, 3 requests.
-    $a = Set-OllamaVariable 'OLLAMA_CONTEXT_LENGTH' ([string]$ContextLength)
-    $b = Set-OllamaVariable 'OLLAMA_MAX_LOADED_MODELS' ([string]$MaxLoadedModels)
-    $c = Set-OllamaVariable 'OLLAMA_NUM_PARALLEL' ([string]$NumParallel)
-    return ($a -or $b -or $c)
+    # 4k context by default, the walk sends ~6k tokens. One model is loaded (6.1), so
+    # OLLAMA_MAX_LOADED_MODELS and OLLAMA_NUM_PARALLEL are left to Ollama's defaults.
+    return (Set-OllamaVariable 'OLLAMA_CONTEXT_LENGTH' ([string]$ContextLength))
 }
 
 function Start-OllamaServer([string]$Exe, [bool]$Restart) {
@@ -163,15 +157,6 @@ function Install-Model([string]$Exe) {
     Install-FromGguf $Exe
 }
 
-function Install-Routed([string]$Exe, [string]$Name, [string]$Role) {
-    if (-not $Name) { return }
-    $listed = Invoke-Direct ($Endpoint.TrimEnd('/') + '/models')
-    if ($listed -and ($listed -match ('"' + [regex]::Escape($Name) + '(:latest)?"'))) { Write-Host ($Role + ' model already present: ' + $Name); return }
-    Write-Host ('pulling the ' + $Role + ' model ' + $Name + ' (several GB, one time)')
-    & $Exe pull $Name
-    if ($LASTEXITCODE -ne 0) { Write-Host ('WARNING: ollama pull ' + $Name + ' failed; the collector works without it (Reititys in Resurssit)') }
-}
-
 function Test-ModelOnGpu([string]$Exe) {
     $body = '{"model":"' + $ModelName + '","messages":[{"role":"user","content":"Reply with exactly: OK"}],"max_tokens":5,"temperature":0}'
     $reply = Invoke-Direct ($Endpoint.TrimEnd('/') + '/chat/completions') 'POST' $body 300
@@ -192,8 +177,6 @@ if (-not $ollama) { $ollama = Install-Ollama } else { Write-Host ('ollama: ' + $
 $changed = Set-OllamaContext
 Start-OllamaServer $ollama $changed
 Install-Model $ollama
-Install-Routed $ollama $NavigationModel 'navigation'
-Install-Routed $ollama $VisionModel 'vision'
 Test-ModelOnGpu $ollama
-Write-Host ('done: ' + $ModelName + ', ' + $NavigationModel + ', ' + $VisionModel + ' at ' + $Endpoint)
+Write-Host ('done: ' + $ModelName + ' at ' + $Endpoint)
 Write-Host 'the panel shows Malli: paikallinen (GPU) and the Reititys line in Resurssit after this

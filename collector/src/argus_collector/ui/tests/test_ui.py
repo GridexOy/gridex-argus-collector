@@ -51,7 +51,6 @@ def test_props_show_required_states(msgs: repository.Messages) -> None:
     props = service.build_props(msgs, version_ok(), report, None, None, disconnected(msgs))
     assert props.version.text == "cv0.4.1.0 (3.10.2026 klo 14.32) abc1234"
     assert props.connection.state_text == "Ei yhteyttä"
-    assert props.collect.site_url_label == "Yrityksen verkkosivu"
     assert (props.collect.start_label, props.collect.stop_label) == ("Käynnistä", "Pysäytä")
     assert not props.collect.start_enabled and not props.collect.stop_enabled
     assert props.collect.hint == "Keruu vaatii paikallisen mallin ja Chromen (katso Resurssit)"
@@ -68,23 +67,16 @@ def test_start_enabled_only_with_model_chrome_and_connection(msgs: repository.Me
     conn = disconnected(msgs)
     online = service.Activity(connected=True)
     offline = service.build_props(msgs, version_ok(), ready_report(), None, None, conn)
-    assert not offline.collect.start_enabled and offline.collect.local_test_enabled
+    assert not offline.collect.start_enabled
     assert offline.collect.hint == "Keruu vaatii yhteyden ARGUSiin (Yhdistä)"
     ready = service.build_props(msgs, version_ok(), ready_report(), None, None, conn, online)
     assert ready.collect.start_enabled and ready.collect.hint == ""
-    assert ready.collect.local_test_label == "Testaa paikallisesti"
-    walking = service.build_props(
-        msgs, version_ok(), ready_report(), None, None, conn,
-        service.Activity(walking=True, connected=True),
-    )
-    assert not walking.collect.start_enabled and walking.collect.stop_enabled
-    assert not walking.open_browser_enabled and not walking.collect.local_test_enabled
     collecting = service.build_props(
         msgs, version_ok(), ready_report(), None, None, conn,
         service.Activity(collecting=True, connected=True),
     )
     assert not collecting.collect.start_enabled and collecting.collect.stop_enabled
-    assert not collecting.collect.local_test_enabled and not collecting.open_browser_enabled
+    assert not collecting.open_browser_enabled
     stopped = service.build_props(
         msgs, version_ok(), ready_report(), None, "/x/STOP", conn, online
     )
@@ -164,7 +156,7 @@ def test_window_renders_keruu_block_and_live_rows(
         app = contract.create_app(root)
         root.update()
         assert root.title() == "ARGUS Selain"
-        for name in ("start", "pause", "stop", "local"):
+        for name in ("start", "pause", "stop"):
             assert not app.view.is_enabled(name), name
         assert app.view.queue.state_label.cget("text") == "Ei tehtäviä"
         assert app.view.delivery.counts_label.cget("text").startswith("Odottaa lähetystä: 0")
@@ -172,9 +164,6 @@ def test_window_renders_keruu_block_and_live_rows(
         assert app.view.connection.state_label.cget("text") == "Ei yhteyttä"
         expected_prefix = f"cv{runtime.current_version_status().file_version} ("
         assert app.view.version_label.cget("text").startswith(expected_prefix)
-        app.view.collect.url_var.set("not a url")
-        app.walk.start("not a url")
-        assert app.view.collect.status_label.cget("text") == "Virheellinen osoite: not a url"
         app.walk.on_event(contact_event())
         app.walk.on_event(WalkEvent("page", url="http://h/", page_no=1, budget=15))
         root.update()

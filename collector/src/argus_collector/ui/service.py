@@ -176,7 +176,7 @@ def build_props(
         resources_title=msgs.t("resources.title"),
         resources=resources_props(msgs, report, report_error, routes),
         open_browser_label=msgs.t("attention.openBrowser"),
-        open_browser_enabled=not (activity.walking or activity.collecting),
+        open_browser_enabled=not activity.collecting,
         stop_banner=banner,
         queue=blocks[0] if blocks else None,
         delivery=blocks[1] if blocks else None,

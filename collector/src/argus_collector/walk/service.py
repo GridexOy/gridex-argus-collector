@@ -61,8 +61,8 @@ END_GOAL_PAGES = "goal_pages"  # people read, 2 more pages without the goal: com
 class WalkSettings:
     """`approved_hosts`/`limits`/`focus`/`resume`/`id_namespace` are set in job mode;
     a panel walk leaves them empty (hosts = seed + redirect, budget = page_budget).
-    `model` reads the person cards (14b); `navigation` chooses the next step when no
-    rule does (7b; None: `model`); `vision` looks at a screenshot (VL; None: never)."""
+    `model` reads the person cards (14b) - the only model of the walk since 6.1:
+    the rules choose every step themselves (`decide.py`)."""
 
     start_url: str
     model: ModelConfig
@@ -79,8 +79,6 @@ class WalkSettings:
     resume: WalkCheckpoint | None = None
     id_namespace: str = ""
     region_fallback: str = "FI"
-    navigation: ModelConfig | None = None
-    vision: ModelConfig | None = None
     stop_at_goal: bool = True  # the goal rule (`goal.py`); off: walk until nothing is left
     browser_host: BrowserHost | None = None  # the collection's Chrome; None: own (profile)
     company_domains: frozenset[str] | None = None  # K7: people only from these; None: any

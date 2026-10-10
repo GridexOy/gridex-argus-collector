@@ -108,11 +108,12 @@ def test_config_defaults_and_mapping() -> None:
     assert service.config_from_mapping({}, "d").model_name == ""
 
 
-def test_config_routed_models_default_and_can_be_switched_off() -> None:
+def test_config_has_one_model_since_6_1() -> None:
     cfg = service.config_from_mapping({}, "d")
-    assert (cfg.model_navigation, cfg.model_vision) == ("qwen2.5:7b", "qwen2.5-vl:7b")
-    off = service.config_from_mapping({"model": {"navigation": "", "vision": ""}}, "x")
-    assert (off.model_navigation, off.model_vision) == ("", "")
+    assert not hasattr(cfg, "model_navigation") and not hasattr(cfg, "model_vision"), (
+        "6.1: the card model is the only model of the collector")
+    named = service.config_from_mapping({"model": {"name": "qwen2.5:14b-instruct"}}, "x")
+    assert named.model_name == "qwen2.5:14b-instruct"
 
 
 def test_config_rejects_bad_page_budget() -> None:

@@ -61,7 +61,7 @@ def test_http_error_is_logged_and_raised(server: FakeModelServer, tmp_path: Path
     assert row["ok"] == 0 and "HTTP 500" in row["error"]
 
 
-def test_bad_json_is_retried_once_then_error(tmp_path: Path) -> None:
+def test_bad_json_is_one_attempt_then_error(tmp_path: Path) -> None:
     srv = FakeModelServer(lambda s, u: "not json at all").start()
     try:
         conn = storage.connect(tmp_path / "c.db")
@@ -69,7 +69,7 @@ def test_bad_json_is_retried_once_then_error(tmp_path: Path) -> None:
         with pytest.raises(contract.ModelError, match="JSON"):
             client.chat_json("sys", "x", "cards")
         purposes = [r["purpose"] for r in conn.execute("SELECT purpose FROM model_calls")]
-        assert purposes == ["cards", "cards:retry"]
+        assert purposes == ["cards"], "6.1: one attempt, no retry of the same window"
     finally:
         srv.stop()
 

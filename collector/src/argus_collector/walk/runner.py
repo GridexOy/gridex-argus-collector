@@ -7,14 +7,13 @@ walk completed.
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 
 from argus_collector.browser import contract as browser
 from argus_collector.discovery import contract as discovery
 from argus_collector.models import contract as models
 from argus_collector.storage import contract as storage
-from argus_collector.walk import country, ending, repository, service, timing, vision
+from argus_collector.walk import country, ending, repository, service, timing
 from argus_collector.walk import page as page_step
 from argus_collector.walk.actions import gap_reason, goto, perform_safely
 from argus_collector.walk.decide import decide, end_budget, end_stalled
@@ -29,7 +28,6 @@ from argus_collector.walk.state import (
 )
 
 DOMAIN_GAP = "domain_ownership_unresolved"
-MODEL_WORKERS = 3  # card-model windows at a time (OLLAMA_NUM_PARALLEL=3, owner 05.10.2026)
 CARDS_MAX_TOKENS = 4096  # a window of many cards is one long JSON answer (Ellego, 40 people)
 CHALLENGE_GAP = "captcha"  # a bot check that did not clear: needs_attention (8.5)
 
@@ -43,10 +41,6 @@ def _state(
     listener = (lambda record: sink.model_called(conn, record)) if sink is not None else None
     cards = replace(settings.model, max_tokens=max(settings.model.max_tokens, CARDS_MAX_TOKENS))
     client = models.ModelClient(cards, conn, listener)
-    nav = settings.navigation
-    nav_client = models.ModelClient(nav, conn, listener) if nav and nav != settings.model else None
-    vision = settings.vision
-    vision_client = models.ModelClient(vision, conn, listener) if vision else None
     run_id = repository.start_run(conn, settings.start_url)
     resume = settings.resume
     cp = WalkCheckpoint.from_json(resume.to_json()) if resume else WalkCheckpoint()
@@ -55,7 +49,6 @@ def _state(
         focus = focus.with_native(cp.native_language)
     return WalkState(
         settings, conn, client, on_event, should_stop, run_id, sink, focus=focus, cp=cp,
-        nav_client=nav_client, vision_client=vision_client,
     )
 
 
@@ -90,13 +83,10 @@ def run(
 def _walk(state: WalkState) -> None:
     settings = state.settings
     host, profile = settings.browser_host, _after_attention(settings)
-    with browser.WalkBrowser(settings.headless, settings.profile_dir, host, profile) as wb, \
-            ThreadPoolExecutor(MODEL_WORKERS, thread_name_prefix="walk-model") as pool:
-        state.pool = pool
+    with browser.WalkBrowser(settings.headless, settings.profile_dir, host, profile) as wb:
         timing.chrome(settings.id_namespace, wb.start_ms, host is not None and not profile)
         page = _open(state, wb)
         while page is not None:
-            page = _vision_bot_check(state, wb, page)
             if page.challenge:
                 _attention(state, page)
                 return
@@ -134,7 +124,7 @@ def _next(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState, te
           pending: page_step.Pending | None) -> Action:
     """The goal first; else the decided step, the page's people read before any navigation
     (the card model works while the step is chosen)."""
-    if pending is not None and not pending.read.calls:  # the rules read it: nothing to wait
+    if pending is not None and not pending.read.asks:  # the rules read it: nothing to ask
         page_step.complete(state, wb, page, pending)
         pending = None
     goal_action = ending.after_goal(state, page)
@@ -144,19 +134,6 @@ def _next(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState, te
         action = decide(state, wb, page, text)
     page_step.complete(state, wb, page, pending)
     return ending.after_goal(state, page) or action
-
-
-def _vision_bot_check(
-    state: WalkState, wb: browser.WalkBrowser, page: browser.PageState
-) -> browser.PageState:
-    """One bot-check sign and the vision model sees a check: wait it out like one."""
-    if not vision.is_bot_check(state, wb, page):
-        return page
-    try:
-        with timing.timed(state.timing, "load"):
-            return wb.wait_out_challenge()
-    except browser.ActionError:
-        return page
 
 
 def _flush_timing(state: WalkState, url: str, action: service.Action) -> None:

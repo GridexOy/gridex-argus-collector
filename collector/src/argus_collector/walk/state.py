@@ -6,9 +6,8 @@ import sqlite3
 import time
 import uuid
 from collections.abc import Callable
-from concurrent.futures import Executor, Future
 from dataclasses import dataclass, field
-from typing import Any, TypeVar
+from typing import TypeVar
 
 from argus_collector.discovery import contract as discovery
 from argus_collector.extraction import contract as extraction
@@ -54,11 +53,7 @@ class WalkState:
     source_id: str | None = None
     end_reason: str = service.END_FINISHED
     timing: PageTiming = field(default_factory=PageTiming)  # the page state being handled
-    nav_client: models.ModelClient | None = None  # next steps (7b); None: `client`
-    vision_client: models.ModelClient | None = None  # screenshots (VL); None: no vision
-    menu_cache: dict[str, tuple[str, str]] = field(default_factory=dict)  # menu -> choice
     read_cache: dict[str, list[extraction.Contact]] = field(default_factory=dict)  # text sha
-    pool: Executor | None = None  # model calls that run while the next step is chosen
     progress: int = 0  # new fields recorded + new links remembered so far
     loops: dict[str, tuple[int, int]] = field(default_factory=dict)  # key -> (repeats, progress)
     finished_urls: set[str] = field(default_factory=set)  # finish_branch: no more clicks here
@@ -69,14 +64,6 @@ class WalkState:
     goal: Tally = field(default_factory=Tally)  # people read so far (`goal.py`)
     foreign_hosts: set[str] = field(default_factory=set)  # K7: told once per host (`scope.py`)
     _mark: float = field(default_factory=time.monotonic)
-
-    def submit(self, fn: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
-        """On the walk's worker pool; at once (a finished Future) without a pool."""
-        if self.pool is not None:
-            return self.pool.submit(fn, *args, **kwargs)
-        done: Future[T] = Future()
-        done.set_result(fn(*args, **kwargs))
-        return done
 
     def seen_again(self, url: str, key: str) -> bool:
         """A page state seen before: True at the third repeat without new records or
@@ -90,13 +77,6 @@ class WalkState:
         self.add_gap(url, "no_progress", f"the page state repeated {repeats} times without new"
                      " records or links: finish_branch (TZ_SELAIN 8.5)", False)
         return True
-
-    def navigator(self) -> models.ModelClient:
-        """The navigation model; the card model once the navigation model failed."""
-        return self.nav_client or self.client
-
-    def navigation_failed(self) -> None:
-        self.nav_client = None
 
     @property
     def job_mode(self) -> bool:

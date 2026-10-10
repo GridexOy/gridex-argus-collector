@@ -1,18 +1,17 @@
-"""Walk controller of the panel: Kaynnista / Pysayta and the live event feed.
+"""The live event feed of the Keruu block: status line, people table, `Löydetty`.
 
-The walk runs in its own thread (Playwright sync API in that thread only);
-every event is handed to the main thread through the panel's ui_queue.
+S6 step 6.1 (TZ_SELAIN v4.0 4.1, owner 10.10.2026): the panel's own test walk
+(`Testaa paikallisesti`) is gone - on MAIN-PC only `Käynnistä` is ever used, and the
+stands are walked by the tests. What is left is what the owner looks at while
+collecting: every walk event of the running company becomes a line or a table row.
 """
 
 from __future__ import annotations
 
-import functools
-import threading
 import webbrowser
 from collections.abc import Callable
 from typing import Protocol
 
-from argus_collector.models import contract as models
 from argus_collector.runtime import contract as runtime
 from argus_collector.ui import walk_lines
 from argus_collector.ui.repository import Messages
@@ -36,52 +35,12 @@ class Host(Protocol):
 class WalkController:
     def __init__(self, host: Host) -> None:
         self.host = host
-        self.stop_event = threading.Event()
-        self.thread: threading.Thread | None = None
         self.contacts = 0
         self.pages = 0
         self.country = ""  # `Maa: FI (vaihdettu en-br → en-fi)` of the company walked now
 
-    @property
-    def walking(self) -> bool:
-        return self.thread is not None and self.thread.is_alive()
-
-    def settings(self, url: str) -> walk.WalkSettings:
-        cfg = self.host.config
-        return walk.WalkSettings(
-            start_url=url,
-            model=models.resolve_config(cfg.model_endpoint, cfg.model_name),
-            navigation=models.resolve_role(cfg.model_endpoint, cfg.model_navigation),
-            vision=models.resolve_role(cfg.model_endpoint, cfg.model_vision),
-            page_budget=cfg.walk_page_budget,
-            action_budget=cfg.walk_action_budget,
-            stop_at_goal=cfg.walk_stop_at_goal,
-            headless=False,
-            stop_files=tuple(runtime.stop_files()) or (runtime.repo_root() / "STOP",),
-        )
-
-    def start(self, raw_url: str) -> None:
-        msgs, view = self.host.msgs, self.host.view
-        if self.walking:
-            return
-        url = walk.validate_start_url(raw_url)
-        if url is None:
-            view.collect.set_status(msgs.t("collecting.invalidUrl", url=raw_url), "error")
-            return
-        if self.host.work_browser_running():
-            view.collect.set_status(msgs.t("collecting.browserBusy"), "error")
-            return
-        self.stop_event.clear()
-        self.reset()
-        view.collect.set_status(msgs.t("collecting.status.starting", url=url), "info")
-        self.thread = threading.Thread(
-            target=self._run, args=(self.settings(url),), name="walk", daemon=True
-        )
-        self.thread.start()
-        self.host.refresh()
-
     def reset(self) -> None:
-        """An empty table and `Löydetty: 0`: per local walk, per company when collecting."""
+        """An empty table and `Löydetty: 0`: once per company while collecting."""
         self.contacts, self.pages, self.country = 0, 0, ""
         self.host.view.collect.clear_contacts()
         self.host.view.collect.set_found(self.found_text())
@@ -90,16 +49,6 @@ class WalkController:
         """`Löydetty: N yhteystietoa`, with the country line of the walk once it has one."""
         found = self.host.msgs.t("collecting.found", n=self.contacts)
         return f"{found} · {self.country}" if self.country else found
-
-    def stop(self) -> None:
-        self.stop_event.set()
-
-    def _run(self, settings: walk.WalkSettings) -> None:
-        summary = walk.run_walk(settings, self._on_event_threadsafe, self.stop_event.is_set)
-        self.host.post(functools.partial(self._finished, summary))
-
-    def _on_event_threadsafe(self, event: walk.WalkEvent) -> None:
-        self.host.post(functools.partial(self.on_event, event))
 
     def on_event(self, event: walk.WalkEvent) -> None:
         """Main thread: update status line and table from one walk event."""
@@ -117,16 +66,6 @@ class WalkController:
         line = walk_lines.walk_event_line(msgs, event)
         if line is not None:
             view.collect.set_status(*line)
-
-    def _finished(self, summary: walk.WalkSummary) -> None:
-        ended = not summary.stopped and not summary.error
-        if ended and summary.end_reason not in (walk.END_ATTENTION, walk.END_GOAL,
-                                                walk.END_GOAL_PAGES):  # the goal line stays
-            text, level = walk_lines.done_line(self.host.msgs, summary.pages, summary.contacts)
-            self.host.view.collect.set_status(text, level)
-        self.thread = None
-        self.host.refresh()
-        self.host.start_diagnostics()
 
     @staticmethod
     def open_source(url: str) -> None:

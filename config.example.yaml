@@ -21,16 +21,11 @@ model:
   # proxy. Ollama by default; a llama.cpp server works with its own /v1 URL.
   # diagnose.ps1 and the panel probe <endpoint>/models and expect `name` listed.
   endpoint: "http://127.0.0.1:11434/v1"
-  # Routing (owner 05.10.2026): rules first, no model; `navigation` chooses the
-  # next step when no rule does; `name` reads the person cards only when the
-  # rules and JSON-LD leave them unread; `vision` looks at a screenshot only for
-  # an uncertain bot check or a page without DOM text. All are pulled by
-  # scripts\install_model.ps1 (OLLAMA_MAX_LOADED_MODELS=2, OLLAMA_NUM_PARALLEL=3).
-  # An empty `navigation` lets the card model choose the steps; an empty
-  # `vision` never sends a screenshot.
+  # One model (TZ_SELAIN v4.0 4.1, owner 10.10.2026): the rules choose every step
+  # of the walk themselves, and `name` reads only the pages the rules could not -
+  # a contact page where they found nobody though it prints two or more channels.
+  # Pulled by scripts\install_model.ps1.
   name: "qwen2.5:14b-instruct"
-  navigation: "qwen2.5:7b"
-  vision: "qwen2.5-vl:7b"
 
 walk:
   # Distinct pages one site walk may open before it finishes.

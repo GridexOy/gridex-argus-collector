@@ -137,7 +137,7 @@ def _start(state: WalkState, page: browser.PageState, text: str, key: str) -> Pe
     with timed(state.timing, "extract"):
         lang, region, sections, channels = _channels(state, page, text)
         read = cards.start(state, page, text, channels, sections, region)
-    state.page_has_contacts = bool(read.people or read.calls or channels)
+    state.page_has_contacts = bool(read.people or read.asks or channels)
     patterns = tuple(extraction.email_patterns(text))
     return Pending(key, source, lang, sections, channels, read, patterns)
 

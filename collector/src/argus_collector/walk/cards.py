@@ -1,21 +1,21 @@
-"""Who reads the person cards of a page state (owner 05.10.2026: rules, then 14b).
+"""Who reads the person cards of a page state: the rules, then 14b for what is left.
 
-`start` (before the next step is chosen): JSON-LD `Person` items, then cards
-by rule (a name line with a phone / email of the page right below it,
-`extraction.text_cards`), both verified like model cards; the same canonical
-text already read on another URL gives its people again. The card model is
-asked only when the rules read nobody (owner 06.10.2026: people the rules
-read end the page's model calls): for a channel that may be a person's, or
-a contact page. A long page goes in
-windows around those channels (not the first 8000 characters, Ellego), each
-window one call on a worker thread, so the next step is chosen meanwhile.
-`finish` (before any navigation): the calls are joined and logged, a cut-off
-answer keeps its complete people, every card is verified.
+`start` (before the next step is chosen): JSON-LD `Person` items, then cards by
+rule (a name line with a phone / email of the page right below it,
+`extraction.text_cards`), both verified like model cards; the same canonical text
+already read on another URL gives its people again.
+
+S6 step 6.1 (TZ_SELAIN v4.0 4.1, owner 10.10.2026): the card model is the only model
+of the walk, and it is asked only when the rules read nobody on a contact page that
+prints at least two personal channels - a page the rules clearly failed to read. Its
+text goes in windows around those channels (not the first characters of a long page,
+Ellego), one call each, one attempt, a cut-off answer keeping its complete people.
+The windows are no longer spread over a thread pool: the walk chooses its next step
+by rule now, so there is nothing to overlap the calls with.
 """
 
 from __future__ import annotations
 
-from concurrent.futures import Future
 from dataclasses import dataclass, field
 
 from argus_collector.browser import contract as browser
@@ -28,6 +28,7 @@ from argus_collector.walk.state import WalkState
 
 UNASSIGNED = "unassigned_channel"
 BEFORE, AFTER, MAX_WINDOWS = 1500, 600, 6
+MIN_CHANNELS = 2  # a contact page with fewer printed channels is not a failed read
 
 
 @dataclass
@@ -37,7 +38,7 @@ class PendingRead:
     region: str
     digest: str
     people: list[extraction.Contact]
-    calls: list[Future[models.Detached]] = field(default_factory=list)
+    asks: list[str] = field(default_factory=list)  # windows the card model still has to read
     seen: set[str] = field(default_factory=set)
 
 
@@ -80,21 +81,26 @@ def windows(text: str, spans: list[tuple[int, int]]) -> list[str]:
     return [text[lo:hi] for lo, hi in merged][:MAX_WINDOWS]
 
 
-def _ask(state: WalkState, page: browser.PageState, read: PendingRead, spans: list[tuple[int, int]]
-         ) -> None:
-    state.step(service.STEP_MODEL, "cards", page.url)
-    state.timing.cards = f"model:{state.client.config.name}"
-    for part in windows(read.text, spans):
-        system, user = prompts.cards_prompt(page.url, page.title, part)
-        call = (system, user, prompts.PURPOSE_CARDS)
-        read.calls.append(state.submit(state.client.detached_json, *call,
-                                       salvage=prompts.salvage_people))
+def _rules_failed(read: PendingRead, page: browser.PageState,
+                  spans: list[tuple[int, int]]) -> bool:
+    """When the rules clearly failed to read a page that holds people.
+
+    TZ_SELAIN v4.0 4.1 proposed "a contact page with 0 people read and >= 2 printed
+    channels". On the stands that threshold loses people: a team page (`fixture_oy`
+    team.html) is no `contact` link by title or URL, and its people were read by the
+    model before. Taken as decided - correct me if wrong: the page must print at least
+    two personal channels, and be either a contact page or hold channels that belong to
+    nobody yet (`spans`). Both halves still mean "the rules read nobody here"."""
+    printed = [c for c in read.channels if c.kind in ("phone", "email")]
+    if len(printed) < MIN_CHANNELS:
+        return False
+    return bool(spans) or discovery.contact_link(page.title, page.url)
 
 
 def start(state: WalkState, page: browser.PageState, text: str,
           channels: list[extraction.Channel], sections: list[extraction.Section],
           region: str) -> PendingRead:
-    """JSON-LD and rule cards now; the card model's calls started for what is left."""
+    """JSON-LD and rule cards now; the windows the card model has to read noted."""
     read = PendingRead(text, channels, region, evidence.sha256_text(text), [])
     jsonld = _verified(extraction.jsonld_people(page.html), read)
     ruled = _verified(extraction.text_cards(text, channels), read)
@@ -107,18 +113,22 @@ def start(state: WalkState, page: browser.PageState, text: str,
         state.ruled_urls.add(discovery.normalize_url(page.url))
         return read
     spans = _unexplained(read, sections)
-    contact_page = discovery.contact_link(page.title, page.url)
-    if extraction.has_contact_signals(text, channels) and (spans or contact_page):
-        _ask(state, page, read, spans)
+    if _rules_failed(read, page, spans):
+        read.asks = windows(read.text, spans)
     return read
 
 
 def finish(state: WalkState, page: browser.PageState, read: PendingRead
            ) -> list[extraction.Contact]:
-    """Join and log the card model's calls; every person of the page, verified."""
-    for call in read.calls:
+    """Ask the card model for every window the rules left; every person verified."""
+    if read.asks:
+        state.step(service.STEP_MODEL, "cards", page.url)
+        state.timing.cards = f"model:{state.client.config.name}"
+    for part in read.asks:
+        system, user = prompts.cards_prompt(page.url, page.title, part)
         try:
-            reply = state.client.record(call.result())
+            reply = state.client.chat_json(system, user, prompts.PURPOSE_CARDS,
+                                           salvage=prompts.salvage_people)
         except models.ModelError as exc:
             state.step(service.STEP_MODEL, f"cards failed: {exc}", page.url)
             continue

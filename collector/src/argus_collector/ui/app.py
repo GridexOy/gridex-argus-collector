@@ -47,17 +47,12 @@ class PanelApp:
         self.connection = ConnectionController(self)
         self.collect = CollectController(self, self.connection.api_target)
         callbacks = Callbacks(
-            self.open_browser, self.collect.start, self.local_test, self.collect.stop,
+            self.open_browser, self.collect.start, self.collect.stop,
             self.walk.open_source, self.connection.pair, self.open_attention,
             self.attention_done, self.connection.reconnect,
         )
         self.view = PanelView(root, self.props(), callbacks)
         self.render_attention()
-
-    def local_test(self, url: str) -> None:
-        """Testaa paikallisesti: one site walk, nothing sent (not while collecting)."""
-        if not self.collect.collecting:
-            self.walk.start(url)
 
     def heartbeat_fields(self) -> scheduler.HeartbeatFields:
         return self.collect.collector.heartbeat_fields()
@@ -74,7 +69,7 @@ class PanelApp:
 
     def activity(self) -> Activity:
         return Activity(
-            walking=self.walk.walking, collecting=self.collect.collecting,
+            collecting=self.collect.collecting,
             connected=self.connection.connected,
         )
 
@@ -139,14 +134,11 @@ class PanelApp:
         self.ui_queue.put(self.refresh)
 
     def _routes(self) -> tuple[RouteHealth, ...]:
-        """The navigation and vision models: pulled on the local endpoint or not."""
-        cfg, out = self.config, []
-        for role, name in (("navigation", cfg.model_navigation), ("vision", cfg.model_vision)):
-            target = models.resolve_role(cfg.model_endpoint, name)
-            if target is not None:
-                out.append(RouteHealth(role, name, models.health(target.endpoint, name)
-                                       .model_listed))
-        return tuple(out)
+        """The one model of the walk: the card model, pulled on the local endpoint or not."""
+        cfg = self.config
+        target = models.resolve_config(cfg.model_endpoint, cfg.model_name)
+        listed = models.health(target.endpoint, target.name).model_listed
+        return (RouteHealth(target.name, listed),)
 
     def test_site_url(self) -> str:
         return f"http://127.0.0.1:{self.config.test_site_port}/"
@@ -180,7 +172,7 @@ class PanelApp:
         self.refresh()
 
     def render_attention(self) -> None:
-        walking = self.walk.walking or self.collect.collector.walking
+        walking = self.collect.collector.walking
         props = attention_lines.attention_props(
             self.msgs, self.collect.collector.attention_view(), walking, self.browser.running()
         )

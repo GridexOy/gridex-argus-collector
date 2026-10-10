@@ -27,9 +27,8 @@ CLOSE_WAIT_S = 10.0  # the panel closes: the collecting thread closes Chrome fir
 
 
 class WalkHost(Protocol):
-    @property
-    def walking(self) -> bool: ...
-    def stop(self) -> None: ...
+    """The Keruu event feed of the panel (`app_walk.WalkController`)."""
+
     def reset(self) -> None: ...
     def on_event(self, event: walk.WalkEvent) -> None: ...
 
@@ -66,8 +65,6 @@ class CollectController:
             model=models.resolve_config(cfg.model_endpoint, cfg.model_name), headless=False,
             profile_dir=None, evidence_dir=None, db_path=None, stop_files=(),
             version=runtime.current_version_status().file_version,
-            navigation=models.resolve_role(cfg.model_endpoint, cfg.model_navigation),
-            vision=models.resolve_role(cfg.model_endpoint, cfg.model_vision),
             stop_at_goal=cfg.walk_stop_at_goal,
         )
         settings = scheduler.Settings(env=env, stop_files=runtime.stop_files,
@@ -113,8 +110,6 @@ class CollectController:
     def start(self) -> None:
         """Kaynnista: claim ARGUS jobs and walk them."""
         msgs, view = self.host.msgs, self.host.view
-        if self.host.walk.walking:
-            return
         if self.host.work_browser_running():
             view.collect.set_status(msgs.t("collecting.browserBusy"), "error")
             return
@@ -126,7 +121,6 @@ class CollectController:
         self.collector.stop(wait_s=CLOSE_WAIT_S)
 
     def stop(self) -> None:
-        """Pysayta: stop collecting and the local test walk; the outbox keeps sending."""
+        """Pysayta: stop collecting; the outbox keeps sending."""
         self.collector.stop()
-        self.host.walk.stop()
         self.host.refresh()

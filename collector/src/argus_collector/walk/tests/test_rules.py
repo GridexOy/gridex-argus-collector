@@ -63,15 +63,3 @@ def test_rules_country_version_then_finder_then_contact() -> None:
     assert contact.candidate.text == "Yhteystiedot", "the /fi/ bonus alone is no rule"
     walk.mark_visited(BASE + "/fi-fi/yhteystiedot/")
     assert rules.rule_action(walk, at(f"{BASE}/fi-fi/", local), local) is None
-
-
-def test_menu_cache_reuses_the_choice_while_it_is_unvisited() -> None:
-    walk = state()
-    menu = [link(0, "Products", "/en-en/products/"), link(1, "Careers", "/en-en/careers/")]
-    key = rules.menu_key(walk, menu)
-    assert key == rules.menu_key(walk, list(reversed(menu))), "order does not matter"
-    rules.remember(walk, key, service.Action(service.ACTION_NAVIGATE, menu[1]))
-    again = rules.cached_action(walk, key, menu)
-    assert again is not None and again.source == "cache" and again.candidate == menu[1]
-    walk.mark_visited(BASE + "/en-en/careers/")
-    assert rules.cached_action(walk, key, menu) is None

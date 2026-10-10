@@ -41,8 +41,6 @@ MODEL_DETAIL_KEYS = {
 
 @dataclass(frozen=True)
 class CollectProps:
-    site_url_label: str
-    manual_note: str
     start_label: str
     pause_label: str
     stop_label: str
@@ -54,15 +52,12 @@ class CollectProps:
     open_source_hint: str
     idle_status: str
     columns: list[str] = field(default_factory=list)
-    local_test_label: str = ""
-    local_test_enabled: bool = False
 
 
 @dataclass(frozen=True)
 class Activity:
-    """What runs now: the panel's local test walk, ARGUS collecting, the connection."""
+    """What runs now: ARGUS collecting and the connection (6.1: no local test walk)."""
 
-    walking: bool = False  # local test walk (Testaa paikallisesti)
     collecting: bool = False  # Kaynnista: ARGUS jobs are claimed and walked
     connected: bool = False  # a saved connection answered the last heartbeat
 
@@ -81,17 +76,14 @@ def collect_props(
     msgs: Messages, report: Report | None, stop_reason: str | None, now: Activity
 ) -> CollectProps:
     """Kaynnista (ARGUS collecting) is live with a listed model, an available Chrome,
-    a working connection and no STOP; the local test needs no connection. Both
-    use the one work-browser profile, so only one of them runs at a time."""
+    a working connection and no STOP (6.1: the panel has no test walk of its own)."""
     ready = (
         report is not None
         and report.states.chrome is ChromeState.AVAILABLE
         and report.states.model is not ModelState.NONE
     )
-    busy = now.walking or now.collecting
+    busy = now.collecting
     return CollectProps(
-        site_url_label=msgs.t("collecting.siteUrl"),
-        manual_note=msgs.t("collecting.manualNote"),
         start_label=msgs.t("collecting.start"),
         pause_label=msgs.t("collecting.pause"),
         stop_label=msgs.t("collecting.stop"),
@@ -109,8 +101,6 @@ def collect_props(
             msgs.t("collecting.col.email"),
             msgs.t("collecting.col.source"),
         ],
-        local_test_label=msgs.t("collecting.localTest"),
-        local_test_enabled=ready and not busy and not stop_reason,
     )
 
 

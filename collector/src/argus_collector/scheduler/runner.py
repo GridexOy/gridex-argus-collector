@@ -36,8 +36,6 @@ class WalkEnv:
     db_path: Path | None
     stop_files: tuple[Path, ...]
     version: str
-    navigation: ModelConfig | None = None  # next steps (7b); None: `model`
-    vision: ModelConfig | None = None  # screenshots (VL); None: never
     stop_at_goal: bool = True  # config `walk.stop_at_goal` (goal rule, 06.10.2026)
 
 
@@ -101,7 +99,7 @@ def walk_settings(
         limits=service.run_limits(api.to_json(job.policy), consumed(claimed)),
         resume=resume, id_namespace=job.job_id,
         region_fallback=countries[0].upper() if countries else DEFAULT_REGION,
-        navigation=env.navigation, vision=env.vision, stop_at_goal=env.stop_at_goal,
+        stop_at_goal=env.stop_at_goal,
         browser_host=host,
         company_domains=service.company_domains(
             [(host_key(h.host), h.basis.value) for h in scope.approved_hosts],

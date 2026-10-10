@@ -14,8 +14,6 @@ same links are shown and the chosen one is still unvisited.
 
 from __future__ import annotations
 
-import hashlib
-
 from argus_collector.browser import contract as browser
 from argus_collector.discovery import contract as discovery
 from argus_collector.walk import service
@@ -60,30 +58,3 @@ def rule_action(
         if discovery.contact_link(cand.text, cand.href):
             return Action(service.ACTION_NAVIGATE, cand, source="rule")
     return None
-
-
-def menu_key(state: WalkState, candidates: list[discovery.Candidate]) -> str:
-    """The same links in any order on any page give the same key."""
-    country = state.focus.country if state.focus is not None else ""
-    items = sorted(f"{c.kind}|{c.text}|{discovery.normalize_url(c.href) if c.href else ''}"
-                   for c in candidates)
-    return hashlib.sha256("\n".join([country, *items]).encode("utf-8")).hexdigest()[:16]
-
-
-def cached_action(
-    state: WalkState, key: str, candidates: list[discovery.Candidate]
-) -> Action | None:
-    """The model's earlier choice for this menu while that link is still unvisited
-    (only links: a cached click could repeat itself)."""
-    chosen = state.menu_cache.get(key)
-    if chosen is None:
-        return None
-    for cand in _open_links(state, candidates):
-        if (cand.text, cand.href) == chosen:
-            return Action(service.ACTION_NAVIGATE, cand, source="cache")
-    return None
-
-
-def remember(state: WalkState, key: str, action: Action) -> None:
-    if action.candidate is not None and action.kind == service.ACTION_NAVIGATE:
-        state.menu_cache[key] = (action.candidate.text, action.candidate.href)

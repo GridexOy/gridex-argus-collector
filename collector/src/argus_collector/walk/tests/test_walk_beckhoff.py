@@ -27,7 +27,7 @@ def run(srv: ThreadingHTTPServer, tmp_path: Path) -> tuple[contract.WalkSummary,
     settings = contract.WalkSettings(
         start_url=server.vhost_url(srv, "beckhoff") + "en-en/",
         model=ModelConfig(fake.endpoint, "qwen2.5:14b"),
-        navigation=ModelConfig(fake.endpoint, "qwen2.5:7b"), headless=True,
+        headless=True,
         profile_dir=tmp_path / "profile", evidence_dir=tmp_path / "evidence",
         db_path=tmp_path / "collector.db", approved_hosts=frozenset({"beckhoff.localhost"}),
         focus=replace(focus, local_seed=False),

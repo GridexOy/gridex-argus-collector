@@ -27,6 +27,7 @@ __all__ = [
     "Focus",
     "approved_hosts_for",
     "contact_link",
+    "unfolds",
     "country_members",
     "department_rank",
     "focus_brief",
@@ -99,6 +100,11 @@ def link_language(text: str, href: str) -> str | None:
 def focus_brief(focus: Focus | None) -> str:
     """The focus as English instructions for the model's action prompt."""
     return focus_rules.focus_brief(focus)
+
+
+def unfolds(text: str) -> bool:
+    """A control that only unfolds its page (`Näytä yhteystiedot`, `Show more`)."""
+    return service.unfolds(text)
 
 
 def contact_link(text: str, href: str) -> bool:

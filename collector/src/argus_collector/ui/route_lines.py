@@ -1,9 +1,9 @@
-"""Pure line of the Resurssit block: the routed models and whether they are pulled.
+"""Pure line of the Resurssit block: who decides and who reads.
 
-Owner 05.10.2026: rules first, the navigation model (7b) for next steps, the
-card model (14b) for people, the vision model (VL) for screenshots. A missing
-navigation model means the card model chooses the steps; a missing vision
-model means no screenshot is ever looked at.
+S6 step 6.1 (TZ_SELAIN v4.0 4.1, owner 10.10.2026): the rules choose every step of
+the walk, and one model - the card model - reads what they could not. The line says
+exactly that: `Reititys: säännöt → qwen2.5:14b`, yellow when the model is not pulled
+on the local endpoint. The navigation (7b) and vision (VL) models are gone.
 """
 
 from __future__ import annotations
@@ -13,24 +13,18 @@ from dataclasses import dataclass
 from argus_collector.ui.repository import Messages
 from argus_collector.ui.walk_lines import LEVEL_OK, LEVEL_WARN
 
-ROLE_KEYS = {"navigation": "resources.route.navigation", "vision": "resources.route.vision"}
-
 
 @dataclass(frozen=True)
 class RouteHealth:
-    role: str  # navigation | vision
-    name: str
+    name: str  # the card model
     listed: bool
 
 
 def route_line(msgs: Messages, routes: tuple[RouteHealth, ...]) -> tuple[str, str] | None:
-    """(text, level) of `Reititys: navigointi qwen2.5:7b · kuva ... puuttuu`, None without."""
+    """(text, level) of `Reititys: säännöt → qwen2.5:14b`; None before diagnostics."""
     if not routes:
         return None
-    items = [
-        msgs.t("resources.route.ok" if r.listed else "resources.route.missing",
-               role=msgs.t(ROLE_KEYS.get(r.role, "resources.route.navigation")), name=r.name)
-        for r in routes
-    ]
-    level = LEVEL_OK if all(r.listed for r in routes) else LEVEL_WARN
-    return msgs.t("resources.routes", items=" · ".join(items)), level
+    reader = routes[0]
+    key = "resources.routes" if reader.listed else "resources.routesMissing"
+    level = LEVEL_OK if reader.listed else LEVEL_WARN
+    return msgs.t(key, name=reader.name), level

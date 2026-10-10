@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 import json
 import re
 from dataclasses import dataclass
@@ -68,30 +67,14 @@ def health_from_models(listed: list[str], name: str) -> Health:
     return Health(reachable=True, model_listed=False, detail=f"model {name} not listed ({shown})")
 
 
-def user_content(user: str, images: tuple[bytes, ...]) -> Any:
-    """Plain text, or text + pictures as OpenAI-style parts (base64 data URLs)."""
-    if not images:
-        return user
-    parts: list[dict[str, Any]] = [{"type": "text", "text": user}]
-    for image in images:
-        url = f"data:{mime_of(image)};base64,{base64.b64encode(image).decode('ascii')}"
-        parts.append({"type": "image_url", "image_url": {"url": url}})
-    return parts
-
-
-def mime_of(image: bytes) -> str:
-    return "image/png" if image.startswith(b"\x89PNG") else "image/jpeg"
-
-
 def request_body(
     config: ModelConfig, system: str, user: str, json_mode: bool,
-    images: tuple[bytes, ...] = (),
 ) -> dict[str, Any]:
     body: dict[str, Any] = {
         "model": config.name,
         "messages": [
             {"role": "system", "content": system},
-            {"role": "user", "content": user_content(user, images)},
+            {"role": "user", "content": user},
         ],
         "temperature": config.temperature,
         "max_tokens": config.max_tokens,

@@ -1,13 +1,15 @@
-"""Choosing the next action: structure and link rules, the menu cache, a model.
+"""Choosing the next action: structure rules, link rules, else the best-ranked link.
 
-Routing (owner 05.10.2026): a structure rule or a link rule needs no model;
-then the menu cache; a page without DOM text goes to the vision model with
-its screenshot; else the navigation model (7b) chooses, the card model when
-the navigation model fails. On a page whose people the rules read no model is
-asked: without a rule link the best-ranked link is next (owner 06.10.2026:
-the model reads, rules walk; the goal rule ends the walk). A page read before
-is never the target, through a redirect neither; an unvisited link is no
-reason not to finish. The page budget holds for every answer.
+S6 step 6.1 (TZ_SELAIN v4.0 4.1, owner 10.10.2026): no model chooses a step any
+more. Until 0.4.8.12 a navigation model (7b) picked the next link, a vision model
+looked at a page without DOM text, and a menu cache repeated an earlier choice. On
+MAIN-PC the two small models were never even pulled - every call failed and the card
+model took over - and on all eight stands the rules alone found the same 109 people
+(`docs/ARGUS20_COLLECTOR_SELFAUDIT.md` 3). So the walk is deterministic: a structure
+rule, then a link rule, then the best-ranked link. The model only reads what the
+rules could not (`cards.py`). A page read before is never the target, through a
+redirect neither; an unvisited link is no reason not to finish. The page budget
+holds for every answer.
 """
 
 from __future__ import annotations
@@ -16,9 +18,8 @@ from dataclasses import replace
 
 from argus_collector.browser import contract as browser
 from argus_collector.discovery import contract as discovery
-from argus_collector.models import contract as models
 from argus_collector.walk import page as page_step
-from argus_collector.walk import prompts, rules, service, structure, vision
+from argus_collector.walk import prompts, rules, service, structure
 from argus_collector.walk.service import Action
 from argus_collector.walk.state import MAX_STALLED, WalkState
 
@@ -50,38 +51,6 @@ def _unread(state: WalkState, action: Action) -> Action:
     return action
 
 
-def _ask(state: WalkState, system: str, user: str,
-         candidates: list[discovery.Candidate]) -> Action:
-    """The navigation model; once it fails (not pulled, down) the card model takes over."""
-    client = state.navigator()
-    try:
-        reply = client.chat_json(system, user, prompts.PURPOSE_ACTION)
-    except models.ModelError:
-        if client is state.client:
-            raise
-        state.navigation_failed()
-        client = state.client
-        reply = client.chat_json(system, user, prompts.PURPOSE_ACTION)
-    return replace(prompts.parse_action(reply, candidates), source=f"model:{client.config.name}")
-
-
-def _model_action(
-    state: WalkState, wb: browser.WalkBrowser, page: browser.PageState, text: str,
-    candidates: list[discovery.Candidate],
-) -> Action:
-    pages_left = state.settings.run_limits().pages - state.cp.pages
-    state.step(service.STEP_MODEL, "action", page.url)
-    brief = discovery.focus_brief(state.focus)
-    system, user = prompts.action_prompt(page.url, page.title, text, candidates, pages_left,
-                                         brief)
-    try:
-        seen = vision.action_without_text(state, wb, page, text, (system, user), candidates)
-        return seen if seen is not None else _ask(state, system, user, candidates)
-    except models.ModelError as exc:
-        state.step(service.STEP_MODEL, f"action failed: {exc}", page.url)
-        return replace(prompts.fallback_action(candidates), source="fallback")
-
-
 def decide(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState,
            text: str) -> Action:
     finished = discovery.normalize_url(page.url) in state.finished_urls  # finish_branch
@@ -91,14 +60,9 @@ def decide(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState,
     candidates = page_step.ranked(state, page)
     if not candidates:
         return Action(service.ACTION_FINISH, source="finish_branch" if finished else "finish")
-    key = rules.menu_key(state, page.candidates)
-    action = rules.rule_action(state, page, candidates) or rules.cached_action(
-        state, key, candidates)
-    if action is None and discovery.normalize_url(page.url) in state.ruled_urls:
+    action = rules.rule_action(state, page, candidates)
+    if action is None:  # no rule link: the best-ranked candidate, still the rules' choice
         action = replace(prompts.fallback_action(candidates), source="rules")
-    if action is None:
-        action = _model_action(state, wb, page, text, candidates)
-        rules.remember(state, key, action)
     action = _unread(state, action)
     pages_left = state.settings.run_limits().pages - state.cp.pages
     if action.kind == service.ACTION_NAVIGATE and pages_left <= 0:

@@ -36,7 +36,6 @@ __all__ = [
     "Salvage",
     "health",
     "resolve_config",
-    "resolve_role",
 ]
 
 CallListener = Callable[[CallRecord], None]
@@ -67,11 +66,6 @@ def resolve_config(endpoint: str = "", name: str = "") -> ModelConfig:
     return ModelConfig(endpoint=endpoint or DEFAULT_ENDPOINT, name=name or DEFAULT_MODEL)
 
 
-def resolve_role(endpoint: str, name: str) -> ModelConfig | None:
-    """A routed model (navigation, vision) from `config.yaml`; "" -> None (not used)."""
-    return ModelConfig(endpoint=endpoint or DEFAULT_ENDPOINT, name=name) if name else None
-
-
 def health(endpoint: str, name: str, timeout_s: float = service.HEALTH_TIMEOUT_S) -> Health:
     """GET <endpoint>/models without proxy; `model_listed` when `name` is served."""
     try:
@@ -100,34 +94,20 @@ class ModelClient:
         return self._send(body, purpose)
 
     def chat_json(
-        self, system: str, user: str, purpose: str, images: tuple[bytes, ...] = (),
-        salvage: Salvage | None = None,
+        self, system: str, user: str, purpose: str, salvage: Salvage | None = None,
     ) -> dict[str, Any]:
-        """One chat completion in JSON mode, parsed to a dict (one retry on bad JSON);
-        `images` (PNG / JPEG bytes) go with the user message to a vision model;
-        `salvage` rebuilds a cut-off answer (complete items of a list) before a retry."""
-        return self.record(self.detached_json(system, user, purpose, images, salvage))
-
-    def detached_json(
-        self, system: str, user: str, purpose: str, images: tuple[bytes, ...] = (),
-        salvage: Salvage | None = None,
-    ) -> Detached:
-        """`chat_json` without the database and the listener: safe in a worker thread
-        (0.4.8.1: the card model runs while the next step is chosen); `record` it after."""
-        body = service.request_body(self.config, system, user, json_mode=True, images=images)
+        """One chat completion in JSON mode, parsed to a dict. One attempt (6.1): the
+        card model is asked only for what the rules could not read, and a second try on
+        the same window cost seconds without finding more. `salvage` rebuilds a cut-off
+        answer (the complete items of a list)."""
+        body = service.request_body(self.config, system, user, json_mode=True)
         attempts: list[Attempt] = []
-        parsed: dict[str, Any] | None = None
-        for suffix in ("", ":retry"):
-            reply = self._post(body, purpose + suffix, attempts)
-            if reply is None:
-                break
-            parsed = service.parse_json_reply(reply.content)
-            if parsed is None and salvage is not None:
-                parsed = salvage(reply.content)
-            if parsed is not None:
-                break
+        reply = self._post(body, purpose, attempts)
+        parsed = service.parse_json_reply(reply.content) if reply is not None else None
+        if parsed is None and reply is not None and salvage is not None:
+            parsed = salvage(reply.content)
         error = attempts[-1].error or f"model {self.config.name} did not return a JSON object"
-        return Detached(tuple(attempts), parsed, "" if parsed is not None else error)
+        return self.record(Detached(tuple(attempts), parsed, "" if parsed is not None else error))
 
     def record(self, detached: Detached) -> dict[str, Any]:
         """Log the attempts of a detached call (model_calls, listener); its JSON or ModelError."""

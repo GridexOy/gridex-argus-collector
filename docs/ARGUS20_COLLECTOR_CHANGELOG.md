@@ -1,5 +1,33 @@
 # ARGUS20_COLLECTOR_CHANGELOG
 
+## 0.5.1.0 — 2026-10-10
+
+**Этап S6, шаг 6.1 (`stage-6/step-1-drop-extras`) по `docs/ARGUS20_TZ_SELAIN_V40.md` §4.1: снять лишнее.** Контракт не менялся.
+
+**Что видно.**
+- Resurssit: одна строка маршрута — `Reititys: säännöt → qwen2.5:14b-instruct` (жёлтым `… puuttuu`, если модель не скачана). Двух других моделей в панели больше нет.
+- Keruu: поле «Yrityksen verkkosivu» и кнопка «Testaa paikallisesti» убраны — на MAIN-PC работает только «Käynnistä», стенды проходят тесты.
+- `walk_timing` показывает один тип модели: строк `walk.action` и `walk.vision` больше не бывает.
+
+**Что убрано целиком** (−726 строк, +175; чистых ≈ 551 при ожидании ≈ 380):
+- модель-навигатор `qwen2.5:7b` и весь выбор шага моделью (`decide._ask`, `_model_action`, роль `navigation`, `state.navigator`);
+- модель зрения `qwen2.5-vl:7b`: `walk/vision.py`, скриншоты для модели (`images=` в `models`), `models/tests/test_images.py`, `walk/tests/test_vision_routing.py`;
+- кэш меню (`rules.menu_key`, `cached_action`, `remember`, `state.menu_cache`);
+- параллельные вызовы модели (`ThreadPoolExecutor`, `state.pool`, `state.submit`, `Detached` как отдельный путь);
+- локальный тест панели (кнопка, поле URL, поток обхода в `app_walk`, `test_ui_walk.py`);
+- `install_model.ps1` ставит только 14b, `OLLAMA_MAX_LOADED_MODELS` и `OLLAMA_NUM_PARALLEL` больше не выставляются; в `config.example.yaml` остался один `model.name`.
+
+**Что осталось.** Правила чтения (`walk/rules.py`, `extraction/text_cards.py`, `jsonld_people.py`, `email_pattern.py`) и модель 14b только для того, что правила не прочли: окно вокруг каналов, строгий JSON, **одна попытка** (раньше был повтор), «спасение» оборванного ответа.
+
+**Решения (поправь, если не так).**
+1. **Порог «правила не прочли» шире, чем в §4.1.** ТЗ предлагало «страница класса `contact`, 0 людей, ≥ 2 канала». На стенде это теряет людей: `fixture_oy/team.html` не контактная по словам и URL. Условие: ≥ 2 напечатанных канала **и** (контактная страница или есть каналы без хозяина).
+2. **Правило раскрытия (новое).** Кнопку вроде `Näytä yhteystiedot` раньше нажимала модель-навигатор; без неё люди за кнопкой пропали (Pekka Salo, `fixture_oy`). Теперь это структурное правило `structure._reveal` — только на странице, где уже есть люди или каналы, и один раз на состояние страницы (то же, что §4.2 разрешает для шага 6.2).
+3. Проверка «не бот» по одному признаку (её смотрела VL) убрана вместе с моделью; проверка по двум признакам DOM и Huomio работают как раньше.
+
+**Модули.** Удалены: `walk/vision.py`, `models/tests/test_images.py`, `walk/tests/test_vision_routing.py`, `ui/tests/test_ui_walk.py`. Изменены: `walk` (decide, cards, rules, runner, state, service, structure, page), `models` (contract, service), `runtime` (service), `scheduler` (runner), `discovery` (service, contract: `unfolds`), `ui` (app, app_collect, app_walk, route_lines, service, view, view_collect, walk_lines), `collector/messages/fi.json`, `config.example.yaml`, `scripts/install_model.ps1`.
+
+**Тесты.** Гейты 11 ok, весь набор зелёный на Windows. Обновлены под новое устройство: `test_route_lines` (одна строка маршрута), `test_models` (одна попытка), `test_runtime` (одна модель в config), `test_rules` (кэш меню убран), `test_ui` (нет локального теста), `test_walk_beckhoff` (одна модель). Стенды и gold не менялись и проходят без изменений.
+
 ## 0.4.8.12 — 2026-10-10
 
 **Правка 12 шага 7 (`stage-5/step-7-fix-12-queue-speed`), найдено живой установкой 0.4.8.11: окно панели не открывалось.** Контракт не менялся.

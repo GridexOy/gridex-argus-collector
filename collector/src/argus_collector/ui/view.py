@@ -41,7 +41,6 @@ MIN_HEIGHT = 860
 class Callbacks:
     open_browser: Callable[[], None]
     start_collect: Callable[[], None]  # Kaynnista: ARGUS jobs
-    local_test: Callable[[str], None]  # Testaa paikallisesti: one URL, nothing sent
     stop: Callable[[], None]  # Pysayta: both
     open_source: Callable[[str], None]
     connect: Callable[[str], None]  # Yhteys: Yhdista with the pasted pairing key

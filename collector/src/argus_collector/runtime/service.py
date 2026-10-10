@@ -24,8 +24,6 @@ class Config:
 
     model_endpoint: str = ""
     model_name: str = ""  # person cards (14b); "" -> the `models` default
-    model_navigation: str = "qwen2.5:7b"  # next steps; "" -> the card model
-    model_vision: str = "qwen2.5-vl:7b"  # screenshots; "" -> no vision model
     walk_page_budget: int = 15
     walk_action_budget: int = 60  # browser actions of a walk from the panel (0.4.8.6)
     walk_stop_at_goal: bool = True  # end a walk once its goal is reached (owner 06.10.2026)
@@ -136,8 +134,6 @@ def config_from_mapping(data: dict[str, object], source: str) -> Config:
     return Config(
         model_endpoint=str(model.get("endpoint", defaults.model_endpoint) or ""),
         model_name=str(model.get("name", defaults.model_name) or ""),
-        model_navigation=str(model.get("navigation", defaults.model_navigation) or ""),
-        model_vision=str(model.get("vision", defaults.model_vision) or ""),
         walk_page_budget=_positive_int(walk, "page_budget", defaults.walk_page_budget, 1000),
         walk_action_budget=_positive_int(walk, "action_budget", defaults.walk_action_budget,
                                          10000),

@@ -126,6 +126,25 @@ def _departments(state: WalkState, page: browser.PageState) -> Action | None:
     return None
 
 
+def _reveal(state: WalkState, page: browser.PageState) -> Action | None:
+    """A button that only unfolds this page: `Näytä yhteystiedot`, `Show more`, an
+    accordion. Until 6.1 the navigation model pressed these; now the rules do, because
+    the people behind them (fixture_oy team.html) are in no other place. Only on a page
+    that already shows people or channels, so a `show more` of a product list is left
+    alone, and only once per page state (`_once`)."""
+    if not state.page_has_contacts:
+        return None
+    for cand in page.candidates:
+        if cand.kind != discovery.KIND_BUTTON and cand.role != EXPAND:
+            continue
+        if cand.state == ON or not discovery.unfolds(cand.text):
+            continue
+        if _once(state, page.url, cand, cand.text):
+            return Action(service.ACTION_CLICK, cand)
+    return None
+
+
 def structural_action(state: WalkState, page: browser.PageState) -> Action | None:
-    """The next structure action of this page state, None when the model decides."""
-    return _open_country(state, page) or _open_worldwide(state, page) or _departments(state, page)
+    """The next structure action of this page state, None when a link rule decides."""
+    return (_open_country(state, page) or _open_worldwide(state, page)
+            or _departments(state, page) or _reveal(state, page))
