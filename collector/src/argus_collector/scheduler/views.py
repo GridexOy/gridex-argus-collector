@@ -60,9 +60,11 @@ def queue_view(
 ) -> QueueView:
     """Active jobs plus the ones that changed in the last 24 h, in claim order."""
     since = (datetime.now(UTC) - timedelta(hours=RECENT_HOURS)).isoformat(timespec="milliseconds")
+    recent = list(repo.recent_jobs(conn, since, service.ACTIVE))
+    waiting = delivery.pending_by_job(conn, [str(row["job_id"]) for row in recent])
     rows = []
-    for row in repo.recent_jobs(conn, since, service.ACTIVE):
-        pending = delivery.job_totals(conn, row["job_id"])[0]
+    for row in recent:
+        pending = waiting.get(str(row["job_id"]), 0)
         rows.append(QueueRow(
             row["job_id"], row["company_name"], row["state"],
             _stage(row, pending, row["job_id"] == running_job),

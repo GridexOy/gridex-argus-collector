@@ -1,16 +1,15 @@
 """Single entry point of the `delivery` module: outbox, uploads, the delivery thread.
 
 The scheduler writes events and snapshot uploads here inside its own write
-transactions (`enqueue_event`, `enqueue_evidence` never commit), so an
-observation and its outbox row are one transaction (TZ_SELAIN 10.2). The
-`Deliverer` thread sends them at-least-once: snapshots first, then events of
-each run in seq order, micro-batches of <= 50 events or 2 s (8.13); results
-are stored per event; nothing is deleted.
+transactions (`enqueue_event`, `enqueue_evidence` never commit), so an observation
+and its outbox row are one transaction (TZ_SELAIN 10.2). The `Deliverer` thread
+sends them at-least-once: snapshots first, then events of each run in seq order,
+micro-batches of <= 50 events or 2 s (8.13); nothing is deleted. Queue counts come
+from `counters.py`, which the indexes of migration 6 serve.
 """
 
 from __future__ import annotations
 
-import json
 import sqlite3
 import uuid
 from collections.abc import Callable
@@ -18,10 +17,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from argus_collector.api_client import contract as api
+from argus_collector.delivery import counters, reports, service
 from argus_collector.delivery import repository as repo
-from argus_collector.delivery import service
 from argus_collector.delivery.hooks import ApiTarget, DeliveryHooks
 from argus_collector.delivery.loop import Deliverer
+from argus_collector.delivery.reports import SentEvent
 
 __all__ = [
     "SentEvent",
@@ -100,7 +100,7 @@ def enqueue_evidence(
 
 
 def stats(conn: sqlite3.Connection) -> DeliveryStats:
-    pending, errors, expired = repo.totals(conn)
+    pending, errors, expired = counters.totals(conn)
     since = (datetime.now(UTC) - timedelta(seconds=P95_WINDOW_S)).isoformat(
         timespec="milliseconds"
     )
@@ -131,13 +131,18 @@ def reason(code: str) -> str:
 
 
 def unsent_runs(conn: sqlite3.Connection) -> set[str]:
-    """Runs with events still to send: their lease is renewed until the tail is out."""
+    """Runs still to send: the lease is renewed until the tail is out."""
     return {run_id for _, run_id in repo.pending_runs(conn)}
 
 
+def pending_by_job(conn: sqlite3.Connection, job_ids: list[str]) -> dict[str, int]:
+    """Waiting events + uploads per job, every job of Jono in one query."""
+    return counters.pending_by_job(conn, job_ids)
+
+
 def job_totals(conn: sqlite3.Connection, job_id: str) -> tuple[int, int]:
-    """(pending, rejected) events + snapshots of one job."""
-    pending, rejected, _expired = repo.totals(conn, job_id)
+    """(pending, rejected) of one job."""
+    pending, rejected, _expired = counters.totals(conn, job_id)
     return pending, rejected
 
 
@@ -154,31 +159,12 @@ def reconcile_info(conn: sqlite3.Connection, run_id: str) -> ReconcileInfo:
 
 def run_events(conn: sqlite3.Connection, run_id: str, event_type: str) -> list[dict[str, object]]:
     """Payloads of the run's events of one type (e.g. model.called for job.finished)."""
-    out: list[dict[str, object]] = []
-    for row in repo.run_rows(conn, run_id):
-        if row["type"] == event_type:
-            payload = json.loads(row["event_json"]).get("payload", {})
-            out.append(payload if isinstance(payload, dict) else {})
-    return out
-
-
-@dataclass(frozen=True)
-class SentEvent:
-    """One outbox event of a run with what ARGUS answered (for reports)."""
-
-    type: str
-    payload: dict[str, object]
-    status: str  # pending | accepted | duplicate | rejected
-    channel_status: str | None  # the strongest K3 status ARGUS gave a contact event
+    return reports.run_events(conn, run_id, event_type)
 
 
 def run_results(conn: sqlite3.Connection, run_id: str) -> list[SentEvent]:
-    out = []
-    for row in repo.run_rows(conn, run_id):
-        payload = json.loads(row["event_json"]).get("payload", {})
-        out.append(SentEvent(str(row["type"]), payload if isinstance(payload, dict) else {},
-                             str(row["status"]), row["channel_status"]))
-    return out
+    """Every event of the run with the answer ARGUS gave it."""
+    return reports.run_results(conn, run_id)
 
 
 def local_evidence_id(conn: sqlite3.Connection, evidence_id: str) -> str | None:

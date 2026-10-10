@@ -14,6 +14,7 @@ import sqlite3
 from pathlib import Path
 
 from argus_collector.delivery import contract as delivery
+from argus_collector.delivery import counters
 from argus_collector.delivery import repository as repo
 from argus_collector.storage import contract as storage
 
@@ -22,7 +23,7 @@ ROW = ("event", "job-1", "run-1", 1, "contact.observed")
 
 def _old_rows(conn: sqlite3.Connection) -> None:
     """Rows as an earlier version left them, with migration 5 not yet applied."""
-    conn.execute("DELETE FROM schema_version WHERE version = 5")
+    conn.execute("DELETE FROM schema_version WHERE version >= 5")
     body = json.dumps({"seq": 1})
     for n, status in ((1, "pending"), (2, "waiting"), (3, "rejected"), (4, "accepted")):
         conn.execute(
@@ -52,11 +53,16 @@ def test_the_old_queue_becomes_expired_on_the_next_start(tmp_path: Path) -> None
         )
         upload = conn.execute("SELECT status FROM evidence_uploads").fetchone()[0]
         assert upload == "expired"
-        pending, errors, expired = repo.totals(conn)
+        pending, errors, expired = counters.totals(conn)
         assert (pending, errors) == (0, 0), "the queue starts at zero"
         assert expired == 4, "3 events + 1 snapshot"
         assert repo.pending_events(conn, "run-1", 50) == [], "nothing of it is ever sent again"
         assert repo.pending_runs(conn) == []
         assert delivery.job_totals(conn, "job-1") == (0, 0)
+        indexes = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'index'")}
+        assert {"outbox_job_status", "outbox_status", "uploads_job_status",
+                "uploads_status"} <= indexes, "migration 6: the counters read an index"
+        assert delivery.pending_by_job(conn, ["job-1"]) == {}, "nothing of job-1 waits"
     finally:
         conn.close()

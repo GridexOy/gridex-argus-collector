@@ -17,8 +17,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from argus_collector.api_client import contract as api
+from argus_collector.delivery import counters, results, retry, service
 from argus_collector.delivery import repository as repo
-from argus_collector.delivery import results, retry, service
 from argus_collector.delivery.holds import Holds
 from argus_collector.delivery.hooks import ApiTarget, DeliveryHooks, Failed
 from argus_collector.delivery.transport import Transport
@@ -118,7 +118,7 @@ class Deliverer(Lanes):
                     self.error, self.failures, self.server_error, self._failing = "", 0, 0, ()
         if self.event_holds.refused() or self.upload_holds.refused():
             self.error = service.ERROR_PERMANENT  # Lähetys epäonnistui while a run waits
-        self.pending = repo.totals(conn)[0]
+        self.pending = counters.totals(conn)[0]
         self.transport.note(self.state)
         self.on_change()
         return delay

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 # Ordered list of (version, sql) applied once each; never edit an applied entry.
 MIGRATIONS: list[tuple[int, str]] = [
@@ -179,6 +179,17 @@ MIGRATIONS: list[tuple[int, str]] = [
             WHERE status IN ('pending', 'waiting', 'rejected');
         UPDATE evidence_uploads SET status = 'expired'
             WHERE status IN ('pending', 'rejected');
+        """,
+    ),
+    (
+        # 0.4.8.11: a queue count scanned the whole 100 MB outbox, once per job of the
+        # Jono table, and the panel window never finished drawing (`counters.py`).
+        6,
+        """
+        CREATE INDEX IF NOT EXISTS outbox_job_status ON outbox (job_id, status);
+        CREATE INDEX IF NOT EXISTS outbox_status ON outbox (status);
+        CREATE INDEX IF NOT EXISTS uploads_job_status ON evidence_uploads (job_id, status);
+        CREATE INDEX IF NOT EXISTS uploads_status ON evidence_uploads (status);
         """,
     ),
 ]
