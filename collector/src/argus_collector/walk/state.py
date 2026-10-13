@@ -50,6 +50,7 @@ class WalkState:
     failures_in_row: int = 0
     contacts: int = 0
     page_has_contacts: bool = False  # the last extracted page state had people or channels
+    page_kind: str = "other"  # K12 class of the page being read: contact | form | other
     source_id: str | None = None
     end_reason: str = service.END_FINISHED
     timing: PageTiming = field(default_factory=PageTiming)  # the page state being handled

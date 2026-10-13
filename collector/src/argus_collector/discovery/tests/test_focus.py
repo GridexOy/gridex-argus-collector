@@ -31,7 +31,6 @@ def test_link_language(text: str, href: str, expected: str | None) -> None:
 
 def test_no_priorities_means_no_focus() -> None:
     assert contract.make_focus([], []) is None
-    assert contract.focus_brief(None) == ""
 
 
 def test_finnish_version_and_finland_office_rank_first() -> None:
@@ -65,10 +64,3 @@ def test_company_without_local_office_goes_to_export_people() -> None:
     assert ranked[0] == "Vertrieb International"
     assert ranked.index("English") < ranked.index("Produkte")
     assert ranked[-1] == "Français", "a third language comes last"
-
-
-def test_brief_names_country_languages_and_export_fallback() -> None:
-    assert FI is not None
-    brief = contract.focus_brief(FI.with_native("de"))
-    assert "Finland (FI)" in brief and "fi, en" in brief
-    assert "export, Nordic" in brief and "in de or in English" in brief

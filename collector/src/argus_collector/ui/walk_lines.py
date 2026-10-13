@@ -21,6 +21,7 @@ STEP_KEYS = {
     "scroll": "collecting.step.scroll",
     "attention": "collecting.step.attention",
     "consent": "collecting.step.consent",
+    "sitemap": "collecting.step.sitemap",
     "loop": "collecting.step.loop",
     "foreign": "collecting.step.foreign",
 }

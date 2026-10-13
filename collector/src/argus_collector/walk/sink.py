@@ -70,7 +70,9 @@ class WalkCheckpoint:
     gaps: list[WalkGap] = field(default_factory=list)
     acted: list[str] = field(default_factory=list)  # structural actions done (url|label)
     declared_total: int = 0  # the largest record count a directory page declared
-    consents: dict[str, str] = field(default_factory=dict)  # host -> cookie banner answer
+    consents: dict[str, str] = field(default_factory=dict)
+    # the site's own sitemap.xml was read once for this company (TZ v4.0 4.2)
+    sitemap_read: bool = False  # host -> cookie banner answer
     pages: int = 0
     actions: int = 0
     active_seconds: float = 0.0

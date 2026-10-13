@@ -1,5 +1,33 @@
 # ARGUS20_COLLECTOR_CHANGELOG
 
+## 0.5.2.0 — 2026-10-13
+
+**Этап S6, шаг 6.2 (`stage-6/step-2-rules-walk`) по `docs/ARGUS20_TZ_SELAIN_V40.md` §4.2: правила ходят.** Контракт не менялся.
+
+**Что видно.**
+- В Jono колонка **Vaihe** у компании, которую сборщик обходит сейчас: `yhteystiedot-sivu 2/8 · 00:41` — класс страницы, какая страница из бюджета и сколько компания уже заняла. У страницы с капчей — `lomake-sivu 3/8 · 02:05`.
+- В Keruu строка `Sivukartta: N yhteystietosivua`, когда у сайта есть `sitemap.xml` и в нём нашлись контактные страницы.
+- Компания теперь стоит **8 страниц, 40 действий и 60 секунд** (было 15 / 60 / без лимита). Время — мягкий лимит: обход заканчивается между страницами и отдаёт то, что успел (`partial`), а не обрывается посреди страницы.
+
+**Лестница (§4.2).**
+1. Словарь контактных ссылок — пять языков в порядке приоритета: финский (`yhteystiedot`, `ota yhteyttä`, `henkilöstö`, `johto`, `myynti`, `toimipisteet`, `toimistomme`, `asiantuntijat`), шведский (`kontakta`, `medarbetare`, `personal`, `ledning`, `försäljning`), английский, немецкий (`ansprechpartner`, `vertrieb`), норвежский (`ansatte`, `medarbeidere`, `kontaktpersoner`).
+2. **`sitemap.xml`** читается один раз на компанию обычным HTTP — без браузера и без страницы бюджета (`discovery/sitemap.py`). Из карты берутся только URL с контактными словами, не больше десяти, и они кладутся во frontier: контактная страница находится и тогда, когда меню её не показывает. Карта, которой нет или которая не читается, — не ошибка обхода.
+3. **K12.** Класс страницы (`walk/page_class.py`): `contact` — есть люди или два напечатанных личных канала либо страница сама себя так называет; `form` — форма за капчей, ни людей, ни каналов; иначе `other`. Страница `form` не считается контактной и не стоит вызова модели.
+4. **K14 Y-tunnus** (`extraction/business_id.py`): `Y-tunnus 1234567-1`, `FO-nummer`, `Business ID`, `FI12345671` — только с верной контрольной цифрой и только там, где строка сама называет, что это за номер. Уходит как поле компании `business_id` с цитатой-строкой; телефон или номер заказа за него не принимается.
+5. **Стоп-лист UI-мусора** расширен на EN/DE/NO/LT: `Please Select`, `Andere Kontaktmöglichkeiten`, `Teknisk Avdeling`, `Markedsansvarlig Grossist`, `Kundeservice`, `Switchboard`, `Reception`, `Vaihde`, `Asiakaspalvelu` как имя не проходят; `kundeservice`, `reception`, `resepsjon`, `vastaanotto` как канал — канал компании, а не человека.
+6. **K9** (минимум): страница `locations` / `addresses` / `offices` / `worldwide` ведёт к стране выставки существующими правилами страны (`structure._open_country`, `_open_worldwide`); в словарь добавлены `addresses` и `address`.
+
+**Модули.** Новые: `discovery/sitemap.py`, `walk/page_class.py`, `walk/ranking.py` (выбор кандидатов вынесен из `page.py`), `scheduler/claiming.py` (запрос заданий вынесен из `collector.py`), `extraction/business_id.py`. Изменены: `discovery` (repository: словарь; contract), `walk` (service, runner, page, cards, state, patterns, findings, context, sink), `scheduler` (views: `WalkProgress`, `note_progress`; collector), `ui` (queue_lines, walk_lines), `collector/messages/fi.json`, `config.example.yaml`.
+
+**Что ушло попутно.** `discovery.focus_brief` — он существовал только ради промпта модели-навигатора, снятого в 6.1.
+
+**Тесты.** Новые: `extraction/tests/test_business_id.py` (контрольная цифра, VAT, номер без подписи), `ui/tests/test_stage_line.py` (строка Vaihe, минуты и секунды, пустая строка у доставленной компании). Гейты 11 ok, весь набор зелёный на Windows.
+
+**Решения (поправь, если не так).**
+1. `sitemap.xml` читается обычным HTTP, а не через Chrome: карта — не страница сайта для человека, тратить на неё страницу бюджета и окно браузера незачем.
+2. Из карты берутся максимум 10 URL с контактными словами: карта большого сайта — это тысячи ссылок, а лестнице нужны только контактные.
+3. Класс страницы считается один раз при чтении страницы и живёт в состоянии обхода: его видят и порог вызова модели, и панель — одно значение, один источник.
+
 ## 0.5.1.1 — 2026-10-10
 
 **Правка 1 шага 6.1: доведена метрика M7.** В cv0.5.1.0 из `walk/`, `models/`, `browser/` ушло 342 строки при цели 380: часть снятого (локальный тест панели) лежала в `ui/`. Добрано тем, что оставалось мёртвым после снятия моделей:

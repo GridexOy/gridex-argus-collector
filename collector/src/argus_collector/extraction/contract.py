@@ -12,10 +12,12 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from argus_collector.extraction import business_id as business
 from argus_collector.extraction import email_pattern as patterns
 from argus_collector.extraction import jsonld_people as jsonld
 from argus_collector.extraction import repository, roles, sections, service
 from argus_collector.extraction import text_cards as text_rules
+from argus_collector.extraction.business_id import BusinessId
 from argus_collector.extraction.email_pattern import EmailPattern
 from argus_collector.extraction.roles import ChannelRole
 from argus_collector.extraction.sections import OfficeLines, Section
@@ -31,6 +33,7 @@ __all__ = [
     "Channel",
     "ChannelRole",
     "Contact",
+    "BusinessId",
     "EmailPattern",
     "OfficeLines",
     "PersonCard",
@@ -39,6 +42,7 @@ __all__ = [
     "card_from_json",
     "classify_unattached",
     "country_sections",
+    "business_id",
     "email_patterns",
     "extract_channels",
     "has_contact_signals",
@@ -110,6 +114,12 @@ def jsonld_people(html: str) -> list[PersonCard]:
 def text_cards(text: str, channels: list[Channel]) -> list[PersonCard]:
     """Cards read by rule: a name line with a phone / email of the page below it."""
     return text_rules.text_cards(text, channels)
+
+
+def business_id(text: str) -> BusinessId | None:
+    """K14: the company's registration number as the page states it, with its line
+    as quote; only a number whose check digit is right."""
+    return business.find(text)
 
 
 def email_patterns(text: str) -> list[EmailPattern]:

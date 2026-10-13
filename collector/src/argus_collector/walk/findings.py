@@ -15,7 +15,7 @@ from argus_collector.extraction import contract as extraction
 from argus_collector.walk import context as ctx
 from argus_collector.walk.entities import BINDING_CAPTION, CONFIRMED, PageBuilder, status_of
 from argus_collector.walk.offices import add_offices
-from argus_collector.walk.patterns import add_patterns
+from argus_collector.walk.patterns import add_business_id, add_patterns
 from argus_collector.walk.sink import (
     AuditEntry,
     FieldFinding,
@@ -156,6 +156,7 @@ def build_findings(
     ]
     add_offices(page, where, channels)
     add_patterns(page, where.patterns)
+    add_business_id(page, where.business_id)
     for channel in channels:
         _add_channel(page, channel, where)
     return PageFindings(source, tuple(page.entities), tuple(page.audit)), keys

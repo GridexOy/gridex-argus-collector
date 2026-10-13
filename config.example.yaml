@@ -29,10 +29,10 @@ model:
 
 walk:
   # Distinct pages one site walk may open before it finishes.
-  page_budget: 15
+  page_budget: 8
   # Browser actions (navigations, clicks) one walk from the panel may take; ARGUS jobs
   # use the job's own limits.
-  action_budget: 60
+  action_budget: 40
   # End a walk once a sales or marketing person with a channel is read, or 2 pages after
   # the first people when none is; false walks until nothing is left to open.
   stop_at_goal: true

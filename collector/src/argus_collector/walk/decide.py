@@ -18,8 +18,7 @@ from dataclasses import replace
 
 from argus_collector.browser import contract as browser
 from argus_collector.discovery import contract as discovery
-from argus_collector.walk import page as page_step
-from argus_collector.walk import prompts, rules, service, structure
+from argus_collector.walk import prompts, ranking, rules, service, structure
 from argus_collector.walk.service import Action
 from argus_collector.walk.state import MAX_STALLED, WalkState
 
@@ -57,7 +56,7 @@ def decide(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState,
     built = None if finished else structure.structural_action(state, page)
     if built is not None:
         return replace(built, source="structure")
-    candidates = page_step.ranked(state, page)
+    candidates = ranking.ranked(state, page)
     if not candidates:
         return Action(service.ACTION_FINISH, source="finish_branch" if finished else "finish")
     action = rules.rule_action(state, page, candidates)

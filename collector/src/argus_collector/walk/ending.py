@@ -12,8 +12,7 @@ from urllib.parse import urlsplit
 
 from argus_collector.browser import contract as browser
 from argus_collector.discovery import contract as discovery
-from argus_collector.walk import goal, service
-from argus_collector.walk import page as page_step
+from argus_collector.walk import goal, ranking, service
 from argus_collector.walk.service import Action, WalkEvent
 from argus_collector.walk.state import WalkState
 
@@ -32,7 +31,7 @@ def _people_link(cand: discovery.Candidate) -> bool:
 def _followup(state: WalkState, page: browser.PageState) -> Action | None:
     if state.goal.followups >= FOLLOWUPS:
         return None
-    links = [c for c in page_step.ranked(state, page) if _people_link(c)]
+    links = [c for c in ranking.ranked(state, page) if _people_link(c)]
     if not links:
         return None
     state.goal.followups += 1

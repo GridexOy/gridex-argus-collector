@@ -12,8 +12,12 @@ from argus_collector.extraction.contract import Contact
 from argus_collector.models.contract import ModelConfig
 from argus_collector.walk.sink import WalkCheckpoint, WalkGap, WalkLimits
 
-DEFAULT_PAGE_BUDGET = 15
-DEFAULT_ACTION_BUDGET = 60  # browser actions of a walk from the panel (Kontaktit 05.10.2026)
+# TZ_SELAIN v4.0 4.2: a company is worth 8 pages, 40 actions and 60 s of active time.
+# The seconds are a soft limit - the walk finishes with what it has (`partial`), it is
+# never cut off mid-page: `budget_spent` is asked between pages only.
+DEFAULT_PAGE_BUDGET = 8
+DEFAULT_ACTION_BUDGET = 40
+DEFAULT_SECONDS = 60.0
 UNLIMITED = 10**9
 
 EVENT_PAGE = "page"  # a page was loaded: url, page_no, budget
@@ -30,7 +34,9 @@ STEP_NAVIGATE = "navigate"
 STEP_CLICK = "click"
 STEP_SCROLL = "scroll"
 STEP_ATTENTION = "attention"  # a bot check did not clear: detail = url
-STEP_CONSENT = "consent"  # a cookie banner was answered: detail = `kind: button text`
+STEP_CONSENT = "consent"
+STEP_SITEMAP = "sitemap"
+STEP_CLASS = "class"  # a cookie banner was answered: detail = `kind: button text`
 STEP_LOOP = "loop"  # a page state repeated 3 times without progress: finish_branch
 STEP_GOAL = "goal"  # the goal is reached: people, channels (owner 06.10.2026)
 STEP_COUNTRY = "country"  # the country's version: detail = `FI|en-br|en-fi|local`
@@ -86,7 +92,7 @@ class WalkSettings:
     def run_limits(self) -> WalkLimits:
         if self.limits is not None:
             return self.limits
-        return WalkLimits(self.page_budget, self.action_budget, float(UNLIMITED), UNLIMITED)
+        return WalkLimits(self.page_budget, self.action_budget, DEFAULT_SECONDS, UNLIMITED)
 
 
 @dataclass(frozen=True)

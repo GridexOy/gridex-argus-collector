@@ -17,7 +17,13 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from argus_collector.walk import service
-from argus_collector.walk.service import WalkEvent, WalkSettings, WalkSummary
+from argus_collector.walk.service import (
+    EVENT_PAGE,
+    STEP_CLASS,
+    WalkEvent,
+    WalkSettings,
+    WalkSummary,
+)
 from argus_collector.walk.sink import (
     EXTRA_FIELDS,
     AuditEntry,
@@ -33,6 +39,8 @@ from argus_collector.walk.sink import (
 )
 
 __all__ = [
+    "EVENT_PAGE",
+    "STEP_CLASS",
     "DEFAULT_ACTION_BUDGET",
     "DEFAULT_PAGE_BUDGET",
     "END_ATTENTION",

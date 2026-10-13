@@ -108,21 +108,3 @@ def country_name(code: str) -> str:
     return tables.COUNTRY_NAMES.get(code, code)
 
 
-def focus_brief(focus: Focus | None) -> str:
-    """English instructions for the model's action prompt (empty without focus)."""
-    if focus is None or not focus.countries:
-        return ""
-    country = country_name(focus.countries[0])
-    preferred = ", ".join(focus.languages) or "the local language"
-    own = focus.native_language or "the company's own language"
-    return (
-        f"Exhibition country: {country} ({focus.countries[0]}); preferred languages: "
-        f"{preferred}. Prefer, in this order: (1) the site version for {country} or in "
-        f"{focus.languages[0] if focus.languages else 'its language'}; (2) the {country} "
-        f"office or the contacts responsible for {country}; (3) when the company has no "
-        f"office in {country}: pages in {own} or in English that list export, Nordic, "
-        "Scandinavian or international sales and marketing people. Other language "
-        "versions of the site come last. On a list of countries open only "
-        f"{country}; on a page with department tabs open every tab, sales and "
-        "marketing first."
-    )

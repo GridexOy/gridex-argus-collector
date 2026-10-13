@@ -18,7 +18,7 @@ from argus_collector.api_client import contract as api
 from argus_collector.browser import contract as browser
 from argus_collector.delivery import contract as delivery
 from argus_collector.runtime import contract as runtime
-from argus_collector.scheduler import leases, runner, service, views
+from argus_collector.scheduler import claiming, runner, service, views
 from argus_collector.scheduler import repository as repo
 from argus_collector.scheduler.hooks import CollectorHooks, Settings
 from argus_collector.storage import contract as storage
@@ -35,7 +35,8 @@ class Collector(CollectorHooks):
         on_walk_event: Callable[[walk.WalkEvent], None],
     ) -> None:
         super().__init__(settings, target, on_change)
-        self.capabilities, self.on_walk_event = capabilities, on_walk_event
+        self.capabilities, self._downstream = capabilities, on_walk_event
+        self.progress = views.WalkProgress()
         self.collecting = False
         self._wake = threading.Event()
         self._thread: threading.Thread | None = None
@@ -45,12 +46,17 @@ class Collector(CollectorHooks):
             for row in repo.jobs(conn, (service.RUNNING,)):
                 repo.update_job(conn, row["job_id"], state=service.STOPPED)
 
+    def on_walk_event(self, event: walk.WalkEvent) -> None:
+        """Note what Jono shows about this company, then pass the event on."""
+        self.progress = views.note_progress(self.progress, event)
+        self._downstream(event)
+
     @property
     def walking(self) -> bool:
         return self.running_job is not None
 
     def start(self) -> None:
-        """Kaynnista: collect (claim + walk) until Pysayta or STOP."""
+        """Kaynnista: claim and walk until Pysayta or STOP."""
         if self.collecting:
             return
         self.collecting = True
@@ -134,29 +140,16 @@ class Collector(CollectorHooks):
         return None
 
     def _claim(self, conn: sqlite3.Connection, target: delivery.ApiTarget) -> int:
-        active = len(repo.jobs(conn, service.ACTIVE))
-        free = service.free_slots(active, self.settings.max_jobs)
+        """Ask ARGUS for as many jobs as there are free slots; 0 when none came."""
+        free = service.free_slots(len(repo.jobs(conn, service.ACTIVE)), self.settings.max_jobs)
         if free == 0:
             return 0
-        self.claim_state = "loading" if active == 0 else self.claim_state
+        self.claim_state = claiming.loading_state(conn, self.claim_state)
         self.on_change()
-        request = api.ClaimRequest(worker_id=target.worker_id, max_jobs=free,
-                                   capabilities=self.capabilities())
-        try:
-            resp = api.claim_jobs(target.base_url, target.token, request,
-                                  proxy_mode=self.mode(target), timeout_s=delivery.API_TIMEOUT_S)
-        except api.ApiError as exc:
-            self.claim_state, self.claim_error = "failed", str(exc)
-            runtime.journal("http", f"claim: HTTP {exc.status} {delivery.error_text(exc)}")
-            self.on_change()
-            return 0
-        for claimed in resp.jobs:
-            kind = leases.store_claimed(conn, claimed)
-            runtime.journal("http", f"claim: job {claimed.job.job_id} {kind}"
-                            f" run {claimed.lease.run_id} gen {claimed.lease.lease_generation}")
-        self.claim_state, self.claim_error = "done", ""
+        taken, self.claim_state, self.claim_error = claiming.claim(
+            conn, target, free, self.capabilities(), self.mode(target))
         self.on_change()
-        return len(resp.jobs)
+        return taken
 
     def _should_stop(self, job_id: str) -> Callable[[], bool]:
         def check() -> bool:
@@ -173,6 +166,7 @@ class Collector(CollectorHooks):
     def _run(self, conn: sqlite3.Connection, row: sqlite3.Row) -> None:
         job_id = row["job_id"]
         self.running_job = job_id
+        self.progress = views.WalkProgress(started=time.monotonic())
         self.lease_expiry[job_id] = datetime.fromisoformat(row["lease_expires_at"])
         self.on_change()
         hooks = (self._should_stop(job_id), self.on_walk_event, lambda: self.deliverer.state)
@@ -188,7 +182,8 @@ class Collector(CollectorHooks):
     def queue_view(self) -> views.QueueView:
         with self.connect() as conn:
             claim = (self.claim_state, self.claim_error)
-            return views.queue_view(conn, self.running_job, claim, self.collecting)
+            return views.queue_view(conn, self.running_job, claim, self.collecting,
+                                    self.progress)
 
     def attention_view(self) -> list[views.AttentionItem]:
         with self.connect() as conn:
@@ -196,5 +191,4 @@ class Collector(CollectorHooks):
 
     def delivery_view(self) -> views.DeliveryView:
         with self.connect() as conn:
-            return views.delivery_view(conn, self.deliverer.state,
-                                       self.deliverer.server_error)
+            return views.delivery_view(conn, self.deliverer.state, self.deliverer.server_error)

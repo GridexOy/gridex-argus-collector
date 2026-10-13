@@ -15,7 +15,7 @@ from argus_collector.browser import contract as browser
 from argus_collector.discovery import contract as discovery
 from argus_collector.discovery.contract import Candidate
 from argus_collector.models import contract as models
-from argus_collector.walk import decide, page, service
+from argus_collector.walk import decide, ranking, service
 from argus_collector.walk.service import Action
 from argus_collector.walk.state import MAX_STALLED, WalkState
 from argus_collector.walk.tests.test_walk_job import RecordingSink
@@ -49,7 +49,7 @@ def test_a_link_that_led_to_a_walked_page_is_walked_too() -> None:
     walk.mark_visited(SITE + "fi/ota-yhteytta/")
     walk.arrived(SITE + "contact-us/", SITE + "fi/ota-yhteytta/")
     assert SITE.rstrip("/") + "/contact-us" in {u.rstrip("/") for u in walk.walked()}
-    offered = page.ranked(walk, at("fi/", link(1, "Contact us", "contact-us/")))
+    offered = ranking.ranked(walk, at("fi/", link(1, "Contact us", "contact-us/")))
     assert offered == [], "the WPML alias is not offered again"
 
 
@@ -66,10 +66,10 @@ def test_a_pressed_button_is_not_offered_in_the_same_state() -> None:
     walk = state()
     walk.current_key = "k1"
     walk.clicked["k1"] = {'[data-argus-idx="2"]'}
-    shown = page.ranked(walk, at("tiimi/", button(2, "Myynti"), button(3, "Huolto")))
+    shown = ranking.ranked(walk, at("tiimi/", button(2, "Myynti"), button(3, "Huolto")))
     assert [c.text for c in shown] == ["Huolto"]
     walk.current_key = "k2"
-    assert len(page.ranked(walk, at("tiimi/", button(2, "Myynti")))) == 1, "a new state"
+    assert len(ranking.ranked(walk, at("tiimi/", button(2, "Myynti")))) == 1, "a new state"
 
 
 def test_six_actions_without_a_new_state_end_the_walk() -> None:

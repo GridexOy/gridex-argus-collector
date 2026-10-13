@@ -23,7 +23,7 @@ from argus_collector.discovery import contract as discovery
 from argus_collector.evidence import contract as evidence
 from argus_collector.extraction import contract as extraction
 from argus_collector.models import contract as models
-from argus_collector.walk import prompts, service
+from argus_collector.walk import page_class, prompts, service
 from argus_collector.walk.state import WalkState
 
 UNASSIGNED = "unassigned_channel"
@@ -90,7 +90,10 @@ def _rules_failed(read: PendingRead, page: browser.PageState,
     team.html) is no `contact` link by title or URL, and its people were read by the
     model before. Taken as decided - correct me if wrong: the page must print at least
     two personal channels, and be either a contact page or hold channels that belong to
-    nobody yet (`spans`). Both halves still mean "the rules read nobody here"."""
+    nobody yet (`spans`). A `form` page (K12: a captcha-guarded form with nothing on it)
+    is never worth a model call."""
+    if page_class.classify(page.url, page.title, page.html, read.channels, 0) == page_class.FORM:
+        return False
     printed = [c for c in read.channels if c.kind in ("phone", "email")]
     if len(printed) < MIN_CHANNELS:
         return False

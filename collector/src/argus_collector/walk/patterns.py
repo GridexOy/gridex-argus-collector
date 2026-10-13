@@ -23,6 +23,7 @@ from argus_collector.walk.entities import BINDING_CAPTION, CONFIRMED, PageBuilde
 from argus_collector.walk.sink import AuditEntry, FieldFinding
 
 FIELD_PATTERN = "email_pattern"
+FIELD_BUSINESS = "business_id"
 COMPANY = "organization_channel"
 
 
@@ -41,6 +42,19 @@ def _join(page: PageBuilder, key: str, found: FieldFinding) -> bool:
             page.state.cp.entities.setdefault(key, {})[found.field] = found.value
             return True
     return False
+
+
+def add_business_id(page: PageBuilder, found: extraction.BusinessId | None) -> None:
+    """K14: `business_id` of the company, quoted from the line that states it. It rides on
+    the same entity as the address pattern, so ARGUS keeps one row for the company."""
+    if found is None:
+        return
+    key = _company_key(page) or f"{COMPANY}:{FIELD_BUSINESS}|{found.value}"
+    vf = extraction.VerifiedField(found.value, found.quote, found.start, found.end, "text")
+    finding, obs_id = page.finding(key, FIELD_BUSINESS, vf, BINDING_CAPTION, CONFIRMED)
+    if finding is not None and not _join(page, key, finding):
+        page.add_entity(key, COMPANY, [finding])
+    page.audit.append(AuditEntry(FIELD_BUSINESS, (obs_id,), found.quote, ""))
 
 
 def add_patterns(page: PageBuilder, patterns: tuple[extraction.EmailPattern, ...]) -> None:

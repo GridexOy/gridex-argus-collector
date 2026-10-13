@@ -129,8 +129,25 @@ def tila(msgs: Messages, row: QueueRow) -> str:
     return " · ".join(parts)
 
 
+KIND_KEYS = {"contact": "queue.kind.contact", "form": "queue.kind.form",
+             "other": "queue.kind.other"}
+
+
+def _stage_text(msgs: Messages, stage: str) -> str:
+    """`yhteystiedot-sivu 2/8 · 00:41` while the company is walked, else the plain stage."""
+    if stage in STAGE_KEYS:
+        return msgs.t(STAGE_KEYS[stage])
+    parts = stage.split("|")
+    if len(parts) != 4:
+        return ""
+    kind, page, budget, seconds = parts
+    clock = f"{int(seconds) // 60:02d}:{int(seconds) % 60:02d}"
+    return msgs.t("queue.stageWalking", kind=msgs.t(KIND_KEYS.get(kind, KIND_KEYS["other"])),
+                  page=page, budget=budget, clock=clock)
+
+
 def _row(msgs: Messages, row: QueueRow) -> tuple[str, str, str, str, str, str]:
-    stage = msgs.t(STAGE_KEYS[row.stage]) if row.stage in STAGE_KEYS else ""
+    stage = _stage_text(msgs, row.stage)
     return (row.company, stage, str(row.persons), str(row.channels), str(row.sources),
             tila(msgs, row))
 

@@ -29,6 +29,7 @@ from argus_collector.walk.state import (
 
 DOMAIN_GAP = "domain_ownership_unresolved"
 CARDS_MAX_TOKENS = 4096  # a window of many cards is one long JSON answer (Ellego, 40 people)
+MAX_SITEMAP_LINKS = 10  # contact URLs taken from the map of one company
 CHALLENGE_GAP = "captcha"  # a bot check that did not clear: needs_attention (8.5)
 
 __all__ = ["StopRequested", "WalkState", "run"]
@@ -86,6 +87,7 @@ def _walk(state: WalkState) -> None:
     with browser.WalkBrowser(settings.headless, settings.profile_dir, host, profile) as wb:
         timing.chrome(settings.id_namespace, wb.start_ms, host is not None and not profile)
         page = _open(state, wb)
+        _read_sitemap(state, page)
         while page is not None:
             if page.challenge:
                 _attention(state, page)
@@ -150,6 +152,22 @@ def _attention(state: WalkState, page: browser.PageState) -> None:
     state.cp.last_url = page.url
     state.end_reason = service.END_ATTENTION
     state.step(service.STEP_ATTENTION, page.url, page.url)
+
+
+def _read_sitemap(state: WalkState, page: browser.PageState | None) -> None:
+    """The site's own map, once per company: its contact URLs join the frontier, so the
+    ladder finds a contact page even when no menu links to it (TZ v4.0 4.2 p. 2)."""
+    if page is None or state.cp.sitemap_read:
+        return
+    state.cp.sitemap_read = True
+    links = []
+    for url in discovery.sitemap_links(page.url):
+        if not discovery.is_allowed_url(url, state.hosts) or not discovery.contact_link("", url):
+            continue
+        links.append(discovery.Candidate(0, "link", url.rstrip("/").rsplit("/", 1)[-1], url, ""))
+    if links:
+        state.remember_links(page.url, links[:MAX_SITEMAP_LINKS])
+        state.step(service.STEP_SITEMAP, str(len(links[:MAX_SITEMAP_LINKS])), page.url)
 
 
 def _open(state: WalkState, wb: browser.WalkBrowser) -> browser.PageState | None:

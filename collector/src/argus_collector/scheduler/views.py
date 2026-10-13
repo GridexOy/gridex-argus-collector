@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 
 from argus_collector.delivery import contract as delivery
 from argus_collector.scheduler import repository as repo
 from argus_collector.scheduler import runner, service
+from argus_collector.walk import contract as walk
 
 RECENT_HOURS = 24
 
@@ -37,6 +39,17 @@ class QueueView:
 
 
 @dataclass(frozen=True)
+class WalkProgress:
+    """What Jono says about the company being walked: its page class, page number,
+    page budget and how long the company has taken (TZ v4.0 4.2, panel 5)."""
+
+    kind: str = ""  # contact | form | other
+    page_no: int = 0
+    budget: int = 0
+    started: float = 0.0
+
+
+@dataclass(frozen=True)
 class DeliveryView:
     pending: int
     errors: int
@@ -47,16 +60,35 @@ class DeliveryView:
     expired: int = 0  # events and snapshots given up as `Vanhentunut` (0.4.8.11)
 
 
-def _stage(row: sqlite3.Row, pending: int, running: bool) -> str:
+def _stage(row: sqlite3.Row, pending: int, running: bool,
+           progress: WalkProgress | None = None) -> str:
     if running:
-        return service.STAGE_BROWSER
+        return _running_stage(progress) if progress else service.STAGE_BROWSER
     if row["state"] in service.TERMINAL:
         return service.STAGE_FINALIZING if pending else ""
     return service.STAGE_QUEUED
 
 
+def note_progress(progress: WalkProgress, event: walk.WalkEvent) -> WalkProgress:
+    """Fold one walk event into what Jono shows about the running company."""
+    if event.kind == walk.EVENT_PAGE:
+        return replace(progress, page_no=event.page_no, budget=event.budget)
+    if event.kind == "step" and event.step == walk.STEP_CLASS:
+        return replace(progress, kind=event.detail)
+    return progress
+
+
+def _running_stage(progress: WalkProgress) -> str:
+    """`contact|2|8|41` for the panel to render; "" before the first page."""
+    if not progress.page_no:
+        return service.STAGE_BROWSER
+    seconds = int(max(0.0, time.monotonic() - progress.started)) if progress.started else 0
+    return f"{progress.kind or 'other'}|{progress.page_no}|{progress.budget}|{seconds}"
+
+
 def queue_view(
-    conn: sqlite3.Connection, running_job: str | None, claim: tuple[str, str], collecting: bool
+    conn: sqlite3.Connection, running_job: str | None, claim: tuple[str, str], collecting: bool,
+    progress: WalkProgress | None = None,
 ) -> QueueView:
     """Active jobs plus the ones that changed in the last 24 h, in claim order."""
     since = (datetime.now(UTC) - timedelta(hours=RECENT_HOURS)).isoformat(timespec="milliseconds")
@@ -67,7 +99,7 @@ def queue_view(
         pending = waiting.get(str(row["job_id"]), 0)
         rows.append(QueueRow(
             row["job_id"], row["company_name"], row["state"],
-            _stage(row, pending, row["job_id"] == running_job),
+            _stage(row, pending, row["job_id"] == running_job, progress),
             int(row["persons"]), int(row["channels"]), int(row["sources"]),
             int(row["rejected"]), row["last_reject_code"], row["completion_reason"], row["detail"],
         ))

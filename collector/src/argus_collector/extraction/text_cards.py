@@ -26,7 +26,8 @@ LOOKAHEAD = 5
 MAX_PLAIN = 2  # lines without a channel between a name and its first channel
 # a channel of the company, not of the person whose card it would close (0.4.8.6)
 SWITCHBOARD = ("vaihde", "switchboard", "zentrale", "växel", "vaxel", "sentralbord",
-               "asiakaspalvelu", "customer service", "kundenservice", "kundtjänst")
+               "asiakaspalvelu", "customer service", "kundenservice", "kundtjänst",
+               "kundeservice", "kundservice", "reception", "resepsjon", "vastaanotto")
 UPPER, LOWER = "A-ZÅÄÖÜÉÈÁÍÓÚØÆ", "a-zåäöüéèáíóúßøæ"
 WORD_RE = re.compile(rf"^[{UPPER}][{LOWER}]+(?:[-'][{UPPER}]?[{LOWER}]+)*$")
 PARTICLES = frozenset({"von", "van", "af", "de", "da", "der", "den", "la", "le", "di", "du"})
@@ -48,6 +49,10 @@ etusivu yhteystiedot yhteystieto tuotteet palvelut yritys ura uutiset ajankohtai
 startseite start hem hjem inicio produkte leistungen unternehmen produits kontakt kontakta
 impressum datenschutz
 leiter vertrieb verkauf technik geschaftsfuhrer chef saljare
+please select choose valitse valj vahlen auswahlen andere kontaktmoglichkeiten weitere
+teknisk avdeling markedsansvarlig grossist kundeservice kundservice switchboard reception
+resepsjon vaihde asiakaspalvelu vastaanotto reception desk salg marked okonomi innkjop
+prekyba vadybininkas direktorius pardavimai klientu aptarnavimas
 """.split())
 
 

@@ -45,10 +45,15 @@ DOCUMENT_SUFFIXES = (
     ".mp4",
 )
 
-# Words that make a link worth opening first (TZ section 8.2), with weights.
+# Words that make a link worth opening first: the ladder of TZ_SELAIN v4.0 4.2,
+# Finnish, Swedish, English, German and Norwegian, in that priority. A phrase
+# (`ota yhteytta`) is matched as its words, so both halves carry the weight.
 CONTACT_WORDS: dict[str, int] = {
+    # Finnish
     "yhteystiedot": 10,
     "yhteys": 8,
+    "yhteyttä": 8,
+    "yhteytta": 8,
     "henkilosto": 9,
     "henkilöstö": 9,
     "henkilokunta": 9,
@@ -56,6 +61,18 @@ CONTACT_WORDS: dict[str, int] = {
     "tiimi": 7,
     "johto": 7,
     "myynti": 7,
+    "toimipisteet": 6,
+    "toimipiste": 6,
+    "toimistomme": 6,
+    "asiantuntijat": 7,
+    # Swedish
+    "kontakta": 9,
+    "personal": 6,
+    "medarbetare": 8,
+    "ledning": 6,
+    "forsaljning": 6,
+    "försäljning": 6,
+    # English
     "contact": 10,
     "contacts": 10,
     "team": 8,
@@ -68,13 +85,18 @@ CONTACT_WORDS: dict[str, int] = {
     "office": 4,
     "offices": 4,
     "locations": 4,
+    "addresses": 4,
+    "address": 3,
     "about": 3,
+    # German
     "kontakt": 10,
     "kontakte": 9,
     "vertrieb": 6,
     "ansprechpartner": 8,
-    "personal": 6,
-    "medarbetare": 8,
+    # Norwegian
+    "ansatte": 8,
+    "medarbeidere": 8,
+    "kontaktpersoner": 9,
 }
 
 # Words that push a link down (not where people are listed).

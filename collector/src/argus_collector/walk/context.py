@@ -36,6 +36,7 @@ class PageContext:
     sections: tuple[extraction.Section, ...] = ()
     lang: str = ""  # `<html lang>` value as written in the snapshot
     patterns: tuple[extraction.EmailPattern, ...] = ()  # address patterns the page states
+    business_id: extraction.BusinessId | None = None  # K14: Y-tunnus of this page
 
 
 def lang_country(lang: str) -> str | None:

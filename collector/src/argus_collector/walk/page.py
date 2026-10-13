@@ -10,7 +10,16 @@ from argus_collector.evidence import contract as evidence
 from argus_collector.extraction import contract as extraction
 from argus_collector.normalization import contract as norm
 from argus_collector.storage import contract as storage
-from argus_collector.walk import cards, coverage, findings, goal, repository, service, structure
+from argus_collector.walk import (
+    cards,
+    coverage,
+    findings,
+    goal,
+    page_class,
+    repository,
+    service,
+    structure,
+)
 from argus_collector.walk.context import PageContext
 from argus_collector.walk.scope import own_page
 from argus_collector.walk.service import WalkEvent
@@ -36,20 +45,6 @@ def enter(state: WalkState, page: browser.PageState) -> bool:
     return True
 
 
-def ranked(state: WalkState, page: browser.PageState) -> list[discovery.Candidate]:
-    """Page links plus frontier links from earlier pages, then the page's buttons; not
-    a link that only led back to a walked page, not a button pressed in this page state."""
-    frontier = [c for c in state.frontier_candidates() if not structure.foreign(state, c)]
-    pool = structure.offered(state, page.candidates) + frontier
-    ordered = discovery.rank_candidates(pool, state.walked(), state.hosts, state.focus)
-    links = [c for c in ordered if c.kind == "link"][:MAX_LINKS_SHOWN]
-    finished = discovery.normalize_url(page.url) in state.finished_urls  # finish_branch
-    pressed = state.clicked.get(state.current_key, set()) | state.failed_targets
-    buttons = [c for c in ordered if c.kind == "button" and c.selector not in pressed
-               and not finished]
-    return links + buttons[:MAX_BUTTONS_SHOWN]
-
-
 @dataclass
 class Pending:
     """A new page state whose people are being read: finished before any navigation."""
@@ -61,6 +56,7 @@ class Pending:
     channels: list[extraction.Channel]
     read: cards.PendingRead
     patterns: tuple[extraction.EmailPattern, ...] = ()
+    business_id: extraction.BusinessId | None = None  # K14
 
 
 def observe(
@@ -138,8 +134,12 @@ def _start(state: WalkState, page: browser.PageState, text: str, key: str) -> Pe
         lang, region, sections, channels = _channels(state, page, text)
         read = cards.start(state, page, text, channels, sections, region)
     state.page_has_contacts = bool(read.people or read.asks or channels)
+    state.page_kind = page_class.classify(page.url, page.title, page.html, channels,
+                                          len(read.people))
+    state.step(service.STEP_CLASS, state.page_kind, page.url)
     patterns = tuple(extraction.email_patterns(text))
-    return Pending(key, source, lang, sections, channels, read, patterns)
+    return Pending(key, source, lang, sections, channels, read, patterns,
+                   extraction.business_id(text))
 
 
 def complete(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState,
@@ -154,7 +154,8 @@ def complete(state: WalkState, wb: browser.WalkBrowser, page: browser.PageState,
     with timed(state.timing, "bind"):
         bindings = wb.bindings(findings.probes(contacts)) if state.job_mode and contacts else []
     with timed(state.timing, "record"):
-        context = PageContext(tuple(pending.sections), pending.lang, pending.patterns)
+        context = PageContext(tuple(pending.sections), pending.lang, pending.patterns,
+                              pending.business_id)
         found, keys = findings.build_findings(state, pending.source, contacts, bindings,
                                               pending.channels, context)
         _record(state, pending.source, found, list(zip(keys, contacts, strict=True)))

@@ -7,7 +7,7 @@ javascript, no documents (M2), contact-word ranking of links, page keys.
 
 from __future__ import annotations
 
-from argus_collector.discovery import countries, service, versions
+from argus_collector.discovery import countries, service, sitemap, versions
 from argus_collector.discovery import focus as focus_rules
 from argus_collector.discovery.focus import Focus
 from argus_collector.discovery.service import (
@@ -27,10 +27,10 @@ __all__ = [
     "Focus",
     "approved_hosts_for",
     "contact_link",
+    "sitemap_links",
     "unfolds",
     "country_members",
     "department_rank",
-    "focus_brief",
     "foreign_country",
     "host_of",
     "is_allowed_url",
@@ -97,19 +97,19 @@ def link_language(text: str, href: str) -> str | None:
     return focus_rules.link_language(text, href)
 
 
-def focus_brief(focus: Focus | None) -> str:
-    """The focus as English instructions for the model's action prompt."""
-    return focus_rules.focus_brief(focus)
+def sitemap_links(seed: str) -> list[str]:
+    """URLs of the site's own `sitemap.xml` (4.2 p. 2); [] without one."""
+    return sitemap.read(seed)
 
 
 def unfolds(text: str) -> bool:
-    """A control that only unfolds its page (`Näytä yhteystiedot`, `Show more`)."""
+    """A control that only unfolds its page (`Näytä yhteystiedot`)."""
     return service.unfolds(text)
 
 
 def contact_link(text: str, href: str) -> bool:
-    """A contact / people link by its own words (`Yhteystiedot`, `Contact`, `Kontakt`),
-    the exhibition-country bonus not counted (a rule may follow it without the model)."""
+    """A contact / people link by its own words (`Yhteystiedot`, `Contact`, `Kontakt`);
+    the exhibition-country bonus is not counted."""
     return service.base_score(text, href) >= service.STRONG_LINK_SCORE
 
 
