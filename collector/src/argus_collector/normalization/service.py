@@ -31,7 +31,22 @@ def _deobfuscate(raw: str) -> str:
     return text.replace(" ", "")
 
 
+def _spelled_out(raw: str) -> bool:
+    """The `@` of this text is a word (`(at)`, ` at `), not the sign itself."""
+    return "@" not in raw and re.search(tables.AT_PATTERN, raw, re.IGNORECASE) is not None
+
+
 def normalize_email(raw: str) -> str | None:
+    """The address a text states, obfuscations decoded; None when it states none.
+
+    A text that spells `@` as a word is only an address when what surrounds it still
+    looks like one (`tables.EMAIL_SPELLED_RE`): on live pages prose kept turning into
+    addresses - `look at it. Going` into look@it.going, `Ampeerin (A) virran. Tehohan`
+    into ampeerin@virran.tehohan - and ARGUS refused them as `value_not_in_quote`
+    (owner 13.10.2026). A written `@` needs no such guard.
+    """
+    if _spelled_out(raw) and not tables.EMAIL_SPELLED_RE.search(normalize_text(raw)):
+        return None
     candidate = _deobfuscate(raw).strip(".,;:<>()[]\"'")
     if candidate.lower().startswith("mailto:"):
         candidate = candidate[7:]
